@@ -3,7 +3,29 @@
 # For more information, please see the documentation at:
 #   https://docs.haskellstack.org/en/stable/topics/lock_files
 
-packages: []
+packages:
+- completed:
+    commit: 26f16d97d2b92ad9007ffe128aafc8015a00bf87
+    git: https://github.com/axionbuster/th-serde.git
+    name: th-serde
+    pantry-tree:
+      sha256: ceae1d95911d42c7d6483abb543b1c819d43f52dee030e15ae9a7f180c96c1d4
+      size: 989
+    version: 0.1.2.1
+  original:
+    commit: 26f16d97d2b92ad9007ffe128aafc8015a00bf87
+    git: https://github.com/axionbuster/th-serde.git
+- completed:
+    commit: d534b85bfac8b27efd96fab1838628e08a8aa163
+    git: https://github.com/axionbuster/varcomp.git
+    name: varcomp
+    pantry-tree:
+      sha256: a5f54cefe26c52f9ed6f51beaae33e7072343b8996aeb7d9f10483e43eb453d7
+      size: 594
+    version: 0.1.0.0
+  original:
+    commit: d534b85bfac8b27efd96fab1838628e08a8aa163
+    git: https://github.com/axionbuster/varcomp.git
 snapshots:
 - completed:
     sha256: dd89d2322cb5af74c6ab9d96c0c5f6c8e6653e0c991d619b4bb141a49cb98668

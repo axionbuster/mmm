@@ -26,6 +26,12 @@ source-repository head
 library
   exposed-modules:
       M.LEB
+      M.Pack
+      M.Pack.Internal.Etc
+      M.Pack.Internal.FromIntegral
+      M.Pack.Internal.Newtypes
+      M.Pack.Internal.Num
+      M.Pack.Internal.Types
   other-modules:
       Paths_mmm
   autogen-modules:
@@ -33,6 +39,7 @@ library
   hs-source-dirs:
       src
   default-extensions:
+      AllowAmbiguousTypes
       BlockArguments
       DeriveAnyClass
       DerivingStrategies
@@ -40,7 +47,9 @@ library
       LambdaCase
       OverloadedStrings
       OverloadedLists
+      QuasiQuotes
       ScopedTypeVariables
+      TemplateHaskell
       TypeApplications
       ViewPatterns
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints
@@ -51,6 +60,11 @@ library
     , flatparse
     , hashable
     , template-haskell
+    , text
+    , th-serde
+    , uuid-types
+    , varcomp
+    , vector
   default-language: GHC2021
 
 test-suite mmm-test
@@ -64,6 +78,7 @@ test-suite mmm-test
   hs-source-dirs:
       test
   default-extensions:
+      AllowAmbiguousTypes
       BlockArguments
       DeriveAnyClass
       DerivingStrategies
@@ -71,7 +86,9 @@ test-suite mmm-test
       LambdaCase
       OverloadedStrings
       OverloadedLists
+      QuasiQuotes
       ScopedTypeVariables
+      TemplateHaskell
       TypeApplications
       ViewPatterns
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints -threaded -rtsopts -with-rtsopts=-N
@@ -85,4 +102,9 @@ test-suite mmm-test
     , hspec
     , mmm
     , template-haskell
+    , text
+    , th-serde
+    , uuid-types
+    , varcomp
+    , vector
   default-language: GHC2021

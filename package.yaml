@@ -9,6 +9,7 @@ copyright:           "2025 Author name here"
 language: GHC2021
 
 default-extensions:
+- AllowAmbiguousTypes
 - BlockArguments
 - DeriveAnyClass
 - DerivingStrategies
@@ -16,7 +17,9 @@ default-extensions:
 - LambdaCase
 - OverloadedStrings
 - OverloadedLists
+- QuasiQuotes
 - ScopedTypeVariables
+- TemplateHaskell
 - TypeApplications
 - ViewPatterns
 
@@ -40,6 +43,11 @@ dependencies:
 - flatparse
 - hashable
 - template-haskell
+- text
+- th-serde
+- uuid-types
+- varcomp
+- vector
 
 ghc-options:
 - -Wall
