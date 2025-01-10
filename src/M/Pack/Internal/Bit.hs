@@ -120,17 +120,13 @@ instance GBitRep (K1 R Bool) where
 
 instance (GBitRep f) => GBitRep (M1 i c f) where
   tobits i p (M1 x) = tobits i p x
-  {-# INLINE tobits #-}
   frombits i p = case frombits i p of
     (x, p') -> (M1 x, p')
-  {-# INLINE frombits #-}
 
 instance (GBitRep f, GBitRep g) => GBitRep (f :*: g) where
   tobits i p (x :*: y) =
     let (i', p') = tobits i p x
      in tobits i' p' y
-  {-# INLINE tobits #-}
   frombits i p = case frombits i p of
     (x, p') -> case frombits i p' of
       (y, p'') -> (x :*: y, p'')
-  {-# INLINE frombits #-}

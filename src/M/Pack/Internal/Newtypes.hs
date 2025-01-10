@@ -39,9 +39,10 @@ instance
       n | bx n -> pure (EnumIndex (toEnum n))
       n -> F.err $ coerce $ "EnumIndex: out of bounds: " <> show n
 
--- | represent a 'Fixed' value but fix an integer type for serialization
--- ('Integer' is still used for the actual value)
-newtype Fixed' i r = Fixed' {unfixed' :: Fixed r}
+-- | use an integer type @i@ for serialization of a fixed-point number
+-- with resolution @r@ (see 'HasResolution', 'Fixed'), with underlying
+-- numeric representation @f@
+newtype Fixed' i r f = Fixed' {unfixed' :: f}
   deriving stock (Generic, Typeable, Data, Lift)
   deriving newtype (Eq, Ord, Show, Read, Hashable, NFData)
   deriving newtype (Enum, Num, Real, Fractional, RealFrac)
@@ -50,12 +51,28 @@ unfix :: Fixed r -> Integer
 unfix (MkFixed x) = x
 {-# INLINE unfix #-}
 
-instance (Integral i, Pack i) => Pack (Fixed' i r) where
-  pack = pack @i . fi . unfix . unfixed'
+instance
+  (Integral i, Pack i, Real f, HasResolution r) =>
+  Pack (Fixed' i r f)
+  where
+  pack =
+    pack @i
+      . fi
+      . (unfix :: Fixed r -> Integer)
+      . realToFrac
+      . unfixed'
   {-# INLINEABLE pack #-}
 
-instance (Integral i, Unpack i) => Unpack (Fixed' i r) where
-  unpack = Fixed' . MkFixed . fi <$> unpack @i
+instance
+  (Integral i, Unpack i, Fractional f, HasResolution r) =>
+  Unpack (Fixed' i r f)
+  where
+  unpack =
+    Fixed'
+      . (realToFrac :: Fixed r -> f)
+      . MkFixed
+      . fi
+      <$> unpack @i
   {-# INLINEABLE unpack #-}
 
 -- | a signed angle; divides the circle into 256 parts
