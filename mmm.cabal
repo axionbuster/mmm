@@ -29,6 +29,7 @@ library
       M.J.NBT.Internal.JS
       M.J.NBT.Internal.P
       M.J.NBT.Internal.Types
+      M.J.Position
       M.LEB
       M.Pack
       M.Pack.Internal.Bit
