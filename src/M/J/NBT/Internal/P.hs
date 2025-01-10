@@ -36,7 +36,7 @@ sp (NamedPair t p) = (t, p)
 {-# INLINE sp #-}
 
 instance Unpack NamedPair where
-  unpack = tag >>= \p -> NamedPair <$> string0 <*> p
+  unpack = tag >>= liftA2 NamedPair string0
   {-# INLINE unpack #-}
 
 instance Unpack Tg where
@@ -70,7 +70,7 @@ tag =
       n <- unpackfi @Int32 >>= ck "List"
       if ty == TEnd && n /= 0
         then F.err "only empty lists may have the end tag as element type"
-        else V.replicateM n p <&> List ty
+        else List ty <$> V.replicateM n p
     TCompound -> Compound . M.fromList <$> manyTill (sp <$> unpack) end
       where
         end = unpack @Ty >>= guard . (== TEnd)
