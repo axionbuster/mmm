@@ -4,9 +4,11 @@
 module M.J.NBT.Internal.P (NamedPair (..)) where
 
 import Control.Applicative.Combinators
+import Control.DeepSeq
 import Control.Monad
 import Data.ByteString qualified as B
 import Data.ByteString.Builder (Builder, byteString)
+import Data.Data
 import Data.Functor
 import Data.HashMap.Strict qualified as M
 import Data.Int
@@ -14,6 +16,7 @@ import Data.Text (Text)
 import Data.Vector qualified as V
 import Data.Vector.Unboxed qualified as VU
 import FlatParse.Stateful qualified as F
+import GHC.Generics
 import M.J.NBT.Internal.JS
 import M.J.NBT.Internal.Types
 import M.Pack
@@ -24,6 +27,8 @@ import M.Pack
 
 -- | named pair of a 'Text' and a 'Tg'
 data NamedPair = NamedPair !Text !Tg
+  deriving stock (Eq, Ord, Show, Read, Generic, Typeable, Data)
+  deriving anyclass (NFData)
 
 -- NamedPair used to be called 'S', hence the 'sp' function name
 sp :: NamedPair -> (Text, Tg)
