@@ -4,6 +4,8 @@
 module M.Pack.Internal.Num
   ( packleb32,
     unpackleb32,
+    packfi,
+    unpackfi,
   )
 where
 
@@ -129,3 +131,13 @@ packleb32 = pack @(LEB Int32) . fromIntegral
 unpackleb32 :: (Integral a) => Parser st r a
 unpackleb32 = fromIntegral <$> unpack @(LEB Int32)
 {-# INLINE unpackleb32 #-}
+
+-- pack with fromIntegral
+
+-- | pack @b@ in the format of @a@
+packfi :: forall a b. (Integral a, Pack a, Integral b) => b -> Builder
+packfi = pack @a . fromIntegral
+
+-- | unpack @b@ from a number in the format of @a@
+unpackfi :: forall a b st r. (Integral a, Unpack a, Integral b) => Parser st r b
+unpackfi = fromIntegral <$> unpack @a

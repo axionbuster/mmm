@@ -25,6 +25,9 @@ source-repository head
 
 library
   exposed-modules:
+      M.J.NBT.Internal.JS
+      M.J.NBT.Internal.P
+      M.J.NBT.Internal.Types
       M.LEB
       M.Pack
       M.Pack.Internal.Bit
@@ -47,6 +50,7 @@ library
       DerivingStrategies
       DerivingVia
       LambdaCase
+      LinearTypes
       OverloadedStrings
       OverloadedLists
       QuasiQuotes
@@ -61,9 +65,11 @@ library
     , deepseq
     , flatparse
     , hashable
+    , parser-combinators
     , template-haskell
     , text
     , th-serde
+    , unordered-containers
     , uuid-types
     , varcomp
     , vector
@@ -74,6 +80,7 @@ test-suite mmm-test
   main-is: Spec.hs
   other-modules:
       M.BitSpec
+      M.J.NBT.Internal.JSSpec
       M.LEBSpec
       Paths_mmm
   autogen-modules:
@@ -88,6 +95,7 @@ test-suite mmm-test
       DerivingStrategies
       DerivingVia
       LambdaCase
+      LinearTypes
       OverloadedStrings
       OverloadedLists
       QuasiQuotes
@@ -105,9 +113,11 @@ test-suite mmm-test
     , hashable
     , hspec
     , mmm
+    , parser-combinators
     , template-haskell
     , text
     , th-serde
+    , unordered-containers
     , uuid-types
     , varcomp
     , vector

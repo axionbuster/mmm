@@ -16,6 +16,7 @@ default-extensions:
 - DerivingStrategies
 - DerivingVia
 - LambdaCase
+- LinearTypes
 - OverloadedStrings
 - OverloadedLists
 - QuasiQuotes
@@ -43,9 +44,11 @@ dependencies:
 - deepseq
 - flatparse
 - hashable
+- parser-combinators
 - template-haskell
 - text
 - th-serde
+- unordered-containers
 - uuid-types
 - varcomp
 - vector
