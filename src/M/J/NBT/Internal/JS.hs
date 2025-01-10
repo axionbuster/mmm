@@ -4,7 +4,9 @@ module M.J.NBT.Internal.JS
     textascesu8,
     cesu8astext,
     tocesu8,
+    tocesu8p,
     fromcesu8,
+    fromcesu8p,
   )
 where
 
@@ -119,10 +121,11 @@ tocesu8p s0 =
            in e h <> e l <> go xs
     -- only possible if the input is not a valid UTF-8 string
     x : _ -> error $ printf "tocesu8p: unexpected character 0x%02x" x
+{-# INLINEABLE tocesu8p #-}
 
 -- | decode CESU-8 encoded text
 fromcesu8 :: ByteString -> Maybe JS
-fromcesu8 s = case parsepure (fromcesu8p <* F.eof) () 0 s of
+fromcesu8 s = case parsepure0 (fromcesu8p <* F.eof) s of
   F.OK x _ _ -> Just x
   _ -> Nothing
 
@@ -206,3 +209,4 @@ fromcesu8p =
                   pure $ sh x 0x0F 12 (shift p 6 .|. q)
         x -> se $ printf "fromcesu8p: unexpected CESU-8 byte 0x%02x" x
     {-# INLINE cp #-}
+{-# INLINEABLE fromcesu8p #-}

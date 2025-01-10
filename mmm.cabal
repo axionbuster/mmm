@@ -25,6 +25,7 @@ source-repository head
 
 library
   exposed-modules:
+      M.J.NBT
       M.J.NBT.Internal.JS
       M.J.NBT.Internal.P
       M.J.NBT.Internal.Types
@@ -81,6 +82,7 @@ test-suite mmm-test
   other-modules:
       M.BitSpec
       M.J.NBT.Internal.JSSpec
+      M.J.NBT.Internal.PSpec
       M.LEBSpec
       Paths_mmm
   autogen-modules:

@@ -1,11 +1,9 @@
 -- | Types for NBT serialization
-module M.J.NBT.Internal.Types (Ty (..), Tg (..), getty, mklist1) where
+module M.J.NBT.Internal.Types (Ty (..), Tg (..), getty) where
 
 import Control.DeepSeq
 import Data.ByteString (ByteString)
 import Data.Data
-import Data.Function
-import Data.Functor
 import Data.HashMap.Strict (HashMap)
 import Data.Hashable
 import Data.Int
@@ -64,6 +62,8 @@ data Tg where
   Compound :: HashMap Text Tg %1 -> Tg
   IntArray :: (VU.Vector Int32) %1 -> Tg
   LongArray :: (VU.Vector Int64) %1 -> Tg
+  deriving stock (Eq, Ord, Show, Read, Generic, Typeable, Data)
+  deriving anyclass (NFData)
 
 -- | get the type of a tag
 getty :: Tg -> Ty
@@ -81,16 +81,3 @@ getty (Compound _) = TCompound
 getty (IntArray _) = TIntArray
 getty (LongArray _) = TLongArray
 {-# INLINE getty #-}
-
--- | a list of tags with a common type (checked at runtime)
---
--- empty is NOT allowed (will return 'Nothing')
-mklist1 :: V.Vector Tg -> Maybe Tg
-mklist1 f = sharedtag f <&> (`List` f)
-  where
-    sharedtag =
-      Nothing & foldr \a -> \case
-        Just TEnd -> Nothing -- TEnd is not allowed in lists
-        Just t | getty a == t -> Just t
-        _ -> Nothing
-{-# INLINE mklist1 #-}

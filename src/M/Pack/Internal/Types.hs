@@ -8,6 +8,7 @@ module M.Pack.Internal.Types
     Result,
     ParseError (..),
     parsepure,
+    parsepure0,
     castsomepack,
     castsomeunpack,
   )
@@ -37,6 +38,11 @@ newtype ParseError = ParseError {showparseerror :: String} -- generic message
 parsepure :: (forall st. Parser st r a) -> r -> Int -> ByteString -> Result a
 parsepure p r i b = runST (F.runParserST p r i b)
 {-# INLINE parsepure #-}
+
+-- | run a pure parser with no state efficiently (by inlining)
+parsepure0 :: (forall st. Parser st () a) -> ByteString -> Result a
+parsepure0 p = parsepure p () 0
+{-# INLINE parsepure0 #-}
 
 -- | produce a 'Builder' from a value
 class Pack a where

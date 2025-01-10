@@ -6,12 +6,11 @@ module M.J.NBT.Internal.P () where
 import Control.Applicative.Combinators
 import Control.Monad
 import Data.ByteString qualified as B
-import Data.ByteString.Builder (Builder)
+import Data.ByteString.Builder (Builder, byteString)
 import Data.Functor
 import Data.HashMap.Strict qualified as M
 import Data.Int
 import Data.Text (Text)
-import Data.Text qualified as T
 import Data.Vector qualified as V
 import Data.Vector.Unboxed qualified as VU
 import FlatParse.Stateful qualified as F
@@ -51,11 +50,12 @@ tag =
     TByteArray -> unpackfi @Int32 >>= (ByteArray <$>) . F.take
     TString -> String <$> string0
     TList -> do
-      p <- tag
+      p <- F.lookahead tag
+      ty <- unpack @Ty
       n <- unpackfi @Int32
-      V.replicateM n p <&> mklist1 >>= \case
-        Just l -> pure l
-        Nothing -> F.err "tag: empty or End tag-containing list"
+      if ty == TEnd && n /= 0
+        then F.err "only empty lists may have the end tag as element type"
+        else V.replicateM n p <&> List ty
     TCompound -> Compound . M.fromList <$> manyTill (sp <$> unpack) end
       where
         end = unpack @Ty >>= guard . (== TEnd)
@@ -68,36 +68,38 @@ arr0 p = unpackfi @Int32 >>= (`VU.replicateM` p)
 {-# INLINE arr0 #-}
 
 string0 :: Parser st r Text
-string0 =
-  unpackfi @Int16 >>= (cesu8astext <$>) . F.take >>= \case
-    Just t -> pure t
-    Nothing -> F.err "string0: invalid CESU-8"
+string0 = unpackfi @Int16 >>= (getjs <$>) . (`F.isolate` fromcesu8p)
 
 -- pack
 
 instance Pack S where
-  pack (S t p) = pack (getty p) <> spack t <> pack p
+  pack (S t p) = pack (getty p) <> spack t <> bodypack p
   {-# INLINE pack #-}
 
 spack :: Text -> Builder
-spack s = packfi @Int16 (T.length s) <> pack (JS s)
+spack s =
+  let c = tocesu8 (JS s)
+   in packfi @Int16 (B.length c) <> byteString c
 {-# INLINE spack #-}
 
 instance Pack Tg where
-  pack End = mempty
-  pack (Byte p) = pack p
-  pack (Short p) = pack p
-  pack (Int p) = pack p
-  pack (Long p) = pack p
-  pack (Float p) = pack p
-  pack (Double p) = pack p
-  pack (ByteArray p) = packfi @Int32 (B.length p) <> pack p
-  pack (String p) = spack p
-  pack (List _ p) | V.null p = pack TEnd
-  pack (List t p) =
-    pack t
-      <> packfi @Int32 (V.length p)
-      <> V.foldMap pack p
-  pack (Compound p) = foldMap (pack . uncurry S) (M.toList p) <> pack TEnd
-  pack (IntArray p) = packfi @Int32 (VU.length p) <> VU.foldMap pack p
-  pack (LongArray p) = packfi @Int32 (VU.length p) <> VU.foldMap pack p
+  pack t = pack (getty t) <> bodypack t
+  {-# INLINE pack #-}
+
+bodypack :: Tg -> Builder
+bodypack End = mempty
+bodypack (Byte p) = pack p
+bodypack (Short p) = pack p
+bodypack (Int p) = pack p
+bodypack (Long p) = pack p
+bodypack (Float p) = pack p
+bodypack (Double p) = pack p
+bodypack (ByteArray p) = packfi @Int32 (B.length p) <> byteString p
+bodypack (String p) = spack p
+bodypack (List t p) =
+  pack t
+    <> packfi @Int32 (V.length p)
+    <> V.foldMap bodypack p
+bodypack (Compound p) = foldMap (pack . uncurry S) (M.toList p) <> pack TEnd
+bodypack (IntArray p) = packfi @Int32 (VU.length p) <> VU.foldMap pack p
+bodypack (LongArray p) = packfi @Int32 (VU.length p) <> VU.foldMap pack p
