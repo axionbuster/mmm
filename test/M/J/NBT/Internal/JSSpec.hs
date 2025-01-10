@@ -37,6 +37,30 @@ spec = do
         let expected = B.pack [0x41, 0x42, 0x43]
         textascesu8 input `shouldBe` expected
 
+      it "encodes multilingual text correctly" do
+        -- "привет こんにちは 안녕하세요"
+        let input = "привет こんにちは 안녕하세요"
+        let expected = B.pack
+              [ 0xD0, 0xBF, 0xD1, 0x80, 0xD0, 0xB8, 0xD0, 0xB2, 0xD0, 0xB5, 0xD1, 0x82  -- привет
+              , 0x20  -- space
+              , 0xE3, 0x81, 0x93, 0xE3, 0x82, 0xA3, 0xE3, 0x81, 0xAB, 0xE3, 0x81, 0xA1, 0xE3, 0x81, 0xAF  -- こんにちは
+              , 0x20  -- space  
+              , 0xEC, 0x95, 0x88, 0xEB, 0x85, 0x95, 0xED, 0x95, 0x98, 0xEC, 0x84, 0xB8, 0xEC, 0x9A, 0x94  -- 안녕하세요
+              ]
+        textascesu8 input `shouldBe` expected
+        cesu8astext expected `shouldBe` Just input
+
+      it "encodes emoji correctly" do
+        -- "🌍🌎🌏"
+        let input = "🌍🌎🌏"
+        let expected = B.pack
+              [ 0xED, 0xA0, 0xBC, 0xED, 0xB8, 0x8D  -- 🌍
+              , 0xED, 0xA0, 0xBC, 0xED, 0xB8, 0x8E  -- 🌎  
+              , 0xED, 0xA0, 0xBC, 0xED, 0xB8, 0x8F  -- 🌏
+              ]
+        textascesu8 input `shouldBe` expected
+        cesu8astext expected `shouldBe` Just input
+
       it "encodes simple Unicode as expected" do
         -- "д" (CYRILLIC SMALL LETTER DE)
         textascesu8 "д" `shouldBe` B.pack [0xD0, 0xB4]

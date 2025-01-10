@@ -118,11 +118,11 @@ tocesu8p s0 =
                   <> w8 ((a .&. 0x3F) .|. 0x80)
            in e h <> e l <> go xs
     -- only possible if the input is not a valid UTF-8 string
-    x : _ -> error $ printf "tocesu8p: unexpected character %02x" x
+    x : _ -> error $ printf "tocesu8p: unexpected character 0x%02x" x
 
 -- | decode CESU-8 encoded text
 fromcesu8 :: ByteString -> Maybe JS
-fromcesu8 s = case parsepure fromcesu8p () 0 s of
+fromcesu8 s = case parsepure (fromcesu8p <* F.eof) () 0 s of
   F.OK x _ _ -> Just x
   _ -> Nothing
 
@@ -167,7 +167,7 @@ fromcesu8p =
         x | x == 0xC0 -> do
           unpack @Word8 >>= \case
             0x80 -> pu [0 :: Word16] -- 2 bytes; null
-            y -> se $ printf "fromcesu8p: unexpected CESU-8 byte %02x" y
+            y -> se $ printf "fromcesu8p: unexpected CESU-8 byte 0x%02x" y
         x | bxt x 0x01 0x7F -> pu . pure $ x -- 1 byte; direct
         x | bxt x 0xC0 0xDF -> an <&> pure . sh x 0x1F 6 -- 2 bytes
         x | x == 0xED -> do
@@ -190,13 +190,13 @@ fromcesu8p =
                       se $
                         printf
                           "fromcesu8p: invalid low surrogate ... \
-                          \%02x is not in [0x30, 0x3F]"
+                          \0x%02x is not in [0x30, 0x3F]"
                           y2
                 else
                   se $
                     printf
                       "fromcesu8p: invalid surrogate pair ... \
-                      \expected 0xED, got %02x"
+                      \expected 0xED, got 0x%02x"
                       x2
             else pu $ pure $ sh x 0x0F 12 (shift y 6 .|. z)
         x -- 3 bytes (exclude 0xED; yeah, spec is weird)
@@ -204,16 +204,5 @@ fromcesu8p =
               an >>= \p ->
                 an <&> \q ->
                   pure $ sh x 0x0F 12 (shift p 6 .|. q)
-        x | bxt x 0xF0 0xF4 -> do
-          -- 6 bytes; come in surrogate pairs
-          y <- an
-          z <- an
-          w <- an
-          let val =
-                fromIntegral (sh x 0x07 18 (shift y 12 .|. shift z 6 .|. w))
-                  + (0x10000 :: Word32)
-              h = 0xD800 + (val .>>. 10)
-              l = 0xDC00 + (val .&. 0x3FF)
-          pu [h, l]
-        x -> se $ printf "fromcesu8p: unexpected CESU-8 byte %02x" x
+        x -> se $ printf "fromcesu8p: unexpected CESU-8 byte 0x%02x" x
     {-# INLINE cp #-}
