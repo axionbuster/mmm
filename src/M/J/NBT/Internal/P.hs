@@ -43,6 +43,12 @@ instance Unpack Tg where
   unpack = join tag
   {-# INLINE unpack #-}
 
+ck :: (Integral a, Show a) => String -> a -> Parser st r a
+ck ctx n
+  | n < 0 = F.err $ ParseError $ ctx <> ": negative length " <> show n
+  | otherwise = pure n
+{-# INLINE ck #-}
+
 tag :: Parser st r (Parser st r Tg)
 tag =
   unpack @Ty <&> \case
@@ -53,12 +59,15 @@ tag =
     TLong -> Long <$> unpack
     TFloat -> Float <$> unpack
     TDouble -> Double <$> unpack
-    TByteArray -> unpackfi @Int32 >>= (ByteArray <$>) . F.take
+    TByteArray ->
+      unpackfi @Int32
+        >>= ck "ByteArray"
+        >>= (ByteArray <$>) . F.take
     TString -> String <$> string0
     TList -> do
       p <- F.lookahead tag
       ty <- unpack @Ty
-      n <- unpackfi @Int32
+      n <- unpackfi @Int32 >>= ck "List"
       if ty == TEnd && n /= 0
         then F.err "only empty lists may have the end tag as element type"
         else V.replicateM n p <&> List ty
@@ -66,15 +75,19 @@ tag =
       where
         end = unpack @Ty >>= guard . (== TEnd)
         {-# INLINE end #-}
-    TIntArray -> IntArray <$> arr0 (unpack @Int32)
-    TLongArray -> LongArray <$> arr0 (unpack @Int64)
+    TIntArray -> IntArray <$> arr0 "IntArray" (unpack @Int32)
+    TLongArray -> LongArray <$> arr0 "LongArray" (unpack @Int64)
 
-arr0 :: (VU.Unbox a) => Parser st r a -> Parser st r (VU.Vector a)
-arr0 p = unpackfi @Int32 >>= (`VU.replicateM` p)
+arr0 :: (VU.Unbox a) => String -> Parser st r a -> Parser st r (VU.Vector a)
+arr0 n p = unpackfi @Int32 >>= ck n >>= (`VU.replicateM` p)
 {-# INLINE arr0 #-}
 
 string0 :: Parser st r Text
-string0 = unpackfi @Int16 >>= (getjs <$>) . (`F.isolate` fromcesu8p)
+string0 =
+  unpackfi @Int16
+    >>= ck "String"
+    >>= (getjs <$>) . (`F.isolate` fromcesu8p)
+{-# INLINE string0 #-}
 
 -- pack
 

@@ -119,6 +119,27 @@ spec = do
         roundTrip input `shouldBe` Just input
 
     describe "error cases" do
+      it "rejects negative lengths" do
+        -- ByteArray with length -1
+        let byteArrayInput = B.pack [0x07, 0xFF, 0xFF, 0xFF, 0xFF]
+        unpackbytes byteArrayInput `shouldBe` Nothing
+
+        -- String with length -1
+        let stringInput = B.pack [0x08, 0xFF, 0xFF]
+        unpackbytes stringInput `shouldBe` Nothing
+
+        -- List with length -1
+        let listInput = B.pack [0x09, 0x01, 0xFF, 0xFF, 0xFF, 0xFF]
+        unpackbytes listInput `shouldBe` Nothing
+
+        -- IntArray with length -1
+        let intArrayInput = B.pack [0x0B, 0xFF, 0xFF, 0xFF, 0xFF]
+        unpackbytes intArrayInput `shouldBe` Nothing
+
+        -- LongArray with length -1
+        let longArrayInput = B.pack [0x0C, 0xFF, 0xFF, 0xFF, 0xFF]
+        unpackbytes longArrayInput `shouldBe` Nothing
+
       it "rejects invalid tag types" do
         -- End tag is not allowed in lists
         let input = List TEnd $ V.fromList [End]
