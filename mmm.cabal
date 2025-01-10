@@ -27,6 +27,7 @@ library
   exposed-modules:
       M.LEB
       M.Pack
+      M.Pack.Internal.Bit
       M.Pack.Internal.Etc
       M.Pack.Internal.FromIntegral
       M.Pack.Internal.Newtypes
@@ -41,6 +42,7 @@ library
   default-extensions:
       AllowAmbiguousTypes
       BlockArguments
+      DefaultSignatures
       DeriveAnyClass
       DerivingStrategies
       DerivingVia
@@ -71,6 +73,7 @@ test-suite mmm-test
   type: exitcode-stdio-1.0
   main-is: Spec.hs
   other-modules:
+      M.BitSpec
       M.LEBSpec
       Paths_mmm
   autogen-modules:
@@ -80,6 +83,7 @@ test-suite mmm-test
   default-extensions:
       AllowAmbiguousTypes
       BlockArguments
+      DefaultSignatures
       DeriveAnyClass
       DerivingStrategies
       DerivingVia
