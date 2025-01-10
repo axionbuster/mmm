@@ -1,7 +1,7 @@
 {-# OPTIONS_GHC -Wno-orphans #-}
 
 -- | parse / serialize NBT data
-module M.J.NBT.Internal.P () where
+module M.J.NBT.Internal.P (NamedPair (..)) where
 
 import Control.Applicative.Combinators
 import Control.Monad
@@ -23,14 +23,15 @@ import M.Pack
 -- parser returns parser. use 'join' from Control.Monad to use it
 
 -- | named pair of a 'Text' and a 'Tg'
-data S = S !Text !Tg
+data NamedPair = NamedPair !Text !Tg
 
-sp :: S -> (Text, Tg)
-sp (S t p) = (t, p)
+-- NamedPair used to be called 'S', hence the 'sp' function name
+sp :: NamedPair -> (Text, Tg)
+sp (NamedPair t p) = (t, p)
 {-# INLINE sp #-}
 
-instance Unpack S where
-  unpack = tag >>= \p -> S <$> string0 <*> p
+instance Unpack NamedPair where
+  unpack = tag >>= \p -> NamedPair <$> string0 <*> p
   {-# INLINE unpack #-}
 
 instance Unpack Tg where
@@ -72,8 +73,8 @@ string0 = unpackfi @Int16 >>= (getjs <$>) . (`F.isolate` fromcesu8p)
 
 -- pack
 
-instance Pack S where
-  pack (S t p) = pack (getty p) <> spack t <> bodypack p
+instance Pack NamedPair where
+  pack (NamedPair t p) = pack (getty p) <> spack t <> bodypack p
   {-# INLINE pack #-}
 
 spack :: Text -> Builder
@@ -100,6 +101,10 @@ bodypack (List t p) =
   pack t
     <> packfi @Int32 (V.length p)
     <> V.foldMap bodypack p
-bodypack (Compound p) = foldMap (pack . uncurry S) (M.toList p) <> pack TEnd
+bodypack (Compound p) =
+  foldMap
+    (pack . uncurry NamedPair)
+    (M.toList p)
+    <> pack TEnd
 bodypack (IntArray p) = packfi @Int32 (VU.length p) <> VU.foldMap pack p
 bodypack (LongArray p) = packfi @Int32 (VU.length p) <> VU.foldMap pack p
