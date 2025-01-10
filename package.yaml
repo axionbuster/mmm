@@ -44,6 +44,7 @@ dependencies:
 - deepseq
 - flatparse
 - hashable
+- linear
 - parser-combinators
 - template-haskell
 - text

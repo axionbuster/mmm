@@ -67,6 +67,7 @@ library
     , deepseq
     , flatparse
     , hashable
+    , linear
     , parser-combinators
     , template-haskell
     , text
@@ -115,6 +116,7 @@ test-suite mmm-test
     , flatparse
     , hashable
     , hspec
+    , linear
     , mmm
     , parser-combinators
     , template-haskell

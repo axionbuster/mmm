@@ -1,12 +1,10 @@
-{-# LANGUAGE Strict #-}
-
 -- | Support for the packed integer 'Position' format used by Java Edition
 module M.J.Position
   ( Position (..),
     encodeposition,
-    parseposition,
     decodeposition,
-    apply,
+    posapply,
+    posapplyv,
   )
 where
 
@@ -17,14 +15,11 @@ import Data.Hashable
 import Data.Int
 import GHC.Generics
 import Language.Haskell.TH.Syntax (Lift)
+import Linear
 import M.Pack
 
 -- | Deserialized position representation
-data Position = Position
-  { x :: Int32,
-    y :: Int32,
-    z :: Int32
-  }
+newtype Position = Position (V3 Int32)
   deriving stock (Eq, Ord, Show, Read, Generic, Typeable, Data, Lift)
   deriving anyclass (Hashable, NFData)
 
@@ -32,27 +27,26 @@ fi :: (Integral a, Num b) => a -> b
 fi = fromIntegral
 {-# INLINE fi #-}
 
--- | Encode a 'Position' into a packed Int64
+-- | encode a 'Position' into a packed Int64
 encodeposition :: Position -> Int64
-encodeposition (Position x y z) =
-  ((fi x .&. 0x3FFFFFF) .<<. 38)
-    .|. ((fi z .&. 0x3FFFFFF) .<<. 12)
-    .|. (fi y .&. 0xFFF)
-{-# INLINE encodeposition #-}
+encodeposition (Position (V3 x y z))
+  | x > 0x1FFFFF = error "Position: X out of bounds"
+  | y > 0xFFF = error "Position: Y out of bounds"
+  | z > 0x1FFFFF = error "Position: Z out of bounds"
+  | otherwise =
+      ((fi x .&. 0x3FFFFFF) .<<. 38)
+        .|. ((fi z .&. 0x3FFFFFF) .<<. 12)
+        .|. (fi y .&. 0xFFF)
+{-# INLINEABLE encodeposition #-}
 
--- | Parse a 'Position' from a ByteString
-parseposition :: Parser st r Position
-parseposition = decodeposition . fi <$> unpack @Int64
-{-# INLINE parseposition #-}
-
--- | Decode a packed Int64 into a 'Position'
+-- | decode a packed Int64 into a 'Position'
 decodeposition :: Int64 -> Position
-decodeposition n = Position x y z
+decodeposition n = Position (V3 x y z)
   where
     x = fi $ n .>>. 38
     y = fi $ (n .<<. 52) .>>. 52
     z = fi $ (n .<<. 26) .>>. 38
-{-# INLINE decodeposition #-}
+{-# INLINEABLE decodeposition #-}
 
 -- Instances for Pack and Unpack
 instance Pack Position where
@@ -60,10 +54,15 @@ instance Pack Position where
   {-# INLINE pack #-}
 
 instance Unpack Position where
-  unpack = parseposition
+  unpack = decodeposition . fi <$> unpack @Int64
   {-# INLINE unpack #-}
 
--- | Apply a function to the x, y, and z components of a 'Position'
-apply :: (Int32 -> Int32) -> Position -> Position
-apply f (Position x y z) = Position (f x) (f y) (f z)
-{-# INLINE apply #-}
+-- | apply a function to the x, y, and z components of a 'Position'
+posapply :: (Int32 -> Int32) -> Position -> Position
+posapply f (Position (V3 x y z)) = Position (V3 (f x) (f y) (f z))
+{-# INLINE posapply #-}
+
+-- | apply a function to the x, y, and z components of a 'Position'
+posapplyv :: (V3 Int32 -> V3 Int32) -> Position -> Position
+posapplyv f (Position v) = Position (f v)
+{-# INLINE posapplyv #-}
