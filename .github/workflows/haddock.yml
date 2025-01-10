@@ -1,0 +1,59 @@
+name: Haddock
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Setup Haskell Stack
+      uses: haskell-actions/setup@v2
+      with:
+        enable-stack: true
+        stack-version: 'latest'
+
+    - name: Cache Stack Files
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.stack
+          .stack-work
+        key: ${{ runner.os }}-stack-${{ hashFiles('stack.yaml.lock', 'package.yaml') }}
+        restore-keys: |
+          ${{ runner.os }}-stack-
+
+    - name: Build Documentation
+      run: |
+        stack build --fast --haddock --no-haddock-deps
+        
+        # Find documentation directory
+        DIST_DOC=$(find .stack-work/dist -type d -name "html" -print -quit)
+        echo "Distribution docs found at: $DIST_DOC"
+        
+        # Ensure docs exist
+        if [ ! -d "$DIST_DOC/mmm" ]; then
+          echo "Error: Documentation not found at $DIST_DOC/mmm"
+          exit 1
+        fi
+        
+        # Copy docs
+        mkdir -p public
+        cp -rv "$DIST_DOC/mmm"/* public/
+        
+        # Verify copy
+        ls -la public/
+
+    - name: Deploy to GitHub Pages
+      if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+      uses: peaceiris/actions-gh-pages@v3
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        publish_dir: ./public
+        force_orphan: true
+        enable_jekyll: false
