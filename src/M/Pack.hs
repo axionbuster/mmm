@@ -19,6 +19,7 @@ where
 
 import M.Pack.Internal.Bit
 import M.Pack.Internal.Etc ()
+import M.Pack.Internal.Linear ()
 import M.Pack.Internal.Newtypes
 import M.Pack.Internal.Num
 import M.Pack.Internal.TH

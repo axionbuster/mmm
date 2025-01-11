@@ -6,6 +6,7 @@ module M.Pack.Internal.Num
     unpackleb32,
     packfi,
     unpackfi,
+    guardnat,
   )
 where
 
@@ -141,3 +142,9 @@ packfi = pack @a . fromIntegral
 -- | unpack @b@ from a number in the format of @a@
 unpackfi :: forall a b st r. (Integral a, Unpack a, Integral b) => Parser st r b
 unpackfi = fromIntegral <$> unpack @a
+
+-- | ensure the number is non-negative
+guardnat :: (Num a, Ord a, Show a) => String -> a -> Parser st r a
+guardnat na nu
+  | nu < 0 = F.err $ ParseError $ na ++ ": negative: " ++ show nu
+  | otherwise = pure nu

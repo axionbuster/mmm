@@ -53,18 +53,12 @@ newtype JS = JS {getjs :: Text}
   deriving newtype (Eq, Ord, Show, Read, Hashable, NFData)
   deriving newtype (IsString)
 
-ck :: (Integral a, Show a) => String -> a -> Parser st r a
-ck ctx n
-  | n < 0 = F.err $ ParseError $ ctx <> ": negative length " <> show n
-  | otherwise = pure n
-{-# INLINE ck #-}
-
 instance Pack JS where
   pack = pack . tocesu8
   {-# INLINE pack #-}
 
 instance Unpack JS where
-  unpack = unpackleb32 >>= ck "JavaString" >>= (`F.isolate` fromcesu8p)
+  unpack = unpackleb32 >>= guardnat "JavaString" >>= (`F.isolate` fromcesu8p)
   {-# INLINE unpack #-}
 
 -- | encode 'Text' into CESU-8 'ByteString'

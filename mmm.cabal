@@ -42,6 +42,7 @@ library
       M.Pack.Internal.Bit
       M.Pack.Internal.Etc
       M.Pack.Internal.FromIntegral
+      M.Pack.Internal.Linear
       M.Pack.Internal.Newtypes
       M.Pack.Internal.Num
       M.Pack.Internal.TH
@@ -74,7 +75,8 @@ library
       ViewPatterns
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints
   build-depends:
-      base >=4.7 && <5
+      adjunctions
+    , base >=4.7 && <5
     , bytestring
     , deepseq
     , flatparse
@@ -125,7 +127,8 @@ test-suite mmm-test
       ViewPatterns
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints -threaded -rtsopts -with-rtsopts=-N
   build-depends:
-      base >=4.7 && <5
+      adjunctions
+    , base >=4.7 && <5
     , binary
     , bytestring
     , deepseq

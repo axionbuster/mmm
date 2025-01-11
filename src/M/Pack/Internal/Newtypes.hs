@@ -7,6 +7,9 @@ module M.Pack.Internal.Newtypes
     IDorX (..),
     IDSet (..),
     TakeRest (..),
+    PackFoldableVI (..),
+    PackFoldable0 (..),
+    UnpackRepresentable0 (..),
     degtoi8angle,
     i8angledeg,
   )
@@ -19,6 +22,10 @@ import Data.ByteString.Builder qualified as BB
 import Data.Coerce
 import Data.Data
 import Data.Fixed
+import Data.Foldable
+import Data.Foldable1
+import Data.Functor.Classes
+import Data.Functor.Rep
 import Data.Hashable
 import Data.Int
 import Data.String
@@ -129,14 +136,11 @@ newtype Identifier = Identifier {identifier :: Text}
       IsString
     )
 
-ck :: (Integral a, Show a) => String -> a -> Parser st r a
-ck ctx n
-  | n < 0 = F.err $ ParseError $ ctx <> ": negative length " <> show n
-  | otherwise = pure n
-{-# INLINE ck #-}
-
 instance Unpack Identifier where
-  unpack = unpackleb32 >>= ck "unpack Identifier" >>= (`F.isolate` unpackid)
+  unpack =
+    unpackleb32
+      >>= guardnat "Identifier.unpack length"
+      >>= (`F.isolate` unpackid)
   {-# INLINE unpack #-}
 
 instance Pack Identifier where
@@ -184,7 +188,7 @@ instance (Pack a) => Pack (IDorX a) where
 
 instance (Unpack a) => Unpack (IDorX a) where
   unpack = do
-    i <- unpackleb32
+    i <- unpackleb32 >>= guardnat "IDorX.n"
     if i == 0
       then IDorX . Right <$> unpack
       else pure $ IDorX $ Left (i - 1)
@@ -204,7 +208,7 @@ instance Pack IDSet where
 
 instance Unpack IDSet where
   unpack =
-    unpackleb32 >>= \case
+    unpackleb32 >>= guardnat "IDSet.n" >>= \case
       0 -> IDSet . Left . identifier <$> unpack
       n -> IDSet . Right <$> V.replicateM (n - 1) unpackleb32
 
@@ -222,3 +226,49 @@ instance Pack TakeRest where
 instance Unpack TakeRest where
   unpack = TakeRest <$> F.takeRest
   {-# INLINE unpack #-}
+
+-- | General 'Pack' instance provider for 'Foldable's
+--
+-- length-prefixed ('VarInt'), strict left fold
+newtype PackFoldableVI f a = PackFoldableVI {getpackfoldablevi :: f a}
+  deriving stock (Generic, Generic1, Typeable, Data, Lift)
+  deriving newtype (Eq, Ord, Show, Read, Hashable, NFData, Functor)
+  deriving newtype (Eq1, Ord1, Show1, Read1, Semigroup, Monoid)
+  deriving newtype (Foldable, Foldable1, Applicative, Monad)
+
+instance (Pack a, Foldable f) => Pack (PackFoldableVI f a) where
+  pack =
+    packleb32 . length . getpackfoldablevi
+      <> foldMap' pack . getpackfoldablevi
+  {-# INLINEABLE pack #-}
+
+-- | General 'Pack' instance provider for 'Foldable's
+--
+-- no length prefix, strict left fold
+newtype PackFoldable0 f a = PackFoldable0 {getpackfoldable0 :: f a}
+  deriving stock (Generic, Generic1, Typeable, Data, Functor, Lift)
+  deriving newtype (Eq, Ord, Show, Read, Hashable, NFData)
+  deriving newtype (Eq1, Ord1, Show1, Read1, Semigroup, Monoid)
+  deriving newtype (Foldable, Foldable1, Applicative, Monad)
+
+-- | @'foldMap' 'pack'@
+instance (Pack a, Foldable f) => Pack (PackFoldable0 f a) where
+  pack = foldMap' pack . getpackfoldable0
+  {-# INLINEABLE pack #-}
+
+-- | General 'Unpack' instance provider for 'Representable's that are also
+-- 'Traversable'
+newtype UnpackRepresentable0 f a = UnpackRepresentable0
+  {getunpackrepresentable0 :: f a}
+  deriving stock (Generic, Generic1, Typeable, Data, Functor, Lift)
+  deriving newtype (Eq, Ord, Show, Read, Hashable, NFData)
+  deriving newtype (Eq1, Ord1, Show1, Read1, Semigroup, Monoid)
+  deriving newtype (Foldable, Foldable1, Applicative, Monad)
+
+-- | @'sequenceA' ('tabulate' ('const' 'unpack'))@
+instance
+  (Unpack a, Representable f, Traversable f) =>
+  Unpack (UnpackRepresentable0 f a)
+  where
+  unpack = UnpackRepresentable0 <$> sequenceA (tabulate (const unpack))
+  {-# INLINEABLE unpack #-}

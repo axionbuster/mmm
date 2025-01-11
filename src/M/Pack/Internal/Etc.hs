@@ -32,7 +32,7 @@ instance Pack ByteString where
   {-# INLINEABLE pack #-}
 
 instance Unpack ByteString where
-  unpack = unpackleb32 >>= F.take
+  unpack = unpackleb32 >>= guardnat "ByteString length" >>= F.take
   {-# INLINE unpack #-}
 
 instance (Pack a) => Pack (Maybe a) where
@@ -56,7 +56,10 @@ instance (Pack a) => Pack (V.Vector a) where
   {-# INLINEABLE pack #-}
 
 instance (Unpack a) => Unpack (V.Vector a) where
-  unpack = unpackleb32 >>= flip V.replicateM unpack
+  unpack =
+    unpackleb32
+      >>= guardnat "V.Vector length"
+      >>= flip V.replicateM unpack
   {-# INLINEABLE unpack #-}
 
 instance (VU.Unbox a, Pack a) => Pack (VU.Vector a) where
@@ -64,7 +67,10 @@ instance (VU.Unbox a, Pack a) => Pack (VU.Vector a) where
   {-# INLINEABLE pack #-}
 
 instance (VU.Unbox a, Unpack a) => Unpack (VU.Vector a) where
-  unpack = unpackleb32 >>= flip VU.replicateM unpack
+  unpack =
+    unpackleb32
+      >>= guardnat "VU.Vector length"
+      >>= flip VU.replicateM unpack
   {-# INLINEABLE unpack #-}
 
 -- UUID

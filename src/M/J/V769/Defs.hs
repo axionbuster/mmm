@@ -10,6 +10,7 @@ import Control.DeepSeq
 import Data.Bits
 import Data.ByteString (ByteString)
 import Data.Data
+import Data.Fixed
 import Data.Hashable
 import Data.Int
 import Data.Serde.QQ
@@ -19,6 +20,7 @@ import Data.Vector qualified as V
 import Data.Word
 import GHC.Generics
 import Language.Haskell.TH.Syntax (Lift)
+import Linear
 import M.J.Chunk.Net
 import M.J.Misc
 import M.J.NBT
@@ -27,6 +29,12 @@ import M.J.TextComponent
 import M.LEB
 import M.Pack
 import Prelude hiding (id)
+
+-- | given in 1/8000 resolution
+data SetEntityVelocityRes
+
+instance HasResolution SetEntityVelocityRes where
+  resolution _ = 8000
 
 -- sum types cannot be defined in serde just yet, so
 -- we define them here
@@ -42,8 +50,6 @@ data ParticleStatus = PSAll | PSDecreased | PSMinimal
 [serde|
 .derive
   Eq Ord Show Generic NFData Data Typeable
-
--- examples
 
 data StatusResponse
   jsonresponse :: Text
@@ -72,7 +78,7 @@ data LoginSuccess_Property
 data SetCompression
   getcompressionthreshold :: Int32 via VarInt
 
--- in the below example we use shadowing to borrow the
+-- in the declaration below we use shadowing to borrow the
 -- Pack and Unpack implementation through LEB Int32,
 -- which is equal to VarInt
 
@@ -130,14 +136,11 @@ data DisplayedSkinParts
   rightpants :: Bool
   hat :: Bool
 
--- other newtype examples
+-- Minecraft uses 'rotation' and 'orientation' interchangeably
 
 data UpdateEntityRotation
   id :: Int32 via VarInt
-  -- arguably, we need to use Double as the underlying type
-  -- instead of Int8. but whatever, it's just an example
-  yaw :: Int8 via Int8Angle
-  pitch :: Int8 via Int8Angle
+  rotation :: V2 Int8 via V2 Int8Angle
   onground :: Bool
 
 -- using dummy types: Slot (Data), Text Component (NBT/JSON), etc.
@@ -181,16 +184,13 @@ data SpawnEntity
   entityid :: Int32 via VarInt
   entityuuid :: UUID
   type_ :: Int32 via VarInt
-  x :: Double
-  y :: Double
-  z :: Double
-  pitch :: Int8 via Int8Angle
-  yaw :: Int8 via Int8Angle
-  headyaw :: Int8 via Int8Angle
+  -- x :: Double
+  -- y :: Double
+  -- z :: Double
+  position :: V3 Double
+  rotation :: V2 Int8 via V2 Int8Angle
   data_ :: Int32 via VarInt
-  velocityx :: Int16
-  velocityy :: Int16
-  velocityz :: Int16
+  velocity :: V3 Double via V3 (Fixed' Int16 SetEntityVelocityRes Double)
 
 data BlockUpdate
   location :: Position 
@@ -209,12 +209,9 @@ data ChunkBiomes
   z :: Int32
   data_ :: ChunkData
 
-data PlayerPosition
-  x :: Double
-  y :: Double
-  z :: Double
-  yaw :: Float
-  pitch :: Float
+data SetPlayerPosition
+  position :: V3 Double
+  rotation :: V2 Float
   flags :: TeleportFlags via Bitwise Word8 TeleportFlags
   teleportid :: Int32 via VarInt
 |]

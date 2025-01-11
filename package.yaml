@@ -43,6 +43,7 @@ category:            Game
 description:         Please see the README on GitHub at <https://github.com/axionbuster/mmm#readme>
 
 dependencies:
+- adjunctions
 - base >= 4.7 && < 5
 - bytestring
 - deepseq
