@@ -3,6 +3,7 @@ module M.J.Misc (TeleportFlags (..), SoundEvent (..)) where
 
 import Control.DeepSeq
 import Data.Bits
+import Data.Data
 import Data.Hashable
 import Data.Serde.QQ
 import Data.Text (Text)
@@ -30,6 +31,7 @@ data TeleportFlags = TeleportFlags
     tprotvelfirst :: Bool
   }
   deriving stock (Eq, Ord, Show, Read, Generic, Lift)
+  deriving stock (Data, Typeable)
   deriving anyclass (Hashable, NFData)
 
 -- | do NOT use 8-bit packing for this type.
@@ -42,7 +44,7 @@ instance (Bits i, Integral i, Pack i, Unpack i) => Bitreppable i TeleportFlags
 [serde|
 .derive
   Eq Ord Show Read Hashable NFData
-  Generic Lift
+  Generic Lift Data Typeable
 
 data SoundEvent
   soundname :: Text via Identifier
