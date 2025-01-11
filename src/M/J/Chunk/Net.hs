@@ -42,6 +42,7 @@ instance Unpack PackedXZ where
 [serde|
 .derive
   Eq Ord Show Generic NFData
+  Data Typeable
 
 data BlockEntity
   bexz :: V2 Word8 via PackedXZ
