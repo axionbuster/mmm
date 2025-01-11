@@ -9,6 +9,24 @@ import M.Pack
 
 -- | WARNING: not implemented yet, but is still usable as a placeholder
 -- because formally a \"text component\" is just an NBT tag
+--
+-- see also: 'TextComponentJSON'
 newtype TextComponent = TextComponent {untextcomponent :: Tg}
   deriving stock (Eq, Ord, Show, Generic, Typeable, Data)
   deriving newtype (Pack, Unpack, NFData)
+
+-- | WARNING: not implemented yet, but is still usable as a placeholder
+newtype TextComponentJSON = TextComponentJSON
+  {untextcomponentjson :: TextComponent}
+  deriving stock (Eq, Ord, Show, Generic, Typeable, Data)
+  deriving newtype (NFData)
+
+-- | throws an error saying that 'TextComponentJSON' is not implemented yet
+instance Pack TextComponentJSON where
+  pack = error "TextComponentJSON.pack: not implemented"
+  {-# INLINE pack #-}
+
+-- | throws an error saying that 'TextComponentJSON' is not implemented yet
+instance Unpack TextComponentJSON where
+  unpack = error "TextComponentJSON.unpack: not implemented"
+  {-# INLINE unpack #-}
