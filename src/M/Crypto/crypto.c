@@ -134,10 +134,11 @@ static int mmmdorsacrypt(int (*initcrypt)(EVP_PKEY_CTX *),
                          EVP_PKEY *key, const unsigned char *in, size_t inlen,
                          struct mmmrsaout *out) {
   EVP_PKEY_CTX *ctx __attribute__((cleanup(mmmfreersactx0))) = NULL;
-  if (!key || !in || inlen < 0 || inlen > INT_MAX || !out)
+  if (!key || !in || inlen > INT_MAX || !out)
     return 0;
   ctx = EVP_PKEY_CTX_new_from_pkey(NULL, key, NULL);
-  INTTRY(ctx);
+  if (!ctx)
+    goto err;
   INTTRY(initcrypt(ctx));
   // measure length
   size_t outlen;
