@@ -1,10 +1,10 @@
 name:                mmm
 version:             0.1.0.0
-github:              "githubuser/mmm"
+github:              "axionbuster/mmm"
 license:             BSD-3-Clause
-author:              "Author name here"
-maintainer:          "example@example.com"
-copyright:           "2025 Author name here"
+author:              "axionbuster"
+maintainer:          "axionbuster@gmail.com"
+copyright:           "2025 axionbuster"
 
 language: GHC2021
 
@@ -19,6 +19,7 @@ default-extensions:
 - LinearTypes
 - OverloadedStrings
 - OverloadedLists
+- OverloadedRecordDot
 - QuasiQuotes
 - RecordWildCards
 - ScopedTypeVariables
@@ -31,13 +32,13 @@ extra-source-files:
 - CHANGELOG.md
 
 # Metadata used when publishing your package
-# synopsis:            Short description of your package
-# category:            Web
+synopsis:            Minecraft 1.21.4 implementation in Haskell
+category:            Game
 
 # To avoid duplicated efforts in documentation and dealing with the
 # complications of embedding Haddock markup inside cabal files, it is
 # common to point users to the README.md file.
-description:         Please see the README on GitHub at <https://github.com/githubuser/mmm#readme>
+description:         Please see the README on GitHub at <https://github.com/axionbuster/mmm#readme>
 
 dependencies:
 - base >= 4.7 && < 5
