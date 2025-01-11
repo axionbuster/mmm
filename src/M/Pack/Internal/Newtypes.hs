@@ -3,6 +3,7 @@ module M.Pack.Internal.Newtypes
   ( EnumIndex (..),
     Fixed' (..),
     Int8Angle (..),
+    Identifier (..),
     degtoi8angle,
     i8angledeg,
   )
