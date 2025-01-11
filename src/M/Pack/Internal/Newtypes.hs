@@ -171,6 +171,8 @@ newtype IDorX a = IDorX
   { -- | VarInt ID + 1 if registry lookup, or inline value
     idorvalue :: Either Int32 a
   }
+  deriving stock (Generic, Typeable, Data, Functor, Lift)
+  deriving newtype (Eq, Ord, Show, Read, Hashable, NFData)
 
 instance (Pack a) => Pack (IDorX a) where
   pack = \case
@@ -190,6 +192,8 @@ newtype IDSet = IDSet
   { -- | name of ID set or inline set
     setnameorids :: Either Text (V.Vector Int32)
   }
+  deriving stock (Generic, Typeable, Data)
+  deriving newtype (Eq, Ord, Show, Read, NFData)
 
 instance Pack IDSet where
   pack (IDSet (Left setname)) = "\0" <> pack setname
