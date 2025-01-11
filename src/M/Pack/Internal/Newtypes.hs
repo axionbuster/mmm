@@ -104,7 +104,7 @@ i8angledeg (Int8Angle x) = fromIntegral x * (360 / 256)
 
 -- | an \"identifier\" string, used for names, tags, etc.
 --
--- example: `minecraft:stone` or `stone/stone`
+-- example: @minecraft:stone@ or @stone/stone@
 --
 -- validation only happens when unpacking ('unpack')
 newtype Identifier = Identifier {identifier :: Text}

@@ -1,4 +1,7 @@
 -- | Java's CESU-8 encoding/decoding
+--
+-- see:
+-- https://docs.oracle.com/en/java/javase/18/docs/api/java.base/java/io/DataInput.html#modified-utf-8
 module M.J.NBT.Internal.JS
   ( JS (..),
     textascesu8,
@@ -64,10 +67,12 @@ instance Unpack JS where
   unpack = unpackleb32 >>= ck "JavaString" >>= (`F.isolate` fromcesu8p)
   {-# INLINE unpack #-}
 
+-- | encode 'Text' into CESU-8 'ByteString'
 textascesu8 :: Text -> ByteString
 textascesu8 = tocesu8 . JS
 {-# INLINE textascesu8 #-}
 
+-- | decode CESU-8 'ByteString' into 'Text'
 cesu8astext :: ByteString -> Maybe Text
 cesu8astext f = getjs <$> fromcesu8 f
 {-# INLINE cesu8astext #-}
@@ -88,7 +93,7 @@ unp :: JS -> [Word8]
 unp = B.unpack . encodeUtf8 . getjs
 {-# INLINE unp #-}
 
--- yes... this code is a bit of a mess
+-- | encode text to CESU-8 ('Builder' version)
 tocesu8p :: JS -> Builder
 tocesu8p s0 =
   unp s0 & fix \go -> \case
@@ -135,9 +140,11 @@ fromcesu8 s = case parsepure0 (fromcesu8p <* F.eof) s of
   F.OK x _ _ -> Just x
   _ -> Nothing
 
--- my condolences to the reader
+-- | decode CESU-8 encoded text ('Parser' version)
 fromcesu8p :: Parser st r JS
 fromcesu8p =
+  -- my condolences to the reader... this is a long one
+  -- https://docs.oracle.com/en/java/javase/18/docs/api/java.base/java/io/DataInput.html#modified-utf-8
   -- CESU-8 -> UTF-16 -> Text
   F.many cp <&> de >>= \case
     Left (e :: UnicodeException) -> se $ "fromcesu8p: " <> show e

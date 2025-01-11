@@ -1,5 +1,5 @@
 -- | LEB128 (unsigned) encoding support for arbitrary, finite-bit integers
-module M.LEB (LEB (..), decodeleb, encodeleb) where
+module M.LEB (LEB (..), VarInt, VarLong, decodeleb, encodeleb) where
 
 import Control.DeepSeq
 import Control.Monad.Fix
@@ -31,6 +31,12 @@ newtype LEB a = LEB {getleb :: a}
     )
   deriving stock (Generic, Typeable, Data, Functor, Lift)
   deriving anyclass (NFData)
+
+-- | VarInt
+type VarInt = LEB Int32
+
+-- | VarLong
+type VarLong = LEB Int64
 
 -- internal state
 data S a = S !Int !a -- shift, accumulator

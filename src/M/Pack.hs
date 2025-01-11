@@ -1,8 +1,18 @@
+-- | 'Pack' and 'Unpack': classes for serializing/deserializing data;
+-- newtypes to modulate serialization behavior; other networking-specific
+-- data types and utilities.
 module M.Pack
-  ( module M.Pack.Internal.Types,
+  ( -- | 'Pack' and 'Unpack' classes for serializing/deserializing data
+    module M.Pack.Internal.Types,
+    -- | instances for numbers; utilities for packing and unpacking numbers
+    -- in specific formats; instances for 'Bool'
     module M.Pack.Internal.Num,
+    -- | newtypes for modulating serialization behavior
     module M.Pack.Internal.Newtypes,
+    -- | bit-fiddling: bitsets, bitflags, etc.
     module M.Pack.Internal.Bit,
+    -- | template Haskell utilities for use with "th-serde"
+    -- to help derive 'Pack' and 'Unpack' instances
     module M.Pack.Internal.TH,
   )
 where

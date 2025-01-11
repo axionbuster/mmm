@@ -19,7 +19,7 @@ import Linear
 import M.Pack
 
 -- | Deserialized position representation
-newtype Position = Position (V3 Int32)
+newtype Position = Position {getposition :: V3 Int32}
   deriving stock (Eq, Ord, Show, Read, Generic, Typeable, Data, Lift)
   deriving anyclass (Hashable, NFData)
 
