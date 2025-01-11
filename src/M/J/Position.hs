@@ -20,8 +20,9 @@ import M.Pack
 
 -- | Deserialized position representation
 newtype Position = Position {getposition :: V3 Int32}
-  deriving stock (Eq, Ord, Show, Read, Generic, Typeable, Data, Lift)
+  deriving stock (Generic, Typeable, Data, Lift)
   deriving anyclass (Hashable, NFData)
+  deriving newtype (Eq, Ord, Show, Read)
 
 fi :: (Integral a, Num b) => a -> b
 fi = fromIntegral

@@ -19,6 +19,7 @@ import Control.Applicative.Combinators
 import Control.DeepSeq
 import Data.ByteString (ByteString)
 import Data.ByteString.Builder qualified as BB
+import Data.Char
 import Data.Coerce
 import Data.Data
 import Data.Fixed
@@ -45,6 +46,7 @@ import M.Pack.Internal.Types
 newtype EnumIndex i a = EnumIndex {enumindex :: a}
   deriving stock (Generic, Typeable, Data, Functor, Lift)
   deriving newtype (Eq, Ord, Show, Read, Hashable, NFData)
+  deriving newtype (Enum, Bounded)
 
 instance (Enum a, Integral i, Pack i) => Pack (EnumIndex i a) where
   pack = pack @i . fi . fromEnum . enumindex
@@ -158,13 +160,13 @@ unpackid =
   -- the value may not be empty
   let name = F.satisfyAscii
         \c ->
-          'a' <= c && c <= 'z'
-            || '0' <= c && c <= '9'
+          isAsciiLower c
+            || isDigit c
             || c `elem` (".-_" :: String)
       value = F.satisfyAscii
         \c ->
-          'a' <= c && c <= 'z'
-            || '0' <= c && c <= '9'
+          isAsciiLower c
+            || isDigit c
             || c `elem` ("._-/" :: String)
       colon = F.satisfyAscii (== ':')
       cvt = Identifier . T.pack
@@ -178,13 +180,14 @@ newtype IDorX a = IDorX
   { -- | VarInt ID (NOT +1) or inline value
     idorvalue :: Either Int32 a
   }
-  deriving stock (Generic, Typeable, Data, Functor, Lift)
-  deriving newtype (Eq, Ord, Show, Read, Hashable, NFData)
+  deriving stock (Generic, Typeable, Data, Lift)
+  deriving newtype (Eq, Ord, Show, Read, Hashable, NFData, Functor)
+  deriving newtype (Applicative, Monad, Foldable, Semigroup)
 
 instance (Pack a) => Pack (IDorX a) where
   pack = \case
     IDorX (Left regid) -> packleb32 (regid + 1) -- Registry ID + 1
-    IDorX (Right val) -> pack (0 :: LEB (Int32)) <> pack val -- Inline value
+    IDorX (Right val) -> pack (0 :: LEB Int32) <> pack val -- Inline value
 
 instance (Unpack a) => Unpack (IDorX a) where
   unpack = do
@@ -200,7 +203,7 @@ newtype IDSet = IDSet
     setnameorids :: Either Text (V.Vector Int32)
   }
   deriving stock (Generic, Typeable, Data)
-  deriving newtype (Eq, Ord, Show, Read, NFData)
+  deriving newtype (Eq, Ord, Show, Read, NFData, Semigroup)
 
 instance Pack IDSet where
   pack (IDSet (Left setname)) = "\0" <> pack setname
@@ -246,8 +249,8 @@ instance (Pack a, Foldable f) => Pack (PackFoldableVI f a) where
 --
 -- no length prefix, strict left fold
 newtype PackFoldable0 f a = PackFoldable0 {getpackfoldable0 :: f a}
-  deriving stock (Generic, Generic1, Typeable, Data, Functor, Lift)
-  deriving newtype (Eq, Ord, Show, Read, Hashable, NFData)
+  deriving stock (Generic, Generic1, Typeable, Data, Lift)
+  deriving newtype (Eq, Ord, Show, Read, Hashable, NFData, Functor)
   deriving newtype (Eq1, Ord1, Show1, Read1, Semigroup, Monoid)
   deriving newtype (Foldable, Foldable1, Applicative, Monad)
 
@@ -260,8 +263,8 @@ instance (Pack a, Foldable f) => Pack (PackFoldable0 f a) where
 -- 'Traversable'
 newtype UnpackRepresentable0 f a = UnpackRepresentable0
   {getunpackrepresentable0 :: f a}
-  deriving stock (Generic, Generic1, Typeable, Data, Functor, Lift)
-  deriving newtype (Eq, Ord, Show, Read, Hashable, NFData)
+  deriving stock (Generic, Generic1, Typeable, Data, Lift)
+  deriving newtype (Eq, Ord, Show, Read, Hashable, NFData, Functor)
   deriving newtype (Eq1, Ord1, Show1, Read1, Semigroup, Monoid)
   deriving newtype (Foldable, Foldable1, Applicative, Monad)
 

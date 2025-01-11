@@ -30,8 +30,7 @@ data TeleportFlags = TeleportFlags
     -- is still used.\"
     tprotvelfirst :: Bool
   }
-  deriving stock (Eq, Ord, Show, Read, Generic, Lift)
-  deriving stock (Data, Typeable)
+  deriving stock (Eq, Ord, Show, Read, Generic, Lift, Data, Typeable)
   deriving anyclass (Hashable, NFData)
 
 -- | do NOT use 8-bit packing for this type.

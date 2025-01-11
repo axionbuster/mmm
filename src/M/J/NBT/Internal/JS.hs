@@ -50,8 +50,7 @@ import Text.Printf
 -- * https://docs.oracle.com/en/java/javase/18/docs/api/java.base/java/io/DataInput.html#modified-utf-8
 newtype JS = JS {getjs :: Text}
   deriving stock (Generic, Typeable, Data, Lift)
-  deriving newtype (Eq, Ord, Show, Read, Hashable, NFData)
-  deriving newtype (IsString)
+  deriving newtype (Eq, Ord, Show, Read, Hashable, NFData, IsString)
 
 instance Pack JS where
   pack = pack . tocesu8

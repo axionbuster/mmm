@@ -18,14 +18,14 @@ import M.Pack.Internal.Types
 
 -- | derive 'Generic' instance for a type
 derivegeneric :: Q Type -> Q [Dec]
-derivegeneric ty = [d|deriving instance Generic $(ty)|]
+derivegeneric ty = [d|deriving instance Generic $ty|]
 
 -- | shadow-derive a 'Pack' instance for a type
 derivepack :: RunUserCoercion -> Q [Dec]
 derivepack RunUserCoercion {..} = do
   [d|
-    instance Pack $(datatyp) where
-      pack $(patnormal) = pack $(appshadow)
+    instance Pack $datatyp where
+      pack $patnormal = pack $appshadow
       {-# INLINEABLE pack #-}
     |]
 
@@ -34,7 +34,7 @@ deriveunpack :: RunUserCoercion -> Q [Dec]
 deriveunpack RunUserCoercion {..} = do
   [d|
     instance Unpack $(datatyp) where
-      unpack = unpack <&> \($(patshadow)) -> $(appnormal)
+      unpack = unpack <&> \($patshadow) -> $appnormal
       {-# INLINEABLE unpack #-}
     |]
 
@@ -42,12 +42,12 @@ deriveunpack RunUserCoercion {..} = do
 derivepackunpack :: RunUserCoercion -> Q [Dec]
 derivepackunpack RunUserCoercion {..} = do
   [d|
-    instance Pack $(datatyp) where
+    instance Pack $datatyp where
       pack $(patnormal) = pack $(appshadow)
       {-# INLINEABLE pack #-}
 
-    instance Unpack $(datatyp) where
-      unpack = unpack <&> \($(patshadow)) -> $(appnormal)
+    instance Unpack $datatyp where
+      unpack = unpack <&> \($patshadow) -> $appnormal
       {-# INLINEABLE unpack #-}
     |]
 

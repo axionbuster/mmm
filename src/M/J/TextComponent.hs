@@ -12,14 +12,14 @@ import M.Pack
 --
 -- see also: 'TextComponentJSON'
 newtype TextComponent = TextComponent {untextcomponent :: Tg}
-  deriving stock (Eq, Ord, Show, Generic, Typeable, Data)
-  deriving newtype (Pack, Unpack, NFData)
+  deriving stock (Generic, Typeable, Data)
+  deriving newtype (Eq, Ord, Show, Pack, Unpack, NFData)
 
 -- | WARNING: not implemented yet, but is still usable as a placeholder
 newtype TextComponentJSON = TextComponentJSON
   {untextcomponentjson :: TextComponent}
-  deriving stock (Eq, Ord, Show, Generic, Typeable, Data)
-  deriving newtype (NFData)
+  deriving stock (Generic, Typeable, Data)
+  deriving newtype (Eq, Ord, Show, NFData)
 
 -- | throws an error saying that 'TextComponentJSON' is not implemented yet
 instance Pack TextComponentJSON where
