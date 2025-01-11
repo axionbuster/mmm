@@ -8,16 +8,22 @@ module M.Pack.Internal.Newtypes
   )
 where
 
+import Control.Applicative.Combinators
 import Control.DeepSeq
 import Data.Coerce
 import Data.Data
 import Data.Fixed
 import Data.Hashable
 import Data.Int
+import Data.String
+import Data.Text (Text)
+import Data.Text qualified as T
 import FlatParse.Stateful qualified as F
 import GHC.Generics
 import Language.Haskell.TH.Syntax (Lift)
+import M.Pack.Internal.Etc ()
 import M.Pack.Internal.FromIntegral
+import M.Pack.Internal.Num
 import M.Pack.Internal.Types
 
 -- | represent any 'Enum' type using a zero-based index
@@ -90,3 +96,67 @@ degtoi8angle x = Int8Angle (round ((x * (256 / 360)) `mod'` 256))
 i8angledeg :: (RealFrac a) => Int8Angle -> a
 i8angledeg (Int8Angle x) = fromIntegral x * (360 / 256)
 {-# INLINEABLE i8angledeg #-}
+
+-- | an \"identifier\" string, used for names, tags, etc.
+--
+-- example: `minecraft:stone` or `stone/stone`
+--
+-- validation only happens when unpacking ('unpack')
+newtype Identifier = Identifier {identifier :: Text}
+  deriving stock
+    ( Generic,
+      Typeable,
+      Data,
+      Lift
+    )
+  deriving anyclass (NFData)
+  deriving newtype
+    ( Eq,
+      Ord,
+      Show,
+      Read,
+      Hashable,
+      Semigroup,
+      Monoid,
+      IsString
+    )
+
+ck :: (Integral a, Show a) => String -> a -> Parser st r a
+ck ctx n
+  | n < 0 = F.err $ ParseError $ ctx <> ": negative length " <> show n
+  | otherwise = pure n
+{-# INLINE ck #-}
+
+instance Unpack Identifier where
+  unpack = unpackleb32 >>= ck "unpack Identifier" >>= (`F.isolate` unpackid)
+  {-# INLINE unpack #-}
+
+instance Pack Identifier where
+  pack = pack . identifier
+  {-# INLINE pack #-}
+
+unpackid :: Parser st r Identifier
+unpackid =
+  -- ':' may happen at most once
+  -- if never occurs, then whole thing is the 'value' part of the ID
+  -- if occurs, the earlier part is the namespace, the later part is the value
+  -- the namespace may not be empty
+  -- the namespace consists of [a-z0-9.-_]
+  -- the value consists of [a-z0-9._-/] -- note that '/' is allowed anywhere
+  -- the value may not be empty
+  let name = F.satisfyAscii
+        \c ->
+          'a' <= c && c <= 'z'
+            || '0' <= c && c <= '9'
+            || c `elem` (".-_" :: String)
+      value = F.satisfyAscii
+        \c ->
+          'a' <= c && c <= 'z'
+            || '0' <= c && c <= '9'
+            || c `elem` ("._-/" :: String)
+      colon = F.satisfyAscii (== ':')
+      cvt = Identifier . T.pack
+      cmb (ns, v) w = cvt $ mconcat [ns, [v], w]
+   in fmap cvt (some value <* F.eof)
+        <|> liftA2 cmb (manyTill_ name colon) (some value <* F.eof)
+        <|> F.err "unpack Identifier: invalid or empty identifier"
