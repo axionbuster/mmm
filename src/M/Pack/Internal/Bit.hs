@@ -31,15 +31,48 @@
 -- * isEnabled = 'bit' 0
 -- * isVisible = 'bit' 1
 -- * isLocked = 'bit' 2
-module M.Pack.Internal.Bit (Bitwise (..), Bitreppable (..)) where
+--
+-- The module provides two types of bit sets:
+--
+-- 1. Variable-length 'Bitset':
+--
+-- @
+-- let bs = Bitset 5  -- Sets bits 0 and 2 (binary 101)
+-- testBit bs 0  -- True
+-- testBit bs 1  -- False
+-- testBit bs 2  -- True
+-- @
+--
+-- 2. Fixed-length 'FixedBitset':
+--
+-- @
+-- let fbs = FixedBitset \@8 5  -- 8-bit bitset with bits 0 and 2 set
+-- -- When packed/unpacked, always uses exactly 8 bits,
+-- -- padding with zeros or truncating as needed
+-- @
+--
+-- Both types of bitsets can be packed/unpacked for network transmission.
+-- Variable-length bitsets are stored as little-endian vectors of 'Int64's,
+-- while fixed-length bitsets are padded or truncated to their specified size.
+module M.Pack.Internal.Bit
+  ( Bitwise (..),
+    Bitreppable (..),
+    Bitset (..),
+    FixedBitset (..),
+  )
+where
 
 import Control.DeepSeq
 import Data.Bits
 import Data.ByteString.Builder (Builder)
 import Data.Data
 import Data.Hashable
+import Data.Int
+import Data.Vector.Unboxed qualified as VU
 import GHC.Generics
+import GHC.TypeLits
 import Language.Haskell.TH.Syntax (Lift)
+import M.Pack.Internal.Etc ()
 import M.Pack.Internal.Types
 
 -- | a wrapper type that enables bit-level packing of boolean product types.
@@ -130,3 +163,90 @@ instance (GBitRep f, GBitRep g) => GBitRep (f :*: g) where
   frombits i p = case frombits i p of
     (x, p') -> case frombits i p' of
       (y, p'') -> (x :*: y, p'')
+
+-- | variable-length bitset
+--
+-- (network representation: little-endian vector of 'Int64's)
+newtype Bitset = Bitset {getbitset :: Integer}
+  deriving stock (Generic, Typeable, Data, Lift)
+  deriving newtype (Eq, Ord, Show, Read, Hashable, NFData)
+  deriving newtype (Enum, Num, Real, Bits)
+
+instance Pack Bitset where
+  pack = pack . bitsettovui64
+  {-# INLINE pack #-}
+
+instance Unpack Bitset where
+  unpack = bitsetfromvui64 <$> unpack
+  {-# INLINE unpack #-}
+
+-- sort of a naive implementation, but it's fine for our purposes
+--
+-- actually returns the highest bit location + 1
+highestbitloc :: Integer -> Int
+highestbitloc x | x < 0 = error "highestbitloc: negative argument"
+highestbitloc 0 = 0
+highestbitloc x = 1 + highestbitloc (x .>>. 1)
+
+bitsettovuin :: Int -> Bitset -> VU.Vector Int8
+bitsettovuin n (Bitset x) = VU.fromListN (m + 1) (go x)
+  where
+    m = (highestbitloc x + n - 1) `div` n
+    go 0 = []
+    go y = fromIntegral y : go (y .>>. n)
+{-# INLINE bitsettovuin #-}
+
+bitsetfromvuin :: Int -> VU.Vector Int8 -> Bitset
+bitsetfromvuin n = Bitset . go 0 0
+  where
+    go a s v =
+      case VU.uncons v of
+        Nothing -> a
+        Just (x, xs) -> go (a .|. (fromIntegral x .<<. s)) (s + n) xs
+
+bitsettovui64 :: Bitset -> VU.Vector Int8
+bitsettovui64 = bitsettovuin 64
+
+bitsetfromvui64 :: VU.Vector Int8 -> Bitset
+bitsetfromvui64 = bitsetfromvuin 64
+
+bitsettovui8 :: Bitset -> VU.Vector Int8
+bitsettovui8 = bitsettovuin 8
+
+bitsetfromvui8 :: VU.Vector Int8 -> Bitset
+bitsetfromvui8 = bitsetfromvuin 8
+
+-- | a fixed-size bitset with @i@ bits
+--
+-- (implemented identically to 'Bitset'; only difference is that
+-- when ser/de occurs, it pads missing bits with zeroes. hence it is
+-- also possible to access out-of-bounds bits, and these bits will
+-- get silently truncated when ser/de occurs)
+newtype FixedBitset i = FixedBitset {getfixedbitset :: Integer}
+  deriving stock (Generic, Typeable, Data, Lift)
+  deriving newtype (Eq, Ord, Show, Read, Hashable, NFData)
+  deriving newtype (Enum, Num, Real, Bits)
+
+-- if too few bytes, pad with zeroes; if too many, truncate
+trim :: Int -> VU.Vector Int8 -> VU.Vector Int8
+trim n v
+  | VU.length v < n = v <> VU.replicate (n - VU.length v) 0
+  | otherwise = VU.take n v
+
+instance (KnownNat i) => Pack (FixedBitset i) where
+  pack =
+    pack
+      . trim (fromIntegral (natVal (Proxy @i) + 7 `div` 8) + 1)
+      . bitsettovui8
+      . Bitset
+      . getfixedbitset
+  {-# INLINE pack #-}
+
+instance (KnownNat i) => Unpack (FixedBitset i) where
+  unpack =
+    FixedBitset
+      . getbitset
+      . bitsetfromvui8
+      . trim (fromIntegral (natVal (Proxy @i) + 7 `div` 8) + 1)
+      <$> unpack
+  {-# INLINE unpack #-}
