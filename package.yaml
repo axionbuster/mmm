@@ -72,6 +72,16 @@ ghc-options:
 
 library:
   source-dirs: src
+  c-sources:
+  - src/M/Crypto/crypto.c
+  extra-libraries:
+  - crypto
+  cc-options:
+  - -Wall
+  - -Wextra
+  - -Werror
+  - -Wno-unused-parameter
+  - -O2
 
 tests:
   mmm-test:

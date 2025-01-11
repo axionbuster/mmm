@@ -27,6 +27,7 @@ source-repository head
 
 library
   exposed-modules:
+      M.Crypto
       M.J.Chunk.Net
       M.J.Misc
       M.J.NBT
@@ -74,6 +75,11 @@ library
       TypeApplications
       ViewPatterns
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints
+  cc-options: -Wall -Wextra -Werror -Wno-unused-parameter -O2
+  c-sources:
+      src/M/Crypto/crypto.c
+  extra-libraries:
+      crypto
   build-depends:
       adjunctions
     , base >=4.7 && <5
