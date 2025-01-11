@@ -11,7 +11,7 @@ module M.Pack.Internal.Types
     parsepure0,
     castsomepack,
     castsomeunpack,
-    someunpack,
+    unpacksome,
   )
 where
 
@@ -80,7 +80,7 @@ class Unpack a where
 
 -- | existential 'Unpack' container
 --
--- to 'unpack' this, try using 'someunpack' with a type application
+-- to 'unpack' this, try using 'unpacksome' with a type application
 data SomeUnpack = forall a. (Typeable a, Unpack a, Show a) => SomeUnpack a
   deriving stock (Typeable)
 
@@ -89,12 +89,12 @@ instance Show SomeUnpack where
   {-# INLINE show #-}
 
 -- | use a type application to retrieve a 'SomeUnpack'
-someunpack ::
+unpacksome ::
   forall a st r.
   (Typeable a, Unpack a, Show a) =>
   Parser st r SomeUnpack
-someunpack = SomeUnpack <$> unpack @a
-{-# INLINE someunpack #-}
+unpacksome = SomeUnpack <$> unpack @a
+{-# INLINE unpacksome #-}
 
 -- | cast a 'SomeUnpack' to a type
 castsomeunpack :: (Typeable a) => SomeUnpack -> Maybe a
