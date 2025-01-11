@@ -25,6 +25,7 @@ source-repository head
 
 library
   exposed-modules:
+      M.J.Misc
       M.J.NBT
       M.J.NBT.Internal.JS
       M.J.NBT.Internal.P
@@ -37,6 +38,7 @@ library
       M.Pack.Internal.FromIntegral
       M.Pack.Internal.Newtypes
       M.Pack.Internal.Num
+      M.Pack.Internal.TH
       M.Pack.Internal.Types
   other-modules:
       Paths_mmm

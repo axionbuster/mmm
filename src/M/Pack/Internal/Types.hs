@@ -48,6 +48,9 @@ parsepure0 p = parsepure p () 0
 class Pack a where
   -- | produce a 'Builder' from a value
   pack :: a -> Builder
+  default pack :: (Generic a, GPack (Rep a)) => a -> Builder
+  pack = gpack . from
+  {-# INLINE pack #-}
 
 -- | existential 'Pack' container
 data SomePack = forall a. (Typeable a, Pack a, Show a) => SomePack a
@@ -61,6 +64,9 @@ castsomepack = cast
 class Unpack a where
   -- | retrieve a 'Parser' for a type
   unpack :: Parser st r a
+  default unpack :: (Generic a, GUnpack (Rep a)) => Parser st r a
+  unpack = to <$> gunpack
+  {-# INLINE unpack #-}
 
 -- | existential 'Unpack' container
 data SomeUnpack = forall a. (Typeable a, Unpack a, Show a) => SomeUnpack a
