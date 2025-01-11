@@ -41,7 +41,7 @@ data ParticleStatus = PSAll | PSDecreased | PSMinimal
 
 [serde|
 .derive
-  Eq Ord Show Generic NFData
+  Eq Ord Show Generic NFData Data Typeable
 
 -- examples
 
