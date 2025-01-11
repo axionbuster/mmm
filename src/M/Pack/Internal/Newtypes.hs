@@ -4,6 +4,8 @@ module M.Pack.Internal.Newtypes
     Fixed' (..),
     Int8Angle (..),
     Identifier (..),
+    IDorX (..),
+    IDSet (..),
     degtoi8angle,
     i8angledeg,
   )
@@ -19,9 +21,11 @@ import Data.Int
 import Data.String
 import Data.Text (Text)
 import Data.Text qualified as T
+import Data.Vector qualified as V
 import FlatParse.Stateful qualified as F
 import GHC.Generics
 import Language.Haskell.TH.Syntax (Lift)
+import M.LEB
 import M.Pack.Internal.Etc ()
 import M.Pack.Internal.FromIntegral
 import M.Pack.Internal.Num
@@ -161,3 +165,38 @@ unpackid =
    in fmap cvt (some value <* F.eof)
         <|> liftA2 cmb (manyTill_ name colon) (some value <* F.eof)
         <|> F.err "unpack Identifier: invalid or empty identifier"
+
+-- | unresolved value; either an ID or an inline value
+newtype IDorX a = IDorX
+  { -- | VarInt ID + 1 if registry lookup, or inline value
+    idorvalue :: Either Int32 a
+  }
+
+instance (Pack a) => Pack (IDorX a) where
+  pack = \case
+    IDorX (Left regid) -> packleb32 (regid + 1) -- Registry ID + 1
+    IDorX (Right val) -> pack (0 :: LEB (Int32)) <> pack val -- Inline value
+
+instance (Unpack a) => Unpack (IDorX a) where
+  unpack = do
+    i <- unpackleb32
+    if i == 0
+      then IDorX . Right <$> unpack
+      else pure $ IDorX $ Left (i - 1)
+
+-- | potentially unresolved ID set; either an identifier for its location or
+-- an inline set of IDs
+newtype IDSet = IDSet
+  { -- | name of ID set or inline set
+    setnameorids :: Either Text (V.Vector Int32)
+  }
+
+instance Pack IDSet where
+  pack (IDSet (Left setname)) = "\0" <> pack setname
+  pack (IDSet (Right ids)) = packleb32 (V.length ids + 1) <> V.foldMap' pack ids
+
+instance Unpack IDSet where
+  unpack =
+    unpackleb32 >>= \case
+      0 -> IDSet . Left . identifier <$> unpack
+      n -> IDSet . Right <$> V.replicateM (n - 1) unpackleb32

@@ -20,6 +20,7 @@ default-extensions:
 - OverloadedStrings
 - OverloadedLists
 - QuasiQuotes
+- RecordWildCards
 - ScopedTypeVariables
 - TemplateHaskell
 - TypeApplications
