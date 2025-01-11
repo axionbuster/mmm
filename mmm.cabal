@@ -35,6 +35,7 @@ library
       M.J.NBT.Internal.Types
       M.J.Position
       M.J.Slot
+      M.J.TextComponent
       M.LEB
       M.Pack
       M.Pack.Internal.Bit
