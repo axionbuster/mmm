@@ -26,7 +26,7 @@ derivepack RunUserCoercion {..} = do
   [d|
     instance Pack $(datatyp) where
       pack $(patnormal) = pack $(appshadow)
-      {-# INLINE pack #-}
+      {-# INLINEABLE pack #-}
     |]
 
 -- | shadow-derive an 'Unpack' instance for a type
@@ -35,7 +35,7 @@ deriveunpack RunUserCoercion {..} = do
   [d|
     instance Unpack $(datatyp) where
       unpack = unpack <&> \($(patshadow)) -> $(appnormal)
-      {-# INLINE unpack #-}
+      {-# INLINEABLE unpack #-}
     |]
 
 -- | shadow-derive 'Pack' and 'Unpack' instances for a type
@@ -44,11 +44,11 @@ derivepackunpack RunUserCoercion {..} = do
   [d|
     instance Pack $(datatyp) where
       pack $(patnormal) = pack $(appshadow)
-      {-# INLINE pack #-}
+      {-# INLINEABLE pack #-}
 
     instance Unpack $(datatyp) where
       unpack = unpack <&> \($(patshadow)) -> $(appnormal)
-      {-# INLINE unpack #-}
+      {-# INLINEABLE unpack #-}
     |]
 
 -- | literally do nothing

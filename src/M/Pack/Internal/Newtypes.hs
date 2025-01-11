@@ -6,6 +6,7 @@ module M.Pack.Internal.Newtypes
     Identifier (..),
     IDorX (..),
     IDSet (..),
+    TakeRest (..),
     degtoi8angle,
     i8angledeg,
   )
@@ -13,6 +14,8 @@ where
 
 import Control.Applicative.Combinators
 import Control.DeepSeq
+import Data.ByteString (ByteString)
+import Data.ByteString.Builder qualified as BB
 import Data.Coerce
 import Data.Data
 import Data.Fixed
@@ -90,7 +93,7 @@ instance
 newtype Int8Angle = Int8Angle {int8angle :: Int8}
   deriving stock (Generic, Typeable, Data, Lift)
   deriving newtype (Eq, Ord, Show, Read, Hashable, NFData)
-  deriving newtype (Enum, Num, Real, Integral)
+  deriving newtype (Enum, Num, Real, Integral, Pack, Unpack)
 
 -- | convert degrees to 'Int8Angle'
 degtoi8angle :: (RealFrac a) => a -> Int8Angle
@@ -204,3 +207,18 @@ instance Unpack IDSet where
     unpackleb32 >>= \case
       0 -> IDSet . Left . identifier <$> unpack
       n -> IDSet . Right <$> V.replicateM (n - 1) unpackleb32
+
+-- | a newtype wrapper over 'ByteString'; not length-prefixed
+newtype TakeRest = TakeRest {gettakerest :: ByteString}
+  deriving stock (Generic, Typeable, Data, Lift)
+  deriving newtype (Show, Read, Eq, Ord, Hashable, NFData, Semigroup, Monoid)
+
+-- | 'TakeRest' is serialized as-is
+instance Pack TakeRest where
+  pack = BB.byteString . gettakerest
+  {-# INLINE pack #-}
+
+-- | 'TakeRest' is deserialized as-is and reads the rest of the input
+instance Unpack TakeRest where
+  unpack = TakeRest <$> F.takeRest
+  {-# INLINE unpack #-}

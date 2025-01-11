@@ -36,6 +36,7 @@ library
       M.J.Position
       M.J.Slot
       M.J.TextComponent
+      M.J.V769.Defs
       M.LEB
       M.Pack
       M.Pack.Internal.Bit
@@ -54,10 +55,12 @@ library
   default-extensions:
       AllowAmbiguousTypes
       BlockArguments
+      DataKinds
       DefaultSignatures
       DeriveAnyClass
       DerivingStrategies
       DerivingVia
+      DuplicateRecordFields
       LambdaCase
       LinearTypes
       OverloadedStrings
@@ -103,10 +106,12 @@ test-suite mmm-test
   default-extensions:
       AllowAmbiguousTypes
       BlockArguments
+      DataKinds
       DefaultSignatures
       DeriveAnyClass
       DerivingStrategies
       DerivingVia
+      DuplicateRecordFields
       LambdaCase
       LinearTypes
       OverloadedStrings

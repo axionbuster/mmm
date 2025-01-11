@@ -11,10 +11,12 @@ language: GHC2021
 default-extensions:
 - AllowAmbiguousTypes
 - BlockArguments
+- DataKinds
 - DefaultSignatures
 - DeriveAnyClass
 - DerivingStrategies
 - DerivingVia
+- DuplicateRecordFields
 - LambdaCase
 - LinearTypes
 - OverloadedStrings
