@@ -25,6 +25,7 @@ source-repository head
 
 library
   exposed-modules:
+      M.J.Chunk.Net
       M.J.Misc
       M.J.NBT
       M.J.NBT.Internal.JS

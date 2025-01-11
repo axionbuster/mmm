@@ -5,15 +5,15 @@
 
 packages:
 - completed:
-    commit: 26f16d97d2b92ad9007ffe128aafc8015a00bf87
+    commit: c22d09aec7870fac30f73f87e71d1a9e23a7c777
     git: https://github.com/axionbuster/th-serde.git
     name: th-serde
     pantry-tree:
-      sha256: ceae1d95911d42c7d6483abb543b1c819d43f52dee030e15ae9a7f180c96c1d4
+      sha256: a4572d18b1907d9a57ddea7e91406fcecd1ed678ef1f8d905567b61bd55b96bd
       size: 989
-    version: 0.1.2.1
+    version: 0.1.2.2
   original:
-    commit: 26f16d97d2b92ad9007ffe128aafc8015a00bf87
+    commit: c22d09aec7870fac30f73f87e71d1a9e23a7c777
     git: https://github.com/axionbuster/th-serde.git
 - completed:
     commit: d534b85bfac8b27efd96fab1838628e08a8aa163
