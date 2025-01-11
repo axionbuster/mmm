@@ -175,7 +175,7 @@ unpackid =
 
 -- | unresolved value; either an ID or an inline value
 newtype IDorX a = IDorX
-  { -- | VarInt ID + 1 if registry lookup, or inline value
+  { -- | VarInt ID (NOT +1) or inline value
     idorvalue :: Either Int32 a
   }
   deriving stock (Generic, Typeable, Data, Functor, Lift)
