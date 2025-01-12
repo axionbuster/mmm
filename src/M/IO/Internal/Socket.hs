@@ -34,7 +34,8 @@ withcxfromsocket sk cont = do
   k <- newTVarIO Nothing
   -- need to go from the easy way to the hard way.
   -- why? because Datagram.hs expects functions to be passed in
-  -- for crypto, and has a dedicated data structure for compression thresholds
+  -- for crypto, so we need to convert encryption keys to
+  -- encryption functions
   let watchk = do
         kold <- newTVarIO Nothing
         forever do
