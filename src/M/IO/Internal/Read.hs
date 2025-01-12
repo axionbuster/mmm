@@ -70,7 +70,7 @@ parseio v i s f = parse mempty
         read s >>= \case
           -- note: FlatParse is not a resumable parser.
           -- so, we must start over from the beginning
-          Just t -> let u = b <> t in parse u
+          Just t -> parse (b <> t) -- concatenate and start over
           Nothing -> fail "parseio: unexpected end of input"
       Err e -> throwIO e
 
