@@ -16,6 +16,7 @@ module M.Pack.Internal.Types
 where
 
 import Control.Applicative
+import Control.Exception
 import Control.Monad.ST.Strict
 import Data.ByteString (ByteString)
 import Data.ByteString.Builder (Builder)
@@ -24,6 +25,7 @@ import Data.String
 import Data.Void
 import FlatParse.Stateful qualified as F
 import GHC.Generics
+import Language.Haskell.TH.Syntax (Lift)
 
 -- | our parser type
 type Parser st r = F.ParserT st r ParseError
@@ -33,7 +35,9 @@ type Result = F.Result ParseError
 
 -- | our parser error type
 newtype ParseError = ParseError {showparseerror :: String} -- generic message
-  deriving newtype (Show, IsString)
+  deriving newtype (Eq, Ord, Show, IsString)
+  deriving stock (Typeable, Data, Generic, Lift)
+  deriving anyclass (Exception)
 
 -- | run a pure parser efficiently (by inlining)
 parsepure :: (forall st. Parser st r a) -> r -> Int -> ByteString -> Result a

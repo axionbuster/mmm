@@ -28,6 +28,7 @@ source-repository head
 library
   exposed-modules:
       M.Crypto
+      M.IO.Internal.Read
       M.J.Chunk.Net
       M.J.Misc
       M.J.NBT
@@ -87,6 +88,7 @@ library
     , deepseq
     , flatparse
     , hashable
+    , io-streams
     , linear
     , parser-combinators
     , template-haskell
@@ -103,6 +105,7 @@ test-suite mmm-test
   main-is: Spec.hs
   other-modules:
       M.BitSpec
+      M.IO.Internal.ReadSpec
       M.J.NBT.Internal.JSSpec
       M.J.NBT.Internal.PSpec
       M.LEBSpec
@@ -141,6 +144,7 @@ test-suite mmm-test
     , flatparse
     , hashable
     , hspec
+    , io-streams
     , linear
     , mmm
     , parser-combinators
