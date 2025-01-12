@@ -35,6 +35,7 @@ library
       M.Crypto
       M.IO.Internal.Datagram
       M.IO.Internal.Read
+      M.IO.Internal.Socket
       M.IO.Internal.Zlib
       M.J.Chunk.Net
       M.J.Misc
@@ -94,6 +95,7 @@ library
       crypto
   build-depends:
       adjunctions
+    , async
     , base >=4.7 && <5
     , bytestring
     , deepseq
@@ -103,6 +105,7 @@ library
     , io-streams
     , lens
     , linear
+    , network
     , parser-combinators
     , stm
     , template-haskell
@@ -159,6 +162,7 @@ test-suite mmm-test
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       adjunctions
+    , async
     , base >=4.7 && <5
     , binary
     , bytestring
@@ -172,6 +176,7 @@ test-suite mmm-test
     , lens
     , linear
     , mmm
+    , network
     , parser-combinators
     , stm
     , template-haskell

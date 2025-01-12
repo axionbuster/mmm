@@ -48,6 +48,7 @@ description:         Please see the README on GitHub at <https://github.com/axio
 
 dependencies:
 - adjunctions
+- async
 - base >= 4.7 && < 5
 - bytestring
 - deepseq
@@ -57,6 +58,7 @@ dependencies:
 - io-streams
 - lens
 - linear
+- network
 - parser-combinators
 - stm
 - template-haskell

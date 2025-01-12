@@ -46,7 +46,7 @@ data EOF = EOF deriving (Show, Typeable, Exception)
 
 -- | compression flag
 data CompressionOn
-  = -- | threshold, inclusive
+  = -- | threshold, inclusive, positive
     CompressionOn !Int
   | CompressionOff
   deriving (Eq, Ord, Show, Generic, Data, Typeable, NFData, Lift)
