@@ -95,7 +95,7 @@ makepacketstreami c s =
       where
         checkuncomplen l
           | l < 0 = throw "parser3: negative length"
-          | l > 0x7FFFFF = throw "parser3: length too large"
+          | l > 0x800000 = throw "parser3: length too large"
           | otherwise = pure l
 
 -- encoding
