@@ -27,6 +27,11 @@ source-repository head
 
 library
   exposed-modules:
+      M.Collision
+      M.Collision.Effectful
+      M.Collision.Internal.Face
+      M.Collision.Internal.March
+      M.Collision.Pure
       M.Crypto
       M.IO.Internal.Datagram
       M.IO.Internal.Read
@@ -68,14 +73,18 @@ library
       DuplicateRecordFields
       LambdaCase
       LinearTypes
+      MultiWayIf
       OverloadedStrings
       OverloadedLists
       OverloadedRecordDot
+      PatternSynonyms
       QuasiQuotes
       RecordWildCards
       ScopedTypeVariables
       TemplateHaskell
       TypeApplications
+      TypeFamilies
+      UndecidableInstances
       ViewPatterns
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints
   cc-options: -Wall -Wextra -Werror -Wno-unused-parameter -O2
@@ -88,9 +97,11 @@ library
     , base >=4.7 && <5
     , bytestring
     , deepseq
+    , effectful
     , flatparse
     , hashable
     , io-streams
+    , lens
     , linear
     , parser-combinators
     , stm
@@ -109,6 +120,9 @@ test-suite mmm-test
   main-is: Spec.hs
   other-modules:
       M.BitSpec
+      M.Collision.BlockModel1
+      M.Collision.BoxSpec
+      M.Collision.Collision2Spec
       M.IO.Internal.ReadSpec
       M.J.NBT.Internal.JSSpec
       M.J.NBT.Internal.PSpec
@@ -129,14 +143,18 @@ test-suite mmm-test
       DuplicateRecordFields
       LambdaCase
       LinearTypes
+      MultiWayIf
       OverloadedStrings
       OverloadedLists
       OverloadedRecordDot
+      PatternSynonyms
       QuasiQuotes
       RecordWildCards
       ScopedTypeVariables
       TemplateHaskell
       TypeApplications
+      TypeFamilies
+      UndecidableInstances
       ViewPatterns
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints -threaded -rtsopts -with-rtsopts=-N
   build-depends:
@@ -144,11 +162,14 @@ test-suite mmm-test
     , base >=4.7 && <5
     , binary
     , bytestring
+    , containers
     , deepseq
+    , effectful
     , flatparse
     , hashable
     , hspec
     , io-streams
+    , lens
     , linear
     , mmm
     , parser-combinators

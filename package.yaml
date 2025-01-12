@@ -19,14 +19,18 @@ default-extensions:
 - DuplicateRecordFields
 - LambdaCase
 - LinearTypes
+- MultiWayIf
 - OverloadedStrings
 - OverloadedLists
 - OverloadedRecordDot
+- PatternSynonyms
 - QuasiQuotes
 - RecordWildCards
 - ScopedTypeVariables
 - TemplateHaskell
 - TypeApplications
+- TypeFamilies
+- UndecidableInstances
 - ViewPatterns
 
 extra-source-files:
@@ -47,9 +51,11 @@ dependencies:
 - base >= 4.7 && < 5
 - bytestring
 - deepseq
+- effectful
 - flatparse
 - hashable
 - io-streams
+- lens
 - linear
 - parser-combinators
 - stm
@@ -95,6 +101,7 @@ tests:
     - -rtsopts
     - -with-rtsopts=-N
     dependencies:
+    - containers
     - mmm
     - hspec
     - binary
