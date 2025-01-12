@@ -15,7 +15,7 @@ import System.IO.Streams.Network (socketToStreams)
 data Connection = Connection
   { -- | encryption key, AES-128-CFB8; doubles as IV
     cxkey :: TVar (Maybe ByteString),
-    -- | compression threshold; make nonnegative to enable
+    -- | compression threshold; negative = off, non-negative = on with threshold
     cxcompth :: TVar Int,
     -- | input stream
     cxinput :: InputStream Uninterpreted,
@@ -26,13 +26,12 @@ data Connection = Connection
 -- | create a connection from a socket
 withcxfromsocket :: Socket -> (Connection -> IO a) -> IO a
 withcxfromsocket sk cont = do
-  th <- newTVarIO CompressionOff
+  th <- newTVarIO (-1) -- compression off by default
   (i0, o0) <- socketToStreams sk
   (ef, df) <- liftA2 (,) (newTVarIO pure) (newTVarIO pure)
   (i1, o1) <- liftA2 (,) (makedecrypting df i0) (makeencrypting ef o0)
   (i2, o2) <- liftA2 (,) (makepacketstreami th i1) (makepacketstreamo th o1)
   k <- newTVarIO Nothing
-  t <- newTVarIO 0
   -- need to go from the easy way to the hard way.
   -- why? because Datagram.hs expects functions to be passed in
   -- for crypto, and has a dedicated data structure for compression thresholds
@@ -55,23 +54,11 @@ withcxfromsocket sk cont = do
               atomically do
                 writeTVar ef (aesupdate aese)
                 writeTVar df (aesupdate aesd)
-      watcht = do
-        told <- newTVarIO 0
-        forever do
-          atomically do
-            told' <- readTVar told
-            tnew <- readTVar t
-            when (tnew == told') retry
-            writeTVar told tnew
-            writeTVar th (posonly tnew)
-  withAsync watchk \_ -> withAsync watcht \_ ->
+  withAsync watchk \_ ->
     cont
       Connection
         { cxkey = k,
-          cxcompth = t,
+          cxcompth = th,
           cxinput = i2,
           cxoutput = o2
         }
-  where
-    posonly n | n <= 0 = CompressionOff
-    posonly n = CompressionOn n

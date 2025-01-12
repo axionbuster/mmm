@@ -2,7 +2,6 @@
 module M.IO.Internal.Datagram
   ( -- * Types
     Uninterpreted (..),
-    CompressionOn (..),
     EOF (..),
 
     -- * Streams
@@ -15,7 +14,6 @@ where
 
 import Codec.Compression.Zlib
 import Control.Concurrent.STM
-import Control.DeepSeq
 import Control.Exception hiding (throw)
 import Control.Monad.IO.Class
 import Data.ByteString (ByteString)
@@ -26,8 +24,6 @@ import Data.ByteString.Lazy qualified as BL
 import Data.Data
 import Data.Word
 import FlatParse.Stateful
-import GHC.Generics
-import Language.Haskell.TH.Syntax (Lift)
 import M.IO.Internal.Read
 import M.IO.Internal.Zlib
 import M.Pack hiding (Parser)
@@ -44,31 +40,24 @@ data Uninterpreted = Uninterpreted
 -- | end of input
 data EOF = EOF deriving (Show, Typeable, Exception)
 
--- | compression flag
-data CompressionOn
-  = -- | threshold, inclusive, positive
-    CompressionOn !Int
-  | CompressionOff
-  deriving (Eq, Ord, Show, Generic, Data, Typeable, NFData, Lift)
-
 -- | make a stream of uninterpreted packets
 makepacketstreami ::
-  -- | compression flag reference
-  TVar CompressionOn ->
+  -- | compression threshold reference (negative = off, non-negative = on with threshold)
+  TVar Int ->
   -- | input stream
   InputStream ByteString ->
   -- | stream of uninterpreted packets
   IO (InputStream Uninterpreted)
 makepacketstreami c s =
   makeInputStream do
-    c' <- readTVarIO c
-    Just <$> takepacket c' s
+    threshold <- readTVarIO c
+    Just <$> takepacket threshold s
   where
-    takepacket d b = do
+    takepacket threshold b = do
       t <- parseio0 @ParseError b checkedlength
       u <- readExactly t b
       let p
-            | CompressionOn _ <- d = parsepostcomp
+            | threshold >= 0 = parsepostcomp
             | otherwise = parseprecomp
       runParserIO p () 0 u >>= \case
         OK a _ _ -> pure a
@@ -115,15 +104,15 @@ instance Monoid Building where
 
 -- | make an output stream of uninterpreted packets
 makepacketstreamo ::
-  TVar CompressionOn ->
+  TVar Int ->
   OutputStream ByteString ->
   IO (OutputStream Uninterpreted)
 makepacketstreamo c s =
   makeOutputStream \case
     Nothing -> throwIO EOF
     Just u -> do
-      c' <- readTVarIO c
-      write (Just $ reify $ encode c' u) s
+      threshold <- readTVarIO c
+      write (Just $ reify $ encode threshold u) s
   where
     reify = B.toStrict . BB.toLazyByteString
     -- notes on "INLINE": inline thought to be good for sharing
@@ -133,9 +122,9 @@ makepacketstreamo c s =
       let B n b = encodez d u
        in packleb32 n <> b
     {-# INLINE encode #-}
-    encodez CompressionOff u = encodeplain u
-    encodez (CompressionOn t) u@(Uninterpreted f d)
-      | B.length d < t = encodeu u
+    encodez threshold u@(Uninterpreted f d)
+      | threshold < 0 = encodeplain u
+      | B.length d < threshold = encodeu u
       | otherwise =
           mkb (packleb32 (B.length d))
             <> mkb (BB.word8 f)
