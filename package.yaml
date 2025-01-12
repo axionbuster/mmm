@@ -52,6 +52,7 @@ dependencies:
 - io-streams
 - linear
 - parser-combinators
+- stm
 - template-haskell
 - text
 - th-serde

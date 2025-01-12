@@ -93,6 +93,7 @@ library
     , io-streams
     , linear
     , parser-combinators
+    , stm
     , template-haskell
     , text
     , th-serde
@@ -151,6 +152,7 @@ test-suite mmm-test
     , linear
     , mmm
     , parser-combinators
+    , stm
     , template-haskell
     , text
     , th-serde

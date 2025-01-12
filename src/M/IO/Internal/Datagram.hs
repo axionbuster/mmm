@@ -14,6 +14,7 @@ module M.IO.Internal.Datagram
 where
 
 import Codec.Compression.Zlib
+import Control.Concurrent.STM
 import Control.DeepSeq
 import Control.Exception hiding (throw)
 import Control.Monad.IO.Class
@@ -23,7 +24,6 @@ import Data.ByteString.Builder (Builder)
 import Data.ByteString.Builder qualified as BB
 import Data.ByteString.Lazy qualified as BL
 import Data.Data
-import Data.IORef
 import Data.Word
 import FlatParse.Stateful
 import GHC.Generics
@@ -54,14 +54,14 @@ data CompressionOn
 -- | make a stream of uninterpreted packets
 makepacketstreami ::
   -- | compression flag reference
-  IORef CompressionOn ->
+  TVar CompressionOn ->
   -- | input stream
   InputStream ByteString ->
   -- | stream of uninterpreted packets
   IO (InputStream Uninterpreted)
 makepacketstreami c s =
   makeInputStream do
-    c' <- readIORef c
+    c' <- readTVarIO c
     Just <$> takepacket c' s
   where
     takepacket d b = do
@@ -115,14 +115,14 @@ instance Monoid Building where
 
 -- | make an output stream of uninterpreted packets
 makepacketstreamo ::
-  IORef CompressionOn ->
+  TVar CompressionOn ->
   OutputStream ByteString ->
   IO (OutputStream Uninterpreted)
 makepacketstreamo c s =
   makeOutputStream \case
     Nothing -> throwIO EOF
     Just u -> do
-      c' <- readIORef c
+      c' <- readTVarIO c
       write (Just $ reify $ encode c' u) s
   where
     reify = B.toStrict . BB.toLazyByteString
@@ -151,7 +151,7 @@ makepacketstreamo c s =
 -- | register an octet streaming decryptor to an input stream
 makedecrypting ::
   -- | decryptor
-  IORef (ByteString -> IO ByteString) ->
+  TVar (ByteString -> IO ByteString) ->
   -- | input stream
   InputStream ByteString ->
   -- | new input stream
@@ -159,12 +159,12 @@ makedecrypting ::
 makedecrypting f s = makeInputStream do
   read s >>= \case
     Nothing -> pure Nothing
-    Just b -> readIORef f >>= (Just <$>) . ($ b)
+    Just b -> readTVarIO f >>= (Just <$>) . ($ b)
 
 -- | register an octet stremaing encryptor to an output stream
 makeencrypting ::
   -- | encryptor
-  IORef (ByteString -> IO ByteString) ->
+  TVar (ByteString -> IO ByteString) ->
   -- | output stream
   OutputStream ByteString ->
   -- | new output stream
@@ -172,5 +172,5 @@ makeencrypting ::
 makeencrypting f s = makeOutputStream \case
   Nothing -> pure ()
   Just b -> do
-    g <- readIORef f
+    g <- readTVarIO f
     g b >>= \c -> write (Just c) s
