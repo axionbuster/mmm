@@ -1,4 +1,4 @@
-name: Haddock
+name: CI
 
 on:
   push:
@@ -7,7 +7,7 @@ on:
     branches: [ master ]
 
 jobs:
-  build:
+  haddock:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
@@ -30,7 +30,7 @@ jobs:
 
     - name: Build Documentation
       run: |
-        stack build --fast --haddock --no-haddock-deps
+        stack build --fast --haddock --no-haddock-deps --no-run-tests
         
         # Find documentation directory
         DIST_DOC=$(find .stack-work/dist -type d -name "html" -print -quit)
@@ -57,3 +57,27 @@ jobs:
         publish_dir: ./public
         force_orphan: true
         enable_jekyll: false
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Setup Haskell Stack
+      uses: haskell-actions/setup@v2
+      with:
+        enable-stack: true
+        stack-version: 'latest'
+
+    - name: Cache Stack Files
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.stack
+          .stack-work
+        key: ${{ runner.os }}-stack-${{ hashFiles('stack.yaml.lock', 'package.yaml') }}
+        restore-keys: |
+          ${{ runner.os }}-stack-
+
+    - name: Run Tests
+      run: stack test --fast
