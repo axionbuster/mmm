@@ -60,11 +60,13 @@ dependencies:
 - lens
 - linear
 - network
+- network-run
 - parser-combinators
 - stm
 - template-haskell
 - text
 - th-serde
+- unliftio
 - unordered-containers
 - uuid-types
 - varcomp

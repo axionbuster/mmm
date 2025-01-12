@@ -20,6 +20,8 @@ import Data.Data
 import Data.Hashable
 import Data.Word
 import Effectful
+import Effectful.Labeled
+import Effectful.Labeled.State
 import Effectful.TH
 import GHC.Generics
 import Language.Haskell.TH.Syntax (Lift)
@@ -38,7 +40,7 @@ data Direction = Inbound | Outbound
 -- | operations on a packet
 data Op r where
   -- | parse any packet
-  Parse :: Uninterpreted %1 -> Op (IO SomeUnpack)
+  Parse :: Uninterpreted %1 -> Op SomeUnpack
   -- | find code of a packet based on its 'TypeRep'
   Code :: Direction %1 -> TypeRep %1 -> Op (Maybe Word8)
   deriving (Typeable)
@@ -72,19 +74,19 @@ instance NFData (Op r) where
 -- | parser state object (as in object-oriented programming)
 newtype ParserState = ParserState
   { -- | send a \"message\" to the parser state and get a response
-    send2parserstate :: forall r. Op r -> IO r
+    send2parserstate :: forall r. Op r -> r
   }
 
 -- | the communication effect
 data Talking :: Effect where
-  -- | listen for a message that can be unpacked into type @a@
-  Hear :: (Unpack a) => Talking m a
+  -- | listen for a message and assert its type
+  Hear :: (Unpack a, Typeable a) => Talking m a
   -- | listen for a raw uninterpreted message
   HearU :: Talking m Uninterpreted
   -- | listen for a message with dynamic unpacking
   HearA :: Talking m SomeUnpack
-  -- | send a packable message of type @a@
-  Say :: (Pack a) => a -> Talking m ()
+  -- | send a message
+  Say :: (Pack a, Typeable a) => a -> Talking m ()
   -- | set the compression threshold
   --
   -- - positive: compress messages larger than this size
@@ -92,7 +94,11 @@ data Talking :: Effect where
   Setcompression :: Int -> Talking m ()
   -- | set the encryption key
   Setencryption :: ByteString -> Talking m ()
-  -- | change the parser state; enter a new state
-  Enter :: ParserState -> Talking m ()
 
 makeEffect ''Talking
+
+-- | enter the parser state
+enter ::
+  (Labeled "parserstate" (State ParserState) :> es) =>
+  ParserState -> Eff es ()
+enter = put @"parserstate"

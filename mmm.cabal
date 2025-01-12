@@ -35,6 +35,7 @@ library
       M.Crypto
       M.IO
       M.IO.Internal.Datagram
+      M.IO.Internal.EffectSocket
       M.IO.Internal.EffectTypes
       M.IO.Internal.Read
       M.IO.Internal.Socket
@@ -109,11 +110,13 @@ library
     , lens
     , linear
     , network
+    , network-run
     , parser-combinators
     , stm
     , template-haskell
     , text
     , th-serde
+    , unliftio
     , unordered-containers
     , uuid-types
     , varcomp
@@ -181,11 +184,13 @@ test-suite mmm-test
     , linear
     , mmm
     , network
+    , network-run
     , parser-combinators
     , stm
     , template-haskell
     , text
     , th-serde
+    , unliftio
     , unordered-containers
     , uuid-types
     , varcomp
