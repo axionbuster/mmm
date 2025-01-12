@@ -1,6 +1,7 @@
 -- | Keep-alive mechanism
 module M.IO.KeepAlive (KeepAliveFail (..), skeepalive) where
 
+import Control.Applicative
 import Control.Monad
 import Data.Data
 import Data.Functor
@@ -12,7 +13,13 @@ import M.Pack
 import System.Random
 
 -- | keep-alive failure
-data KeepAliveFail a = KeepAliveFail {kasent :: a, kreceived :: a}
+data KeepAliveFail a
+  = KeepAliveFail
+      -- | sent
+      a
+      -- | received
+      a
+  | KeepAliveTimeout
   deriving (Eq, Show, Typeable, Exception)
 
 -- | server's keep-alive mechanism
@@ -32,11 +39,12 @@ skeepalive ::
 skeepalive =
   wait *> forever do
     a <- send
-    b <- wait *> receive
+    b <- wait *> (receive <|> timeout)
     unless (a == b) do
-      throw a b
+      mismatch a b
   where
     wait = threadDelay 15_000_000 -- microseconds
     send = liftIO (randomIO :: IO a) >>= \n -> say n $> n
     receive = hear @a Immediately
-    throw = (throwIO .) . KeepAliveFail
+    mismatch = (throwIO .) . KeepAliveFail
+    timeout = throwIO (KeepAliveTimeout @a)
