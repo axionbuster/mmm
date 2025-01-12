@@ -34,6 +34,7 @@ library
       M.Collision.Pure
       M.Crypto
       M.IO
+      M.IO.Effect
       M.IO.Internal.Datagram
       M.IO.Internal.Read
       M.IO.Internal.Socket
@@ -101,6 +102,7 @@ library
     , bytestring
     , deepseq
     , effectful
+    , effectful-th
     , flatparse
     , hashable
     , io-streams
@@ -170,6 +172,7 @@ test-suite mmm-test
     , containers
     , deepseq
     , effectful
+    , effectful-th
     , flatparse
     , hashable
     , hspec

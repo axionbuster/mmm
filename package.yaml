@@ -53,6 +53,7 @@ dependencies:
 - bytestring
 - deepseq
 - effectful
+- effectful-th
 - flatparse
 - hashable
 - io-streams
