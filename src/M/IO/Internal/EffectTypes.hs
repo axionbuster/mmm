@@ -1,5 +1,5 @@
 -- | Networking effects for Minecraft clients and servers.
-module M.IO.Effect
+module M.IO.Internal.EffectTypes
   ( Talking (..),
     Direction (..),
     Op (..),
@@ -14,8 +14,10 @@ module M.IO.Effect
   )
 where
 
+import Control.DeepSeq
 import Data.ByteString (ByteString)
 import Data.Data
+import Data.Hashable
 import Data.Word
 import Effectful
 import Effectful.TH
@@ -31,6 +33,7 @@ import M.Pack
 -- hardcode the direction of a packet
 data Direction = Inbound | Outbound
   deriving (Eq, Show, Read, Ord, Enum, Bounded, Data, Typeable, Generic, Lift)
+  deriving (Hashable, NFData)
 
 -- | operations on a packet
 data Op r where
@@ -39,6 +42,32 @@ data Op r where
   -- | find code of a packet based on its 'TypeRep'
   Code :: Direction %1 -> TypeRep %1 -> Op (Maybe Word8)
   deriving (Typeable)
+
+instance Show (Op r) where
+  show = \case
+    Parse u -> "Parse " ++ show u
+    Code d t -> "Code " ++ show d ++ " " ++ show t
+
+instance Eq (Op r) where
+  Parse u == Parse u' = u == u'
+  Code d t == Code d' t' = d == d' && t == t'
+
+instance Ord (Op r) where
+  compare (Parse u) (Parse u') = compare u u'
+  compare (Code d t) (Code d' t') = compare (d, t) (d', t')
+
+instance Hashable (Op r) where
+  hashWithSalt s (Parse u) = s `hashWithSalt` (0 :: Int) `hashWithSalt` u
+  hashWithSalt s (Code d t) =
+    s
+      `hashWithSalt` (1 :: Int)
+      `hashWithSalt` d
+      `hashWithSalt` t
+
+instance NFData (Op r) where
+  rnf = \case
+    Parse u -> rnf u
+    Code d t -> rnf d `seq` rnf t
 
 -- | parser state object (as in object-oriented programming)
 newtype ParserState = ParserState

@@ -14,6 +14,7 @@ where
 
 import Codec.Compression.Zlib
 import Control.Concurrent.STM
+import Control.DeepSeq
 import Control.Exception hiding (throw)
 import Control.Monad.IO.Class
 import Data.ByteString (ByteString)
@@ -22,6 +23,7 @@ import Data.ByteString.Builder (Builder)
 import Data.ByteString.Builder qualified as BB
 import Data.ByteString.Lazy qualified as BL
 import Data.Data
+import Data.Hashable
 import Data.Word
 import FlatParse.Stateful
 import GHC.Generics
@@ -38,7 +40,7 @@ data Uninterpreted = Uninterpreted
   { pkcode :: !Word8,
     pkdata :: !ByteString
   }
-  deriving (Typeable, Generic, Data, Lift)
+  deriving (Eq, Ord, Hashable, Typeable, Generic, Data, Lift, NFData)
 
 instance Show Uninterpreted where
   show (Uninterpreted c d) = printf "Uninterpreted %d <%d bytes>" c (B.length d)

@@ -2,11 +2,12 @@
 module M.IO
   ( Connection (..),
     Uninterpreted (..),
-    module M.IO.Effect,
+    -- | define communication effects
+    module M.IO.Internal.EffectTypes,
     withcxfromsocket,
   )
 where
 
-import M.IO.Effect
 import M.IO.Internal.Datagram
+import M.IO.Internal.EffectTypes
 import M.IO.Internal.Socket

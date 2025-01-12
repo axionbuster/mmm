@@ -34,8 +34,8 @@ library
       M.Collision.Pure
       M.Crypto
       M.IO
-      M.IO.Effect
       M.IO.Internal.Datagram
+      M.IO.Internal.EffectTypes
       M.IO.Internal.Read
       M.IO.Internal.Socket
       M.IO.Internal.Zlib
