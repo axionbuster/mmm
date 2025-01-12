@@ -62,6 +62,7 @@ dependencies:
 - network
 - network-run
 - parser-combinators
+- random
 - stm
 - template-haskell
 - text

@@ -14,6 +14,7 @@ import Effectful
 import Effectful.Concurrent.STM
 import Effectful.Dispatch.Dynamic
 import Effectful.Exception
+import Effectful.NonDet
 import Effectful.State.Dynamic
 import M.IO.Internal.Datagram
 import M.IO.Internal.EffectTypes
@@ -47,15 +48,20 @@ reify t b = do
 
 -- Run a computation with Talking effect using a Connection
 runtalking0 ::
-  ( IOE :> es,
-    Concurrent :> es,
-    State ParserState :> es
-  ) =>
+  (IOE :> es, NonDet :> es, State ParserState :> es, Concurrent :> es) =>
   Connection -> Eff (Talking : es) a -> Eff es a
 runtalking0 cx = interpret_ \case
-  Hear -> handleheara cx.cxinput <&> fromJust . castsomeunpack
-  HearU -> handlehearu cx.cxinput
-  HearA -> handleheara cx.cxinput
+  Hear i -> case i of
+    Immediately ->
+      handleheara_immediate cx.cxinput
+        <&> fromJust . castsomeunpack
+    Eventually -> handleheara cx.cxinput <&> fromJust . castsomeunpack
+  HearU i -> case i of
+    Immediately -> handlehearu_immediate cx.cxinput
+    Eventually -> handlehearu cx.cxinput
+  HearA i -> case i of
+    Immediately -> handleheara_immediate cx.cxinput
+    Eventually -> handleheara cx.cxinput
   -- todo: it's possible to create a stream that accepts Builder instead
   -- of ByteString for the sake of efficiency (from io-streams itself)
   -- but I haven't given it much thought yet
@@ -66,6 +72,15 @@ runtalking0 cx = interpret_ \case
 handlehearu :: (IOE :> es) => InputStream Uninterpreted -> Eff es Uninterpreted
 handlehearu i = liftIO (read i) >>= maybe (throwIO EOF) pure
 
+handlehearu_immediate ::
+  (IOE :> es, NonDet :> es) =>
+  InputStream Uninterpreted -> Eff es Uninterpreted
+handlehearu_immediate i = do
+  mv <- liftIO $ peek i
+  case mv of
+    Nothing -> empty
+    Just v -> liftIO (read i) $> v
+
 handleheara ::
   (IOE :> es, State ParserState :> es) =>
   InputStream Uninterpreted -> Eff es SomeUnpack
@@ -74,9 +89,21 @@ handleheara i = do
   ParserState p <- get
   pure $ p (Parse u)
 
+handleheara_immediate ::
+  (IOE :> es, State ParserState :> es, NonDet :> es) =>
+  InputStream Uninterpreted -> Eff es SomeUnpack
+handleheara_immediate i = do
+  u <- handlehearu_immediate i
+  ParserState p <- get
+  pure $ p (Parse u)
+
 -- | run server accepting multiple connections
 withtalkingserver ::
-  (IOE :> es, State ParserState :> es, Concurrent :> es) =>
+  ( IOE :> es,
+    State ParserState :> es,
+    Concurrent :> es,
+    NonDet :> es
+  ) =>
   -- | unlift strategy
   UnliftStrategy ->
   -- | host (Nothing = all interfaces)
@@ -94,7 +121,11 @@ withtalkingserver u host port handler = withEffToIO u \run -> do
 
 -- | run client with single connection
 withtalkingclient ::
-  (IOE :> es, State ParserState :> es, Concurrent :> es) =>
+  ( IOE :> es,
+    State ParserState :> es,
+    Concurrent :> es,
+    NonDet :> es
+  ) =>
   -- | unlift strategy
   UnliftStrategy ->
   -- | host

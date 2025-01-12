@@ -40,6 +40,7 @@ library
       M.IO.Internal.Read
       M.IO.Internal.Socket
       M.IO.Internal.Zlib
+      M.IO.KeepAlive
       M.J.Chunk.Net
       M.J.Misc
       M.J.NBT
@@ -112,6 +113,7 @@ library
     , network
     , network-run
     , parser-combinators
+    , random
     , stm
     , template-haskell
     , text
@@ -186,6 +188,7 @@ test-suite mmm-test
     , network
     , network-run
     , parser-combinators
+    , random
     , stm
     , template-haskell
     , text

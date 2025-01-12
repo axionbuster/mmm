@@ -4,6 +4,8 @@ module M.IO.Internal.EffectTypes
     Direction (..),
     Op (..),
     ParserState (..),
+    Immediately (..),
+    Talking',
     hear,
     hearU,
     hearA,
@@ -20,6 +22,7 @@ import Data.Data
 import Data.Hashable
 import Data.Word
 import Effectful
+import Effectful.NonDet
 import Effectful.State.Dynamic
 import Effectful.TH
 import GHC.Generics
@@ -33,6 +36,11 @@ import M.Pack
 -- both the client and the server, so we don't want to
 -- hardcode the direction of a packet
 data Direction = Inbound | Outbound
+  deriving (Eq, Show, Read, Ord, Enum, Bounded, Data, Typeable, Generic, Lift)
+  deriving (Hashable, NFData)
+
+-- | urgency of receiving a packet
+data Immediately = Immediately | Eventually
   deriving (Eq, Show, Read, Ord, Enum, Bounded, Data, Typeable, Generic, Lift)
   deriving (Hashable, NFData)
 
@@ -79,11 +87,17 @@ newtype ParserState = ParserState
 -- | the communication effect
 data Talking :: Effect where
   -- | listen for a message and assert its type
-  Hear :: (Unpack a, Typeable a) => Talking m a
+  --
+  -- when immediately is set and message missing, invoke 'Empty'
+  Hear :: (Unpack a, Typeable a) => Immediately -> Talking m a
   -- | listen for a raw uninterpreted message
-  HearU :: Talking m Uninterpreted
+  --
+  -- when immediately is set and message missing, invoke 'Empty'
+  HearU :: Immediately -> Talking m Uninterpreted
   -- | listen for a message with dynamic unpacking
-  HearA :: Talking m SomeUnpack
+  --
+  -- when immediately is set and message missing, invoke 'Empty'
+  HearA :: Immediately -> Talking m SomeUnpack
   -- | send a message
   Say :: (Pack a, Typeable a) => a -> Talking m ()
   -- | set the compression threshold
@@ -96,6 +110,10 @@ data Talking :: Effect where
 
 makeEffect ''Talking
 
+-- | the communication effect with parser state and non-determinism
+type Talking' es = (Talking :> es, State ParserState :> es, NonDet :> es)
+
 -- | enter the parser state
 enter :: (State ParserState :> es) => ParserState -> Eff es ()
 enter = put
+{-# INLINE enter #-}
