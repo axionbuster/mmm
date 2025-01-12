@@ -1,8 +1,6 @@
 -- | Interpret the 'Talking' effect in terms of a socket connection.
 module M.IO.Internal.EffectSocket
-  ( -- | run server accepting multiple connections
-    withtalkingserver,
-    -- | run client with single connection
+  ( withtalkingserver,
     withtalkingclient,
   )
 where

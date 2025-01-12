@@ -89,8 +89,8 @@ data Talking :: Effect where
   Say :: (Pack a, Typeable a) => a -> Talking m ()
   -- | set the compression threshold
   --
-  -- - positive: compress messages larger than this size
-  -- - non-positive: disable compression
+  -- - non-negative: compress messages larger than this size
+  -- - negative: disable compression
   Setcompression :: Int -> Talking m ()
   -- | set the encryption key
   Setencryption :: ByteString -> Talking m ()
