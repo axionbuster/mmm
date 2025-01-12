@@ -24,6 +24,8 @@ import Data.ByteString.Lazy qualified as BL
 import Data.Data
 import Data.Word
 import FlatParse.Stateful
+import GHC.Generics
+import Language.Haskell.TH.Syntax (Lift)
 import M.IO.Internal.Read
 import M.IO.Internal.Zlib
 import M.Pack hiding (Parser)
@@ -36,13 +38,18 @@ data Uninterpreted = Uninterpreted
   { pkcode :: !Word8,
     pkdata :: !ByteString
   }
+  deriving (Typeable, Generic, Data, Lift)
+
+instance Show Uninterpreted where
+  show (Uninterpreted c d) = printf "Uninterpreted %d <%d bytes>" c (B.length d)
 
 -- | end of input
-data EOF = EOF deriving (Show, Typeable, Exception)
+data EOF = EOF deriving (Show, Read, Generic, Data, Typeable, Lift, Exception)
 
 -- | make a stream of uninterpreted packets
 makepacketstreami ::
-  -- | compression threshold reference (negative = off, non-negative = on with threshold)
+  -- | compression threshold reference (negative = off,
+  -- non-negative = on with threshold)
   TVar Int ->
   -- | input stream
   InputStream ByteString ->
