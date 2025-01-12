@@ -28,6 +28,7 @@ source-repository head
 library
   exposed-modules:
       M.Crypto
+      M.IO.Internal.Datagram
       M.IO.Internal.Read
       M.IO.Internal.Zlib
       M.J.Chunk.Net
