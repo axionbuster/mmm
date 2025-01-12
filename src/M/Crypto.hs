@@ -15,8 +15,9 @@ module M.Crypto
     -- * Hash
     hashservnam,
 
-    -- * Error
+    -- * General
     Error (..),
+    AESClass,
 
     -- * Re-exports
     ByteString,

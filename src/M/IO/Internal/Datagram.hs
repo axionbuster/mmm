@@ -1,10 +1,15 @@
 -- | Datagram and uninterpreted packet parsing and building.
 module M.IO.Internal.Datagram
-  ( Uninterpreted (..),
+  ( -- * Types
+    Uninterpreted (..),
     CompressionOn (..),
     EOF (..),
+
+    -- * Streams
     makepacketstreami,
     makepacketstreamo,
+    makedecrypting,
+    makeencrypting,
   )
 where
 
@@ -16,7 +21,6 @@ import Data.ByteString (ByteString)
 import Data.ByteString qualified as B
 import Data.ByteString.Builder (Builder)
 import Data.ByteString.Builder qualified as BB
-import Data.ByteString.Builder.Extra (flush)
 import Data.ByteString.Lazy qualified as BL
 import Data.Data
 import Data.IORef
@@ -112,15 +116,16 @@ instance Monoid Building where
 -- | make an output stream of uninterpreted packets
 makepacketstreamo ::
   IORef CompressionOn ->
-  OutputStream Builder ->
+  OutputStream ByteString ->
   IO (OutputStream Uninterpreted)
 makepacketstreamo c s =
   makeOutputStream \case
     Nothing -> throwIO EOF
     Just u -> do
       c' <- readIORef c
-      write (Just $ encode c' u <> flush) s
+      write (Just $ reify $ encode c' u) s
   where
+    reify = B.toStrict . BB.toLazyByteString
     -- notes on "INLINE": inline thought to be good for sharing
     -- esp. the compression part (to avoid compressing the same data twice)
     -- (remains to be checked)
@@ -142,3 +147,31 @@ makepacketstreamo c s =
     {-# INLINE encodeplain #-}
     mkb b = B (fromIntegral $ BL.length $ BB.toLazyByteString b) b
     {-# INLINE mkb #-}
+
+-- | register an octet streaming decryptor to an input stream
+makedecrypting ::
+  -- | decryptor
+  IORef (ByteString -> IO ByteString) ->
+  -- | input stream
+  InputStream ByteString ->
+  -- | new input stream
+  IO (InputStream ByteString)
+makedecrypting f s = makeInputStream do
+  g <- readIORef f
+  read s >>= \case
+    Nothing -> pure Nothing
+    Just b -> Just <$> g b
+
+-- | register an octet stremaing encryptor to an output stream
+makeencrypting ::
+  -- | encryptor
+  IORef (ByteString -> IO ByteString) ->
+  -- | output stream
+  OutputStream ByteString ->
+  -- | new output stream
+  IO (OutputStream ByteString)
+makeencrypting f s = makeOutputStream \case
+  Nothing -> pure ()
+  Just b -> do
+    g <- readIORef f
+    g b >>= \c -> write (Just c) s
