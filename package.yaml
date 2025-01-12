@@ -59,6 +59,7 @@ dependencies:
 - uuid-types
 - varcomp
 - vector
+- zlib
 
 ghc-options:
 - -Wall

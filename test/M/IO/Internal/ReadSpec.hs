@@ -14,7 +14,7 @@ spec = do
       input <- Streams.fromList []
       result <- parseio0 @IOException input (pure ())
       result `shouldBe` ()
-    
+
     it "copes with empty chunks" do
       input <- Streams.fromList ["", "\x80", "", "", "\x01"]
       result <- parseio0 input (unpackleb32 @Int)

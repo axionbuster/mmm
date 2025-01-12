@@ -29,6 +29,7 @@ library
   exposed-modules:
       M.Crypto
       M.IO.Internal.Read
+      M.IO.Internal.Zlib
       M.J.Chunk.Net
       M.J.Misc
       M.J.NBT
@@ -98,6 +99,7 @@ library
     , uuid-types
     , varcomp
     , vector
+    , zlib
   default-language: GHC2021
 
 test-suite mmm-test
@@ -155,4 +157,5 @@ test-suite mmm-test
     , uuid-types
     , varcomp
     , vector
+    , zlib
   default-language: GHC2021
