@@ -18,6 +18,7 @@ module M.Crypto
     -- * General
     Error (..),
     AESClass,
+    RSAClass,
 
     -- * Re-exports
     ByteString,
