@@ -157,10 +157,9 @@ makedecrypting ::
   -- | new input stream
   IO (InputStream ByteString)
 makedecrypting f s = makeInputStream do
-  g <- readIORef f
   read s >>= \case
     Nothing -> pure Nothing
-    Just b -> Just <$> g b
+    Just b -> readIORef f >>= (Just <$>) . ($ b)
 
 -- | register an octet stremaing encryptor to an output stream
 makeencrypting ::
