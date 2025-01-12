@@ -20,8 +20,7 @@ import Data.Data
 import Data.Hashable
 import Data.Word
 import Effectful
-import Effectful.Labeled
-import Effectful.Labeled.State
+import Effectful.State.Dynamic
 import Effectful.TH
 import GHC.Generics
 import Language.Haskell.TH.Syntax (Lift)
@@ -98,7 +97,5 @@ data Talking :: Effect where
 makeEffect ''Talking
 
 -- | enter the parser state
-enter ::
-  (Labeled "parserstate" (State ParserState) :> es) =>
-  ParserState -> Eff es ()
-enter = put @"parserstate"
+enter :: (State ParserState :> es) => ParserState -> Eff es ()
+enter = put
