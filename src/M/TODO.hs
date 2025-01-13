@@ -64,3 +64,13 @@ data TextComponent
   deriving stock (Eq, Ord, Show, Read, Generic, Typeable, Data)
   deriving anyclass (NFData, Hashable)
   deriving (Pack, Unpack) via ErrorOnPackUnpack TextComponent
+
+data MapIcon
+  deriving stock (Eq, Ord, Show, Read, Generic, Typeable, Data)
+  deriving anyclass (NFData, Hashable)
+  deriving (Pack, Unpack) via ErrorOnPackUnpack MapIcon
+
+data MerchantOffer
+  deriving stock (Eq, Ord, Show, Read, Generic, Typeable, Data)
+  deriving anyclass (NFData, Hashable)
+  deriving (Pack, Unpack) via ErrorOnPackUnpack MerchantOffer

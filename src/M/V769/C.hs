@@ -20,22 +20,61 @@ import Prelude hiding (id)
 [serde|
 .derive
   Show Read Data Typeable
+
+-- Clientbound packets
+data CookieRequest
+  key :: Text
+
+data ClientboundPluginMessage
+  channel :: Text
+  data :: ByteString via TakeRest
+
+data Disconnect
+  reason :: Text
+
 data FinishConfiguration -- Empty packet
+
+data ClientboundKeepAlive
+  id :: Int64
+
+data Ping
+  id :: Int64
+
+data ResetChat -- Empty packet
+
+data RegistryData
+  data :: ByteString via TakeRest
+
+data RemoveResourcePack -- Empty packet
+
+data AddResourcePack
+  url :: Text
+  hash :: Text
+
+data StoreCookie
+  key :: Text
+  value :: Text
+
+data Transfer
+  serveraddress :: Text
+  serverport :: Word16
 
 data FeatureFlags
   flags :: V.Vector Text via V.Vector Identifier
 
-data ServerData
-  motd :: TextComponent
-  icon :: Maybe Text
-  enforcesecurechat :: Bool
+data UpdateTags
+  tags :: ByteString via TakeRest
 
-data ServerLinks
-  links :: V.Vector Text via V.Vector Identifier
+data ClientboundKnownPacks
+  packs :: ByteString via TakeRest
 
 data CustomReportDetails
   details :: ByteString via TakeRest
 
+data ServerLinks
+  links :: V.Vector Text via V.Vector Identifier
+
+-- Serverbound packets
 data ClientInformationConfiguration
   locale :: Text
   viewdistance :: Int8
@@ -46,7 +85,29 @@ data ClientInformationConfiguration
   enabletextfiltering :: Bool
   allowserverlistings :: Bool
   particlestatus :: ParticleStatus via EnumIndex VarInt ParticleStatus
-  |]
+
+data CookieResponse
+  key :: Text
+  value :: Text
+
+data ServerboundPluginMessage
+  channel :: Text
+  data :: ByteString via TakeRest
+
+data AcknowledgeFinishConfiguration -- Empty packet
+
+data ServerboundKeepAlive
+  id :: Int64
+
+data Pong
+  id :: Int64
+
+data ResourcePackResponse
+  status :: VarInt
+
+data ServerboundKnownPacks
+  packs :: ByteString via TakeRest
+|]
 
 -- provided by "th-serde": Data.Serde.QQ
 runusercoercion
