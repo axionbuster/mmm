@@ -34,7 +34,14 @@ data FilterType = PassThrough | FullyFiltered | PartiallyFiltered
   deriving stock (Enum, Bounded, Generic, Data, Typeable, Lift)
   deriving anyclass (NFData, Hashable)
 
-data BossBarColor = Pink | Blue | Red | Green | Yellow | Purple | White
+data BossBarColor
+  = BCPink
+  | BCBlue
+  | BCRed
+  | BCGreen
+  | BCYellow
+  | BCPurple
+  | BCWhite
   deriving stock (Eq, Ord, Show, Read)
   deriving stock (Enum, Bounded, Generic, Data, Typeable, Lift)
   deriving anyclass (NFData, Hashable)
