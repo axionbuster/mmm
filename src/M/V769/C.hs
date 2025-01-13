@@ -26,7 +26,7 @@ data CookieRequest
 
 data ClientboundPluginMessage
   channel :: Text
-  data_ :: ByteString via TakeRest
+  data_ :: ByteString
 
 data Disconnect
   reason :: Text
@@ -42,7 +42,7 @@ data Ping
 data ResetChat -- Empty packet
 
 data RegistryData
-  data_ :: ByteString via TakeRest
+  data_ :: ByteString
 
 data RemoveResourcePack -- Empty packet
 
@@ -91,7 +91,7 @@ data CookieResponse
 
 data ServerboundPluginMessage
   channel :: Text
-  data_ :: ByteString via TakeRest
+  data_ :: ByteString
 
 data AcknowledgeFinishConfiguration -- Empty packet
 

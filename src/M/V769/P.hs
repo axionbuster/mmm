@@ -146,7 +146,7 @@ data ChatSuggestions
 
 data ClientboundPluginMessage
   channel :: Text
-  data_ :: ByteString via TakeRest
+  data_ :: ByteString
 
 data DamageEvent
   entityid :: Int32 via VarInt
@@ -269,7 +269,7 @@ data MapData
   rows :: Int8
   x :: Int8
   z :: Int8
-  data_ :: ByteString via TakeRest
+  data_ :: ByteString
 
 data MerchantOffers
   windowid :: Word8
@@ -338,7 +338,7 @@ data PlayerChatMessage
   message :: Text
   timestamp :: Int64
   salt :: Int64
-  signature :: ByteString via TakeRest
+  signature :: ByteString
   signedpreview :: Bool
   lastseenmessages :: V.Vector UUID
 
@@ -357,7 +357,7 @@ data PlayerInfoRemove
   players :: V.Vector UUID
 
 data PlayerInfoUpdate
-  action :: Int32 via VarInt -- incorrect, but we don't know the actual type
+  action :: Int32 via VarInt -- incorrect, but we don't know the correct type
   data_ :: ByteString via TakeRest
 
 data LookAt
@@ -603,7 +603,7 @@ data ServerboundChatCommand
   command :: Text
   timestamp :: Int64
   salt :: Int64
-  argumentsignatures :: ByteString via TakeRest
+  argumentsignatures :: ByteString
   signedpreview :: Bool
   lastseenmessages :: V.Vector UUID
 
@@ -611,7 +611,7 @@ data SignedChatCommand
   command :: Text
   timestamp :: Int64
   salt :: Int64
-  argumentsignatures :: ByteString via TakeRest
+  argumentsignatures :: ByteString
   signedpreview :: Bool
   lastseenmessages :: V.Vector UUID
 
@@ -619,14 +619,14 @@ data ChatMessage
   message :: Text
   timestamp :: Int64
   salt :: Int64
-  signature :: ByteString via TakeRest
+  signature :: ByteString
   signedpreview :: Bool
   lastseenmessages :: V.Vector UUID
 
 data PlayerSession
   sessionid :: UUID
-  publickey :: ByteString via TakeRest
-  signature :: ByteString via TakeRest
+  publickey :: ByteString
+  signature :: ByteString
 
 data ChunkBatchReceived -- Empty packet
 
@@ -677,7 +677,7 @@ data CookieResponsePlay
 
 data ServerboundPluginMessagePlay
   channel :: Text
-  data_ :: ByteString via TakeRest
+  data_ :: ByteString
 
 data DebugSampleSubscription
   data_ :: ByteString via TakeRest
