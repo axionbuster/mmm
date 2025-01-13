@@ -49,7 +49,13 @@ library
       M.J.NBT.Internal.Types
       M.J.Position
       M.J.TODO
+      M.J.V769.C
       M.J.V769.Defs
+      M.J.V769.H
+      M.J.V769.I
+      M.J.V769.L
+      M.J.V769.P
+      M.J.V769.S
       M.LEB
       M.Pack
       M.Pack.Internal.Bit
