@@ -1,4 +1,11 @@
--- | Interpret the 'Talking' effect in terms of a socket connection.
+-- |
+-- Module: M.IO.Internal.EffectSocket
+-- Description: Socket-based effect interpretation
+-- Copyright: (c) axionbuster, 2025
+-- License: BSD-3-Clause
+--
+-- Implements the interpretation of the 'Talking' effect in terms of socket
+-- connections, providing both client and server capabilities.
 module M.IO.Internal.EffectSocket
   ( SocketTalkingError (..),
     withtalkingserver,

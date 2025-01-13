@@ -1,4 +1,11 @@
--- | sample points on the face of a cuboid against a direction
+-- |
+-- Module: M.Collision.Internal.Face
+-- Description: Point sampling on cuboid faces for collision detection
+-- Copyright: (c) axionbuster, 2025
+-- License: BSD-3-Clause
+--
+-- Provides utilities for sampling points on cuboid faces, used in collision detection.
+-- The module focuses on efficient face point generation for AABB collision testing.
 module M.Collision.Internal.Face
   ( facepoints,
     dbgcountfacepoints,

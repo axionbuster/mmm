@@ -1,4 +1,11 @@
--- | LEB128 (unsigned) encoding support for arbitrary, finite-bit integers
+-- |
+-- Module: M.LEB
+-- Description: LEB128 encoding support for integers
+-- Copyright: (c) axionbuster, 2025
+-- License: BSD-3-Clause
+--
+-- Implements LEB128 (Little-Endian Base 128) variable-length encoding
+-- for arbitrary finite-bit integers, used in the Minecraft protocol.
 module M.LEB (LEB (..), VarInt, VarLong, decodeleb, encodeleb) where
 
 import Control.DeepSeq

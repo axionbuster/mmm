@@ -1,4 +1,11 @@
--- | Datagram and uninterpreted packet parsing and building.
+-- |
+-- Module: M.IO.Internal.Datagram
+-- Description: Packet parsing and building internals
+-- Copyright: (c) axionbuster, 2025
+-- License: BSD-3-Clause
+--
+-- Internal module for handling low-level packet parsing and building,
+-- including uninterpreted packets and stream transformations.
 module M.IO.Internal.Datagram
   ( -- * Types
     Uninterpreted (..),

@@ -1,4 +1,11 @@
--- | Define newtypes that control the way values are packed and unpacked
+-- |
+-- Module: M.Pack.Internal.Newtypes
+-- Description: Special-purpose serialization wrappers
+-- Copyright: (c) axionbuster, 2025
+-- License: BSD-3-Clause
+--
+-- Defines newtype wrappers that control how values are packed and unpacked,
+-- including enum indices, fixed-point numbers, angles, and identifiers.
 module M.Pack.Internal.Newtypes
   ( EnumIndex (..),
     Fixed' (..),

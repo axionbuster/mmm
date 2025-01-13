@@ -1,5 +1,14 @@
 {-# OPTIONS_GHC -Wno-missing-export-lists #-}
 
+-- |
+-- Module: M.V769.C
+-- Description: Protocol configuration state packets (AI-generated)
+-- Copyright: (c) axionbuster, 2025
+-- License: BSD-3-Clause
+--
+-- Defines packet structures for the configuration state of protocol version 769,
+-- including client and server capabilities negotiation, resource pack management,
+-- and server feature flags.
 module M.V769.C where
 
 import Control.DeepSeq

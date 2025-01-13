@@ -1,5 +1,14 @@
 {-# OPTIONS_GHC -Wno-missing-export-lists #-}
 
+-- |
+-- Module: M.V769.P
+-- Description: Protocol play state packets (AI-generated)
+-- Copyright: (c) axionbuster, 2025
+-- License: BSD-3-Clause
+--
+-- Implements the extensive set of packet structures for the play state
+-- of protocol version 769, including entity management, world interaction,
+-- inventory handling, and all other gameplay-related communication.
 module M.V769.P where
 
 import Control.DeepSeq

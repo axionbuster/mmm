@@ -1,4 +1,11 @@
--- | Define some common miscellaneous types.
+-- |
+-- Module: M.Misc
+-- Description: Common miscellaneous types for Minecraft protocol
+-- Copyright: (c) axionbuster, 2025
+-- License: BSD-3-Clause
+--
+-- Defines common types used across the Minecraft protocol implementation,
+-- including teleportation flags and sound events.
 module M.Misc (TeleportFlags (..), SoundEvent (..)) where
 
 import Control.DeepSeq

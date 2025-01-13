@@ -1,6 +1,13 @@
 {-# OPTIONS_GHC -Wno-orphans #-}
 
--- | Other implementations of 'Pack' and 'Unpack'
+-- |
+-- Module: M.Pack.Internal.Etc
+-- Description: Additional serialization instances
+-- Copyright: (c) axionbuster, 2025
+-- License: BSD-3-Clause
+--
+-- Implements Pack and Unpack instances for various types including Text,
+-- ByteString, Maybe, Vector, and UUID.
 module M.Pack.Internal.Etc () where
 
 import Data.ByteString (ByteString)

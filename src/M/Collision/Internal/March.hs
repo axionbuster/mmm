@@ -1,4 +1,11 @@
--- | march along a ray, finding all intersections with grid points
+-- |
+-- Module: M.Collision.Internal.March
+-- Description: Ray marching implementation for grid-based collision detection
+-- Copyright: (c) axionbuster, 2025
+-- License: BSD-3-Clause
+--
+-- Implements ray marching algorithm for finding intersections with grid points.
+-- Used for precise collision detection in voxel-based environments.
 module M.Collision.Internal.March (March (..), march) where
 
 import Control.Lens hiding (index)

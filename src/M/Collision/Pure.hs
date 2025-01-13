@@ -1,6 +1,13 @@
 {-# LANGUAGE MonoLocalBinds #-}
 
--- | pure collision detection
+-- |
+-- Module: M.Collision.Pure
+-- Description: Pure collision detection primitives and algorithms
+-- Copyright: (c) axionbuster, 2025
+-- License: BSD-3-Clause
+--
+-- Core collision detection primitives and algorithms in pure form.
+-- Provides AABB collision testing, shape interfaces, and hit detection utilities.
 module M.Collision.Pure
   ( Shape (..),
     SomeShape1 (..),

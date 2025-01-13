@@ -1,5 +1,14 @@
 {-# OPTIONS_GHC -Wno-missing-export-lists #-}
 
+-- |
+-- Module: M.V769.H
+-- Description: Protocol handshake packets (AI-generated)
+-- Copyright: (c) axionbuster, 2025
+-- License: BSD-3-Clause
+--
+-- Implements packet structures for the initial handshake phase of protocol
+-- version 769, where clients establish basic connection parameters including
+-- protocol version and intended next state.
 module M.V769.H where
 
 import Control.DeepSeq

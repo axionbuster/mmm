@@ -1,5 +1,14 @@
 {-# OPTIONS_GHC -Wno-missing-export-lists #-}
 
+-- |
+-- Module: M.V769.I
+-- Description: Internal protocol types and utilities (AI-generated)
+-- Copyright: (c) axionbuster, 2025
+-- License: BSD-3-Clause
+--
+-- Provides internal type definitions and utilities for protocol version 769,
+-- including game-specific enumerations, resolution specifications, and
+-- display configuration types used across different protocol states.
 module M.V769.I where
 
 import Control.DeepSeq

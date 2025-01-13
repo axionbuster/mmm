@@ -1,4 +1,12 @@
--- | Crypto module
+-- |
+-- Module: M.Crypto
+-- Description: Cryptographic operations for Minecraft protocol
+-- Copyright: (c) axionbuster, 2025
+-- License: BSD-3-Clause
+--
+-- Provides cryptographic functionality required by the Minecraft protocol,
+-- including AES encryption/decryption, RSA operations, and server-specific
+-- hashing utilities.
 module M.Crypto
   ( -- * AES
     AES,

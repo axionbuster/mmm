@@ -1,6 +1,13 @@
 {-# OPTIONS_GHC -Wno-orphans #-}
 
--- | instances for "linear" types
+-- |
+-- Module: M.Pack.Internal.Linear
+-- Description: Linear algebra type serialization
+-- Copyright: (c) axionbuster, 2025
+-- License: BSD-3-Clause
+--
+-- Provides Pack and Unpack instances for linear algebra types from the
+-- linear package, including vectors and complex numbers.
 module M.Pack.Internal.Linear () where
 
 import Data.Complex

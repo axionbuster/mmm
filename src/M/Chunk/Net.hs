@@ -1,4 +1,11 @@
--- | Chunk and light data types for network serialization.
+-- |
+-- Module: M.Chunk.Net
+-- Description: Network serialization types for chunk data
+-- Copyright: (c) axionbuster, 2025
+-- License: BSD-3-Clause
+--
+-- Defines data types for chunk and lighting data used in network serialization.
+-- Includes block entities and packed coordinate representations.
 module M.Chunk.Net (ChunkData (..), BlockEntity (..), LightData (..)) where
 
 import Control.DeepSeq

@@ -1,4 +1,7 @@
--- | This module contains types that are not implemented yet.
+-- |
+-- Module: M.TODO
+-- Description: Placeholder types for unimplemented features
+-- License: BSD-3-Clause
 module M.TODO
   ( Slot,
     BossBarAction,

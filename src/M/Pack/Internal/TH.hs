@@ -1,6 +1,11 @@
--- | Template Haskell code for shadowing 'Pack' and 'Unpack' instances
+-- |
+-- Module: M.Pack.Internal.TH
+-- Description: Template Haskell serialization utilities
+-- Copyright: (c) axionbuster, 2025
+-- License: BSD-3-Clause
 --
--- Used with "serde" quasiquoter
+-- Provides Template Haskell machinery for automatically deriving Pack and
+-- Unpack instances, including support for shadowing and proper derivation.
 module M.Pack.Internal.TH
   ( borrowderivepackunpack,
     properderivepackunpack,

@@ -1,4 +1,11 @@
--- | Serialize and deserialize
+-- |
+-- Module: M.Pack.Internal.Types
+-- Description: Core serialization type system
+-- Copyright: (c) axionbuster, 2025
+-- License: BSD-3-Clause
+--
+-- Defines the core type system for binary serialization and deserialization,
+-- including Pack and Unpack typeclasses and related utilities.
 module M.Pack.Internal.Types
   ( Pack (..),
     SomePack (..),

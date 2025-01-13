@@ -1,59 +1,13 @@
 {-# LANGUAGE UndecidableInstances #-}
 
--- | This module provides functionality for encoding product types consisting of boolean flags
--- into compact bit representations.
+-- |
+-- Module: M.Pack.Internal.Bit
+-- Description: Bit-level serialization support
+-- Copyright: (c) axionbuster, 2025
+-- License: BSD-3-Clause
 --
--- = Usage
---
--- To use this module, define a record type with boolean fields and derive Generic:
---
--- @
--- data Flags = Flags
---   { isEnabled :: Bool
---   , isVisible :: Bool
---   , isLocked  :: Bool
---   } deriving Generic
---
--- instance 'Bitreppable' 'Word8' Flags
--- @
---
--- Then you can encode/decode using the Bitwise wrapper:
---
--- @
--- let flags = Bitwise (Flags True False True)
--- let packed = 'pack' flags   -- Packs into a single byte
--- let unpacked = 'unpack' packed  -- Recovers the original flags
--- @
---
--- The bits are assigned from least significant to most significant based on field order.
--- In the example above:
---
--- * isEnabled = 'bit' 0
--- * isVisible = 'bit' 1
--- * isLocked = 'bit' 2
---
--- The module provides two types of bit sets:
---
--- 1. Variable-length 'Bitset':
---
--- @
--- let bs = Bitset 5  -- Sets bits 0 and 2 (binary 101)
--- testBit bs 0  -- True
--- testBit bs 1  -- False
--- testBit bs 2  -- True
--- @
---
--- 2. Fixed-length 'FixedBitset':
---
--- @
--- let fbs = FixedBitset \@8 5  -- 8-bit bitset with bits 0 and 2 set
--- -- When packed/unpacked, always uses exactly 8 bits,
--- -- padding with zeros or truncating as needed
--- @
---
--- Both types of bitsets can be packed/unpacked for network transmission.
--- Variable-length bitsets are stored as little-endian vectors of 'Int64's,
--- while fixed-length bitsets are padded or truncated to their specified size.
+-- Implements bit-level serialization for boolean flags and bitsets,
+-- supporting both variable-length and fixed-length bit patterns.
 module M.Pack.Internal.Bit
   ( Bitwise (..),
     Bitreppable (..),

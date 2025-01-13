@@ -1,7 +1,13 @@
--- | Java's CESU-8 encoding/decoding
+-- |
+-- Module: M.NBT.Internal.JS
+-- Description: Java string encoding (CESU-8) support
+-- Copyright: (c) axionbuster, 2025
+-- License: BSD-3-Clause
 --
--- see:
--- https://docs.oracle.com/en/java/javase/18/docs/api/java.base/java/io/DataInput.html#modified-utf-8
+-- Implements Java's Modified UTF-8 (CESU-8) encoding and decoding for
+-- string handling in NBT format.
+--
+-- See: https://docs.oracle.com/javase/8/docs/api/java/io/DataInput.html#modified-utf-8
 module M.NBT.Internal.JS
   ( JS (..),
     textascesu8,

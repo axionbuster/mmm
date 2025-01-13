@@ -1,6 +1,12 @@
--- | 'Pack' and 'Unpack': classes for serializing/deserializing data;
--- newtypes to modulate serialization behavior; other networking-specific
--- data types and utilities.
+-- |
+-- Module: M.Pack
+-- Description: Core serialization framework
+-- Copyright: (c) axionbuster, 2025
+-- License: BSD-3-Clause
+--
+-- Provides the core serialization framework including Pack and Unpack typeclasses,
+-- along with utilities for numeric types, newtypes, bit operations, and Template
+-- Haskell support for automated instance derivation.
 module M.Pack
   ( -- | 'Pack' and 'Unpack' classes for serializing/deserializing data
     module M.Pack.Internal.Types,

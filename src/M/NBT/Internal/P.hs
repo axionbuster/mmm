@@ -1,6 +1,13 @@
 {-# OPTIONS_GHC -Wno-orphans #-}
 
--- | parse / serialize NBT data
+-- |
+-- Module: M.NBT.Internal.P
+-- Description: NBT parsing and serialization
+-- Copyright: (c) axionbuster, 2025
+-- License: BSD-3-Clause
+--
+-- Implements parsing and serialization for NBT data structures,
+-- handling named pairs and tag types.
 module M.NBT.Internal.P (NamedPair (..)) where
 
 import Control.Applicative.Combinators

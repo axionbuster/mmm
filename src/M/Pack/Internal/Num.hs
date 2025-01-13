@@ -1,6 +1,13 @@
 {-# OPTIONS_GHC -Wno-orphans #-}
 
--- | implement 'Pack' and 'Unpack' for number types and 'Bool'
+-- |
+-- Module: M.Pack.Internal.Num
+-- Description: Numeric type serialization
+-- Copyright: (c) axionbuster, 2025
+-- License: BSD-3-Clause
+--
+-- Implements Pack and Unpack instances for numeric types and Bool,
+-- including integral types, floating point numbers, and LEB128 encoding.
 module M.Pack.Internal.Num
   ( packleb32,
     unpackleb32,

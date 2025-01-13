@@ -1,5 +1,14 @@
 {-# OPTIONS_GHC -Wno-missing-export-lists #-}
 
+-- |
+-- Module: M.V769.L
+-- Description: Protocol login state packets (AI-generated)
+-- Copyright: (c) axionbuster, 2025
+-- License: BSD-3-Clause
+--
+-- Defines packet structures for the login phase of protocol version 769,
+-- handling authentication, encryption setup, and session establishment
+-- between client and server.
 module M.V769.L where
 
 import Control.DeepSeq

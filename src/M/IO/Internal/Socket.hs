@@ -1,4 +1,11 @@
--- | Bringing the Java Minecraft protocol to reliable duplex streams.
+-- |
+-- Module: M.IO.Internal.Socket
+-- Description: Socket connection handling for Minecraft protocol
+-- Copyright: (c) axionbuster, 2025
+-- License: BSD-3-Clause
+--
+-- Implements reliable duplex stream connections for the Java Minecraft protocol,
+-- handling encryption and compression.
 module M.IO.Internal.Socket (Connection (..), withcxfromsocket) where
 
 import Control.Concurrent.Async

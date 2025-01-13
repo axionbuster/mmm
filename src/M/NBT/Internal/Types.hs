@@ -1,4 +1,11 @@
--- | Types for NBT serialization
+-- |
+-- Module: M.NBT.Internal.Types
+-- Description: Core NBT type definitions
+-- Copyright: (c) axionbuster, 2025
+-- License: BSD-3-Clause
+--
+-- Internal type definitions for Named Binary Tag (NBT) format used in
+-- Minecraft, including tag types and container types.
 module M.NBT.Internal.Types (Ty (..), Tg (..), getty) where
 
 import Control.DeepSeq

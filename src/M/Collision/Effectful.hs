@@ -1,4 +1,11 @@
--- | "effectful" collision detection and resolution
+-- |
+-- Module: M.Collision.Effectful
+-- Description: Effectful collision detection and resolution system
+-- Copyright: (c) axionbuster, 2025
+-- License: BSD-3-Clause
+--
+-- Provides the core collision detection and resolution system with effects.
+-- Handles block-based collision detection, movement resolution, and ground contact states.
 --
 -- = Parts
 --

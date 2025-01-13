@@ -1,4 +1,12 @@
--- | Support for the packed integer 'Position' format used by Java Edition
+-- |
+-- Module: M.Position
+-- Description: Minecraft position encoding
+-- Copyright: (c) axionbuster, 2025
+-- License: BSD-3-Clause
+--
+-- Implements the packed integer Position format used by Minecraft Java Edition,
+-- including encoding and decoding of 3D coordinates into a compact Int64
+-- representation.
 module M.Position
   ( Position (..),
     encodeposition,

@@ -1,4 +1,11 @@
--- | Safe decompression of zlib-compressed data.
+-- |
+-- Module: M.IO.Internal.Zlib
+-- Description: Safe zlib decompression utilities
+-- Copyright: (c) axionbuster, 2025
+-- License: BSD-3-Clause
+--
+-- Provides safe decompression functionality for zlib-compressed data
+-- with length validation and error handling.
 module M.IO.Internal.Zlib (safedecomp) where
 
 import Codec.Compression.Zlib
