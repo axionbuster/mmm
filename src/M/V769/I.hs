@@ -1,6 +1,6 @@
 {-# OPTIONS_GHC -Wno-missing-export-lists #-}
 
-module M.J.V769.I where
+module M.V769.I where
 
 import Control.DeepSeq
 import Data.Bits

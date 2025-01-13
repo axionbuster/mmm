@@ -27,6 +27,7 @@ source-repository head
 
 library
   exposed-modules:
+      M.Chunk.Net
       M.Collision
       M.Collision.Effectful
       M.Collision.Internal.Face
@@ -41,22 +42,12 @@ library
       M.IO.Internal.Socket
       M.IO.Internal.Zlib
       M.IO.KeepAlive
-      M.J.Chunk.Net
-      M.J.Misc
-      M.J.NBT
-      M.J.NBT.Internal.JS
-      M.J.NBT.Internal.P
-      M.J.NBT.Internal.Types
-      M.J.Position
-      M.J.TODO
-      M.J.V769.C
-      M.J.V769.Defs
-      M.J.V769.H
-      M.J.V769.I
-      M.J.V769.L
-      M.J.V769.P
-      M.J.V769.S
       M.LEB
+      M.Misc
+      M.NBT
+      M.NBT.Internal.JS
+      M.NBT.Internal.P
+      M.NBT.Internal.Types
       M.Pack
       M.Pack.Internal.Bit
       M.Pack.Internal.Etc
@@ -66,6 +57,15 @@ library
       M.Pack.Internal.Num
       M.Pack.Internal.TH
       M.Pack.Internal.Types
+      M.Position
+      M.TODO
+      M.V769.C
+      M.V769.Defs
+      M.V769.H
+      M.V769.I
+      M.V769.L
+      M.V769.P
+      M.V769.S
   other-modules:
       Paths_mmm
   autogen-modules:

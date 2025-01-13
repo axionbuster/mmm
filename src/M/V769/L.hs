@@ -1,6 +1,6 @@
 {-# OPTIONS_GHC -Wno-missing-export-lists #-}
 
-module M.J.V769.L where
+module M.V769.L where
 
 import Control.DeepSeq
 import Data.ByteString (ByteString)
@@ -11,8 +11,8 @@ import Data.Text (Text)
 import Data.UUID.Types (UUID)
 import Data.Vector qualified as V
 import GHC.Generics
-import M.J.TODO
-import M.J.V769.I
+import M.TODO
+import M.V769.I
 import M.LEB
 import M.Pack
 

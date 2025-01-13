@@ -1,5 +1,5 @@
 -- | Support for the packed integer 'Position' format used by Java Edition
-module M.J.Position
+module M.Position
   ( Position (..),
     encodeposition,
     decodeposition,

@@ -2,7 +2,7 @@
 --
 -- see:
 -- https://docs.oracle.com/en/java/javase/18/docs/api/java.base/java/io/DataInput.html#modified-utf-8
-module M.J.NBT.Internal.JS
+module M.NBT.Internal.JS
   ( JS (..),
     textascesu8,
     cesu8astext,

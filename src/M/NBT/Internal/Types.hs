@@ -1,5 +1,5 @@
 -- | Types for NBT serialization
-module M.J.NBT.Internal.Types (Ty (..), Tg (..), getty) where
+module M.NBT.Internal.Types (Ty (..), Tg (..), getty) where
 
 import Control.DeepSeq
 import Data.ByteString (ByteString)

@@ -1,7 +1,7 @@
-module M.J.NBT.Internal.JSSpec (spec) where
+module M.NBT.Internal.JSSpec (spec) where
 
 import Data.ByteString qualified as B
-import M.J.NBT.Internal.JS
+import M.NBT.Internal.JS
 import Test.Hspec
 
 spec :: Spec

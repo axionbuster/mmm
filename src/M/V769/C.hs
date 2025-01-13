@@ -1,6 +1,6 @@
 {-# OPTIONS_GHC -Wno-missing-export-lists #-}
 
-module M.J.V769.C where
+module M.V769.C where
 
 import Control.DeepSeq
 import Data.ByteString (ByteString)
@@ -11,8 +11,8 @@ import Data.Text (Text)
 import Data.Vector qualified as V
 import Data.Word
 import GHC.Generics
-import M.J.TODO
-import M.J.V769.I
+import M.TODO
+import M.V769.I
 import M.LEB
 import M.Pack
 import Prelude hiding (id)

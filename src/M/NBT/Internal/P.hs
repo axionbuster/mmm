@@ -1,7 +1,7 @@
 {-# OPTIONS_GHC -Wno-orphans #-}
 
 -- | parse / serialize NBT data
-module M.J.NBT.Internal.P (NamedPair (..)) where
+module M.NBT.Internal.P (NamedPair (..)) where
 
 import Control.Applicative.Combinators
 import Control.DeepSeq
@@ -17,8 +17,8 @@ import Data.Vector qualified as V
 import Data.Vector.Unboxed qualified as VU
 import FlatParse.Stateful qualified as F
 import GHC.Generics
-import M.J.NBT.Internal.JS
-import M.J.NBT.Internal.Types
+import M.NBT.Internal.JS
+import M.NBT.Internal.Types
 import M.Pack
 
 -- unpack orphan instance for 'Tg'

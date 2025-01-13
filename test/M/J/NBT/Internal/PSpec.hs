@@ -1,4 +1,4 @@
-module M.J.NBT.Internal.PSpec (spec) where
+module M.NBT.Internal.PSpec (spec) where
 
 import Data.ByteString qualified as B
 import Data.ByteString.Builder qualified as BB
@@ -7,8 +7,8 @@ import Data.Int
 import Data.Vector qualified as V
 import Data.Vector.Unboxed qualified as VU
 import FlatParse.Stateful qualified as F
-import M.J.NBT.Internal.P ()
-import M.J.NBT.Internal.Types
+import M.NBT.Internal.P ()
+import M.NBT.Internal.Types
 import M.Pack
 import Test.Hspec
 

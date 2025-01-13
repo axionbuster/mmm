@@ -1,5 +1,5 @@
 -- | Define some common miscellaneous types.
-module M.J.Misc (TeleportFlags (..), SoundEvent (..)) where
+module M.Misc (TeleportFlags (..), SoundEvent (..)) where
 
 import Control.DeepSeq
 import Data.Bits

@@ -1,5 +1,5 @@
 -- | Chunk and light data types for network serialization.
-module M.J.Chunk.Net (ChunkData (..), BlockEntity (..), LightData (..)) where
+module M.Chunk.Net (ChunkData (..), BlockEntity (..), LightData (..)) where
 
 import Control.DeepSeq
 import Data.Bits
@@ -14,7 +14,7 @@ import Data.Word
 import GHC.Generics
 import Language.Haskell.TH.Syntax (Lift)
 import Linear
-import M.J.NBT
+import M.NBT
 import M.LEB
 import M.Pack
 

@@ -1,5 +1,5 @@
 -- | This module contains types that are not implemented yet.
-module M.J.TODO
+module M.TODO
   ( Slot,
     BossBarAction,
     CommandNode,
