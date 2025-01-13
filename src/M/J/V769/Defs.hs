@@ -336,6 +336,103 @@ data UpdateLight
   chunkz :: Int32 via VarInt
   data_ :: LightData
 
+-- Status response packet components
+data Version
+  name :: Text
+  protocol :: Int32 via VarInt
+
+data Players
+  max :: Int32 via VarInt
+  online :: Int32 via VarInt
+  sample :: V.Vector PlayerSample
+
+data PlayerSample
+  name :: Text
+  id :: UUID
+
+-- Basic configuration packets
+data FinishConfiguration -- Empty packet
+
+data FeatureFlags
+  flags :: V.Vector Text via V.Vector Identifier
+
+-- Chat and messaging
+data SystemChatMessage
+  content :: TextComponent
+  overlay :: Bool
+
+-- Entity-related packets
+data SpawnExperienceOrb
+  entityid :: Int32 via VarInt
+  position :: V3 Double
+  count :: Int16
+
+-- World border packets
+data InitializeWorldBorder
+  x :: Double
+  z :: Double
+  oldradius :: Double
+  newradius :: Double
+  speed :: Int64 via VarLong
+  portalteleportboundary :: Int32 via VarInt
+  warningtime :: Int32 via VarInt
+  warningblocks :: Int32 via VarInt
+
+-- Custom types for specific needs
+data TeleportFlags
+  x :: Bool
+  y :: Bool
+  z :: Bool
+  y_rot :: Bool
+  x_rot :: Bool
+
+-- Status packet responses
+data PongResponse
+  payload :: Int64
+
+-- Login state packets
+data EncryptionResponse
+  sharedsecret :: ByteString
+  verifytoken :: ByteString
+
+data LoginAcknowledged
+
+-- Configuration state packets
+data ServerLinks
+  links :: V.Vector Text via V.Vector Identifier
+
+data CustomReportDetails
+  details :: ByteString via TakeRest
+
+data ServerData
+  motd :: TextComponent
+  icon :: Maybe Text
+  enforcesecurechat :: Bool
+
+-- Play state packets
+data ConfirmTeleportation
+  teleportid :: Int32 via VarInt
+
+data QueryBlockEntityTag
+  transactionid :: Int32 via VarInt
+  location :: Position
+
+data ChatCommand
+  command :: Text
+  timestamp :: Int64
+  salt :: Int64
+  signatures :: V.Vector ByteString
+  signedpreview :: Bool
+  lastseenmessages :: V.Vector UUID
+
+data ClientStatus
+  action :: Int32 via VarInt
+
+data ClientTickEnd
+
+data CommandSuggestionsRequest
+  id :: Int32 via VarInt
+  text :: Text
 |]
 
 -- provided by "th-serde": Data.Serde.QQ
@@ -361,3 +458,7 @@ runusercoercion
 instance
   (Bits i, Integral i, Pack i, Unpack i) =>
   Bitreppable i DisplayedSkinParts
+
+instance
+  (Bits i, Integral i, Pack i, Unpack i) =>
+  Bitreppable i TeleportFlags
