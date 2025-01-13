@@ -144,7 +144,7 @@ class RSAClass (mode :: Mode) where
     withForeignPtr rsa \rsaptr ->
       unsafeUseAsCStringLen input \(castPtr -> ip, len) -> do
         alloca \out -> do
-          r <- rsaup_ @mode rsaptr (ip) (fromIntegral len) out
+          r <- rsaup_ @mode rsaptr ip (fromIntegral len) out
           if r == 1
             then do
               -- rsa input/outputs typically have different lengths
