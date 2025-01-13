@@ -7,12 +7,9 @@ import Data.Bits
 import Data.Data
 import Data.Fixed
 import Data.Hashable
-import Data.Int
 import Data.Serde.QQ
-import Data.Text (Text)
 import GHC.Generics
 import Language.Haskell.TH.Syntax (Lift)
-import M.LEB
 import M.Pack
 
 -- | given in 1/8000 resolution

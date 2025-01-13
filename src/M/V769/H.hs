@@ -11,7 +11,6 @@ import Data.Word
 import GHC.Generics
 import M.LEB
 import M.Pack
-import M.V769.I
 
 [serde|
 .derive

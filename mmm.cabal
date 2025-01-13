@@ -138,9 +138,9 @@ test-suite mmm-test
       M.Collision.BoxSpec
       M.Collision.Collision2Spec
       M.IO.Internal.ReadSpec
-      M.J.NBT.Internal.JSSpec
-      M.J.NBT.Internal.PSpec
       M.LEBSpec
+      M.NBT.Internal.JSSpec
+      M.NBT.Internal.PSpec
       Paths_mmm
   autogen-modules:
       Paths_mmm
