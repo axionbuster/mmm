@@ -11,10 +11,9 @@ import Data.Text (Text)
 import Data.Vector qualified as V
 import Data.Word
 import GHC.Generics
-import M.TODO
-import M.V769.I
 import M.LEB
 import M.Pack
+import M.V769.I
 import Prelude hiding (id)
 
 [serde|
@@ -27,7 +26,7 @@ data CookieRequest
 
 data ClientboundPluginMessage
   channel :: Text
-  data :: ByteString via TakeRest
+  data_ :: ByteString via TakeRest
 
 data Disconnect
   reason :: Text
@@ -43,7 +42,7 @@ data Ping
 data ResetChat -- Empty packet
 
 data RegistryData
-  data :: ByteString via TakeRest
+  data_ :: ByteString via TakeRest
 
 data RemoveResourcePack -- Empty packet
 
@@ -92,7 +91,7 @@ data CookieResponse
 
 data ServerboundPluginMessage
   channel :: Text
-  data :: ByteString via TakeRest
+  data_ :: ByteString via TakeRest
 
 data AcknowledgeFinishConfiguration -- Empty packet
 

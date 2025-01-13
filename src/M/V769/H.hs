@@ -9,9 +9,9 @@ import Data.Serde.QQ
 import Data.Text (Text)
 import Data.Word
 import GHC.Generics
-import M.V769.I
 import M.LEB
 import M.Pack
+import M.V769.I
 
 [serde|
 .derive

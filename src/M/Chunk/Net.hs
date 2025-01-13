@@ -14,8 +14,8 @@ import Data.Word
 import GHC.Generics
 import Language.Haskell.TH.Syntax (Lift)
 import Linear
-import M.NBT
 import M.LEB
+import M.NBT
 import M.Pack
 
 -- only for internal use

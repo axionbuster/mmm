@@ -14,12 +14,12 @@ import Data.Word
 import GHC.Generics
 import Linear (V2, V3)
 import M.Chunk.Net
+import M.LEB
 import M.NBT (Tg)
+import M.Pack
 import M.Position (Position)
 import M.TODO
 import M.V769.I
-import M.LEB
-import M.Pack
 import Prelude hiding (id, length, sequence)
 
 [serde|
@@ -146,7 +146,7 @@ data ChatSuggestions
 
 data ClientboundPluginMessage
   channel :: Text
-  data :: ByteString via TakeRest
+  data_ :: ByteString via TakeRest
 
 data DamageEvent
   entityid :: Int32 via VarInt
@@ -155,7 +155,7 @@ data DamageEvent
   amount :: Float
 
 data DebugSample
-  data :: ByteString via TakeRest
+  data_ :: ByteString via TakeRest
 
 data DeleteMessage
   messageid :: UUID
@@ -218,9 +218,8 @@ data ClientboundKeepAlive
 data ChunkDataAndUpdateLight
   chunkx :: Int32
   chunkz :: Int32
-  groundupcontinuous :: Bool
-  primarybitmask :: Int32 via VarInt
-  heightmaps -- TODO
+  data_ :: ChunkData
+  lightdata_ :: LightData
 
 data WorldEvent  
   event :: Int32
@@ -413,7 +412,7 @@ data Respawn
   previousgamemode :: Int8
   isdebug :: Bool
   isflat :: Bool
-  copymetadata :: Bool
+  copymetadata_ :: Bool
 
 data SetHeadRotation
   entityid :: Int32 via VarInt
@@ -464,7 +463,7 @@ data SetRenderDistance
   viewdistance :: Int32 via VarInt
 
 data SetCursorItem
-  slotdata :: Slot
+  slotdata_ :: Slot
 
 data SetDefaultSpawnPosition
   location :: Position
@@ -476,7 +475,7 @@ data DisplayObjective
 
 data SetEntityMetadata
   entityid :: Int32 via VarInt
-  metadata :: ByteString via TakeRest
+  metadata_ :: ByteString via TakeRest
 
 data LinkEntities
   vehicleid :: Int32 via VarInt
@@ -515,7 +514,7 @@ data SetPassengers
 
 data SetPlayerInventorySlot
   slot :: Int16
-  slotdata :: Slot
+  slotdata_ :: Slot
 
 data UpdateTeams
   teamname :: Text
@@ -652,10 +651,6 @@ data CommandSuggestionsRequest
 
 data AcknowledgeConfiguration -- Empty packet
 
-data CommandSuggestionsRequest
-  id :: Int32 via VarInt
-  text :: Text
-
 data ClickContainerButton
   windowid :: Word8
   buttonid :: Word8
@@ -682,10 +677,10 @@ data CookieResponsePlay
 
 data ServerboundPluginMessagePlay
   channel :: Text
-  data :: ByteString via TakeRest
+  data_ :: ByteString via TakeRest
 
 data DebugSampleSubscription
-  data :: ByteString via TakeRest
+  data_ :: ByteString via TakeRest
 
 data EditBook
   hand :: Int32 via VarInt
@@ -820,7 +815,7 @@ data ProgramCommandBlockMinecart
 
 data SetCreativeModeSlot
   slot :: Int16
-  slotdata :: Slot
+  slotdata_ :: Slot
 
 data ProgramJigsawBlock
   location :: Position
@@ -839,7 +834,7 @@ data ProgramStructureBlock
   size :: V3 Int8
   mirror :: Int32 via VarInt
   rotation :: Int32 via VarInt
-  metadata :: Text
+  metadata_ :: Text
   integrity :: Float
   seed :: Int64 via VarLong
   flags :: Word8
