@@ -1,5 +1,18 @@
--- | Keep-alive mechanism
-module M.IO.KeepAlive (KeepAliveFail (..), skeepalive) where
+-- |
+-- Module: M.IO.KeepAlive
+-- Description: Keep-alive mechanism for maintaining server connections
+-- License: BSD-3-Clause
+--
+-- This module implements the Minecraft protocol's keep-alive mechanism, which helps
+-- detect stale connections by periodically exchanging random numbers.
+module M.IO.KeepAlive
+  ( -- * Types
+    KeepAliveFail (..),
+
+    -- * Keep-alive functions
+    skeepalive, -- ^ Server keep-alive handler
+  )
+where
 
 import Control.Applicative
 import Control.Monad
@@ -12,7 +25,10 @@ import M.IO.Internal.EffectTypes
 import M.Pack
 import System.Random
 
--- | keep-alive failure
+-- | keep-alive failure modes. Occurs when:
+--
+-- * the response number doesn't match the sent number ('KeepAliveFail')
+-- * no response is received within timeout ('KeepAliveTimeout')
 data KeepAliveFail a
   = KeepAliveFail
       -- | sent
@@ -22,7 +38,13 @@ data KeepAliveFail a
   | KeepAliveTimeout
   deriving (Eq, Show, Typeable, Exception)
 
--- | server's keep-alive mechanism
+-- | server's keep-alive mechanism. sends a random number every 15 seconds
+-- and verifies the client echoes it back correctly
+--
+-- throws:
+--
+-- * 'KeepAliveFail' if response doesn't match
+-- * 'KeepAliveTimeout' if no response within timeout
 skeepalive ::
   forall a es void.
   ( Concurrent :> es,

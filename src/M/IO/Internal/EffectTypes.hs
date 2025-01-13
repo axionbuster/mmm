@@ -1,15 +1,29 @@
--- | Networking effects for Minecraft clients and servers.
+-- |
+-- Module: M.IO.Internal.EffectTypes
+-- Description: Core networking effects for Minecraft protocol
+-- License: BSD-3-Clause
+--
+-- This module defines the core effects used for networking in the Minecraft protocol
+-- implementation. It provides bidirectional packet communication with compression and
+-- encryption support.
 module M.IO.Internal.EffectTypes
-  ( Talking (..),
+  ( -- * Core effect
+    Talking (..),
+
+    -- * Types
     Direction (..),
+    Immediately (..),
     Op (..),
     ParserState (..),
-    Immediately (..),
+
+    -- * Effect operations
     Talking',
     hear,
     hearU,
     hearA,
     say,
+
+    -- * Configuration
     setcompression,
     setencryption,
     enter,
@@ -30,16 +44,13 @@ import Language.Haskell.TH.Syntax (Lift)
 import M.IO.Internal.Datagram
 import M.Pack
 
--- | relative direction of a packet
---
--- why relative? because the same mechanism is shared by
--- both the client and the server, so we don't want to
--- hardcode the direction of a packet
+-- | relative packet direction. Used to identify packet flow without
+-- hardcoding client/server roles
 data Direction = Inbound | Outbound
   deriving (Eq, Show, Read, Ord, Enum, Bounded, Data, Typeable, Generic, Lift)
   deriving (Hashable, NFData)
 
--- | urgency of receiving a packet
+-- | urgency level for receiving packets
 data Immediately = Immediately | Eventually
   deriving (Eq, Show, Read, Ord, Enum, Bounded, Data, Typeable, Generic, Lift)
   deriving (Hashable, NFData)

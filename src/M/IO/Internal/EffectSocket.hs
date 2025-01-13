@@ -1,6 +1,7 @@
 -- | Interpret the 'Talking' effect in terms of a socket connection.
 module M.IO.Internal.EffectSocket
-  ( withtalkingserver,
+  ( SocketTalkingError (..),
+    withtalkingserver,
     withtalkingclient,
   )
 where
@@ -30,7 +31,7 @@ import Prelude hiding (read)
 -- ConcUnlift: allow concurrent access
 
 -- | error in communication
-data Error
+data SocketTalkingError
   = UnknownCode Direction TypeRep
   | Mismatch Direction TypeRep TypeRep
   deriving (Eq, Show, Typeable, Exception)

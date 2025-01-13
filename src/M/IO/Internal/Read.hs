@@ -1,7 +1,15 @@
--- | Parse from a stream
+-- |
+-- Module: M.IO.Internal.Read
+-- Description: Stream parsing utilities
+-- License: BSD-3-Clause
+--
+-- This module provides parsing utilities for reading structured data from streams.
 module M.IO.Internal.Read
-  ( parseio,
+  ( -- * Basic parsing
+    parseio,
     parseio0,
+
+    -- * Lifted versions
     parseiolift,
     parseio0lift,
   )
@@ -40,14 +48,12 @@ parseio0lift ::
 parseio0lift = parseiolift () 0
 {-# INLINE parseio0lift #-}
 
--- | parse from a stream
+-- | Parse from a stream. Automatically handles chunked input by
+-- concatenating chunks until a complete parse succeeds.
 --
--- one may either get the result or an exception. the exception may
--- be of @e@ type or a generic 'IOError' saying \"parseio: unexpected
--- end of input\"
---
--- on many small chunks, time complexity may approach O(n^2) due to
--- use of left-associated 'mappend' in 'ByteString' concatenation
+-- May throw:
+-- * The parser's error type @e@
+-- * IOError "parseio: unexpected end of input"
 parseio ::
   (Exception e) =>
   -- | state
