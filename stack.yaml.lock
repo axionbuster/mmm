@@ -5,27 +5,16 @@
 
 packages:
 - completed:
-    commit: c22d09aec7870fac30f73f87e71d1a9e23a7c777
+    commit: 6d5e7aabb14120a3ae7d74a1dee954a237a3c421
     git: https://github.com/axionbuster/th-serde.git
     name: th-serde
     pantry-tree:
-      sha256: a4572d18b1907d9a57ddea7e91406fcecd1ed678ef1f8d905567b61bd55b96bd
+      sha256: 8dda827bc460dfac45e7624fb3f11800df6cdb7e3a57063e1a0c84abaa8a1323
       size: 989
-    version: 0.1.2.2
+    version: 0.1.3.0
   original:
-    commit: c22d09aec7870fac30f73f87e71d1a9e23a7c777
+    commit: 6d5e7aabb14120a3ae7d74a1dee954a237a3c421
     git: https://github.com/axionbuster/th-serde.git
-- completed:
-    commit: d534b85bfac8b27efd96fab1838628e08a8aa163
-    git: https://github.com/axionbuster/varcomp.git
-    name: varcomp
-    pantry-tree:
-      sha256: a5f54cefe26c52f9ed6f51beaae33e7072343b8996aeb7d9f10483e43eb453d7
-      size: 594
-    version: 0.1.0.0
-  original:
-    commit: d534b85bfac8b27efd96fab1838628e08a8aa163
-    git: https://github.com/axionbuster/varcomp.git
 snapshots:
 - completed:
     sha256: dd89d2322cb5af74c6ab9d96c0c5f6c8e6653e0c991d619b4bb141a49cb98668

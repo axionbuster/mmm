@@ -25,14 +25,15 @@ import M.J.Chunk.Net
 import M.J.Misc
 import M.J.NBT
 import M.J.Position
-import M.J.TextComponent
+import M.J.TODO
 import M.LEB
 import M.Pack
-import Prelude hiding (id)
+import Prelude hiding (id, length, sequence)
 
 -- | given in 1/8000 resolution
 data SetEntityVelocityRes
 
+-- | given in 1/8000 resolution
 instance HasResolution SetEntityVelocityRes where
   resolution _ = 8000
 
@@ -40,16 +41,28 @@ instance HasResolution SetEntityVelocityRes where
 -- we define them here
 
 data ChatMode = CMEnabled | CMCommandsOnly | CMHidden
-  deriving stock (Eq, Ord, Show, Enum, Bounded, Generic, Data, Typeable, Lift)
+  deriving stock (Eq, Ord, Show, Read)
+  deriving stock (Enum, Bounded, Generic, Data, Typeable, Lift)
   deriving anyclass (NFData, Hashable)
 
 data ParticleStatus = PSAll | PSDecreased | PSMinimal
-  deriving stock (Eq, Ord, Show, Enum, Bounded, Generic, Data, Typeable, Lift)
+  deriving stock (Eq, Ord, Show, Read)
+  deriving stock (Enum, Bounded, Generic, Data, Typeable, Lift)
+  deriving anyclass (NFData, Hashable)
+
+data FilterType = PassThrough | FullyFiltered | PartiallyFiltered
+  deriving stock (Eq, Ord, Show, Read)
+  deriving stock (Enum, Bounded, Generic, Data, Typeable, Lift)
+  deriving anyclass (NFData, Hashable)
+
+data BossBarColor = Pink | Blue | Red | Green | Yellow | Purple | White
+  deriving stock (Eq, Ord, Show, Read)
+  deriving stock (Enum, Bounded, Generic, Data, Typeable, Lift)
   deriving anyclass (NFData, Hashable)
 
 [serde|
 .derive
-  Eq Ord Show Generic NFData Data Typeable
+  Show Read Data Typeable
 
 data StatusResponse
   jsonresponse :: Text
@@ -214,7 +227,128 @@ data SetPlayerPosition
   rotation :: V2 Float
   flags :: TeleportFlags via Bitwise Word8 TeleportFlags
   teleportid :: Int32 via VarInt
+
+data EntityAnimation
+  entityid :: Int32 via VarInt
+  animation :: Word8
+
+data AwardStatistics
+  stats :: V.Vector AwardStatistics_Entry
+
+data AwardStatistics_Entry
+  categoryid :: Int32 via VarInt
+  statisticid :: Int32 via VarInt
+  value :: Int32 via VarInt
+
+data AcknowledgeBlockChange
+  sequence :: Int32 via VarInt
+
+data SetBlockDestroyStage
+  entityid :: Int32 via VarInt
+  location :: Position
+  destroystage :: Word8
+
+data BlockEntityData
+  location :: Position
+  type_ :: Int32 via VarInt
+  data_ :: Tg -- NBT data
+
+data BlockAction
+  location :: Position
+  actionid :: Word8
+  actionparam :: Word8
+  blocktype :: Int32 via VarInt
+
+data BossBar
+  uuid :: UUID
+  action :: BossBarAction
+  -- other fields depend on action type, we'll define the action type separately
+
+data ChangeDifficulty
+  difficulty :: Word8
+  locked :: Bool
+
+data ChunkBatchFinished
+  batchsize :: Int32 via VarInt
+
+data ChunkBatchStarted
+
+data ClearTitles
+  reset :: Bool
+
+data CommandSuggestionsResponse
+  id :: Int32 via VarInt
+  start :: Int32 via VarInt
+  length :: Int32 via VarInt
+  matches :: V.Vector CommandMatch
+
+data CommandMatch
+  match :: Text
+  tooltip :: Maybe TextComponent
+
+data Commands
+  nodes :: V.Vector CommandNode  -- CommandNode type defined elsewhere
+  rootindex :: Int32 via VarInt
+
+data CloseContainer
+  windowid :: Int32 via VarInt
+
+data SetContainerContent
+  windowid :: Int32 via VarInt
+  stateid :: Int32 via VarInt
+  slots :: V.Vector Slot  -- Slot type defined elsewhere
+  carrieditem :: Slot
+
+data SetContainerProperty
+  windowid :: Int32 via VarInt
+  property :: Int16
+  value :: Int16
+
+data SetContainerSlot
+  windowid :: Int32 via VarInt
+  stateid :: Int32 via VarInt
+  slot :: Int16
+  data_ :: Slot
+
+data DisguisedChatMessage
+  message :: TextComponent
+  chattype :: Int32 via VarInt
+  sendername :: TextComponent
+  targetname :: Maybe TextComponent
+
+data WorldEvent  
+  event :: Int32
+  location :: Position
+  data_ :: Int32
+  disablerelativevolume :: Bool
+
+data ParticleEffect
+  particleid :: Int32 via VarInt
+  longdistance :: Bool
+  position :: V3 Double
+  offset :: V3 Float
+  maxspeed :: Float
+  count :: Int32
+  data_ :: ParticleData -- Type defined elsewhere
+
+data UpdateLight
+  chunkx :: Int32 via VarInt
+  chunkz :: Int32 via VarInt
+  data_ :: LightData
+
 |]
+
+-- provided by "th-serde": Data.Serde.QQ
+runusercoercion
+  -- provided by M.Pack
+  borrowderivepackunpack
+  properderivepackunpack
+  -- preparations for shadow types
+  [ ''Generic,
+    ''NFData,
+    ''Eq,
+    ''Ord
+  ]
 
 -- another thing. to use Bitwise, we need to derive Bitreppable
 -- for the type. Bitreppable takes two type parameters: the
@@ -222,15 +356,8 @@ data SetPlayerPosition
 
 -- the standard way is to make a blanket instance like so:
 
+-- lastly, we invoke Template Haskell to generate the instances
+
 instance
   (Bits i, Integral i, Pack i, Unpack i) =>
   Bitreppable i DisplayedSkinParts
-
--- lastly, we invoke Template Haskell to generate the instances
-
--- provided by "th-serde": Data.Serde.QQ
-runusercoercion
-  -- provided by M.Pack
-  derivepackunpack
-  -- preparations for shadow types
-  [''Generic, ''Pack, ''Unpack]

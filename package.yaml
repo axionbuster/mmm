@@ -70,7 +70,6 @@ dependencies:
 - unliftio
 - unordered-containers
 - uuid-types
-- varcomp
 - vector
 - zlib
 

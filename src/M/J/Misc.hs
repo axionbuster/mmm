@@ -42,21 +42,19 @@ instance (Bits i, Integral i, Pack i, Unpack i) => Bitreppable i TeleportFlags
 
 [serde|
 .derive
-  Eq Ord Show Read Hashable NFData
-  Generic Lift Data Typeable
+  Show Read Lift Data Typeable
 
 data SoundEvent
   soundname :: Text via Identifier
   fixedrange :: Maybe Float
   |]
 
--- 1st argument: TH declarations generator
--- 2nd argument: preparation derivations for shadow type (SoundEvent__)
-
--- in English:
---  first, derive the Pack, Unpack, and Generic instances for SoundEvent__
---  (the shadow type)
---
---  then, derive the Pack, Unpack, and Generic instances for SoundEvent
---  by borrowing the shadow type's instances
-runusercoercion derivepackunpack [''Pack, ''Unpack, ''Generic]
+runusercoercion
+  borrowderivepackunpack
+  properderivepackunpack
+  [ ''Generic,
+    ''Hashable,
+    ''NFData,
+    ''Eq,
+    ''Ord
+  ]

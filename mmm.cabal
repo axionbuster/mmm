@@ -48,8 +48,7 @@ library
       M.J.NBT.Internal.P
       M.J.NBT.Internal.Types
       M.J.Position
-      M.J.Slot
-      M.J.TextComponent
+      M.J.TODO
       M.J.V769.Defs
       M.LEB
       M.Pack
@@ -121,7 +120,6 @@ library
     , unliftio
     , unordered-containers
     , uuid-types
-    , varcomp
     , vector
     , zlib
   default-language: GHC2021
@@ -196,7 +194,6 @@ test-suite mmm-test
     , unliftio
     , unordered-containers
     , uuid-types
-    , varcomp
     , vector
     , zlib
   default-language: GHC2021

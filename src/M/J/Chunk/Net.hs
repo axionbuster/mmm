@@ -41,8 +41,7 @@ instance Unpack PackedXZ where
 
 [serde|
 .derive
-  Eq Ord Show Generic NFData
-  Data Typeable
+  Show Read Data Typeable
 
 data BlockEntity
   bexz :: V2 Word8 via PackedXZ
@@ -65,4 +64,11 @@ data LightData
   ldblocklights :: V.Vector ByteString
  |]
 
-runusercoercion derivepackunpack [''Generic, ''Pack, ''Unpack]
+runusercoercion
+  borrowderivepackunpack
+  properderivepackunpack
+  [ ''Generic,
+    ''NFData,
+    ''Eq,
+    ''Ord
+  ]
