@@ -64,82 +64,7 @@ data BossBarColor = Pink | Blue | Red | Green | Yellow | Purple | White
 .derive
   Show Read Data Typeable
 
-data StatusResponse
-  jsonresponse :: Text
-
-data StatusRequest
-
--- to define LoginSuccess, need to define 'Property' first
--- also, assume OverloadedRecordDot is enabled, as well as
--- DuplicateRecordFields and DisambiguateRecordFields, so that
--- multiple records can have the same field name
-
-data LoginSuccess_Property
-  name :: Text
-  value :: Text
-  signature :: Maybe Text
-
--- SetCompression shows the example of using a via clause
--- to define how to serialize/deserialize a field, without
--- leaking the implementation details of the serialization
--- format to the user
-
--- though we can use a newtype, because of an issue in deriving
--- Generic using DerivingVia, we can't use it here until
--- the ".no" feature (which disables deriving specific instances)
--- is implemented
-data SetCompression
-  getcompressionthreshold :: Int32 via VarInt
-
--- in the declaration below we use shadowing to borrow the
--- Pack and Unpack implementation through LEB Int32,
--- which is equal to VarInt
-
-data LoginPluginRequest
-  messageid :: Int32 via LEB Int32
-  channel :: Text
-  data_ :: ByteString via TakeRest -- if Coercible, ok
-
-data LoginStart
-  name :: Text
-  uuid :: UUID
-
--- 'Identifier' isn't to be exposed to the user (yet);
--- I haven't made up my mind about that
-
-data CookieRequestConfiguration
-  key :: Text via Identifier
-
--- we don't ever use raw lists ([...]) for serialization/deserialization.
--- we use Vectors (V.Vector or VU.Vector)
-
-data RegistryData
-  regid :: Text via Identifier
-  entries :: V.Vector RegistryData_Entry
-
-data RegistryData_Entry
-  id :: Text via Identifier
-  data_ :: Maybe Tg -- NBT = Tg
-
--- some more complicated bits are shown here
--- sum types: we can't define sum types here yet, so
---  for now, assume they are defined elsewhere
--- EnumIndex i a: newtype over 'a' but uses integral type 'i' to
---  represent it. used for simple sum types
--- Bitwise i a: newtype over 'a', a product of booleans.
---  represents it as a bit set over the integral type 'i'.
-
-data ClientInformationConfiguration
-  locale :: Text
-  viewdistance :: Int8
-  chatmode :: ChatMode via EnumIndex VarInt ChatMode
-  chatcolors :: Bool
-  displayedskinparts :: DisplayedSkinParts via Bitwise Word8 DisplayedSkinParts
-  mainhandright :: Bool
-  enabletextfiltering :: Bool
-  allowserverlistings :: Bool
-  particlestatus :: ParticleStatus via EnumIndex VarInt ParticleStatus
-
+-- Common/Shared types first
 data DisplayedSkinParts
   cape :: Bool
   jacket :: Bool
@@ -149,28 +74,23 @@ data DisplayedSkinParts
   rightpants :: Bool
   hat :: Bool
 
--- Minecraft uses 'rotation' and 'orientation' interchangeably
-
-data UpdateEntityRotation
-  id :: Int32 via VarInt
-  rotation :: V2 Int8 via V2 Int8Angle
-  onground :: Bool
-
--- using dummy types: Slot (Data), Text Component (NBT/JSON), etc.
--- some shim types have been defined, so we can use them here
-
-data CombatDeath
-  id :: Int32 via VarInt
-  message :: TextComponent
-
--- Basic handshaking/status packets
+-- Handshaking
 data HandshakePacket
   protocolversion :: Int32 via VarInt
   serveraddress :: Text 
   serverport :: Word16
   nextstate :: Int32 via VarInt
 
--- Login packets
+-- Status
+data StatusResponse
+  jsonresponse :: Text
+
+data StatusRequest
+
+data PongResponse
+  payload :: Int64
+
+-- Login
 data LoginDisconnect
   reason :: TextComponent
 
@@ -185,48 +105,75 @@ data LoginSuccess
   username :: Text
   properties :: V.Vector LoginSuccess_Property
 
+data LoginSuccess_Property
+  name :: Text
+  value :: Text
+  signature :: Maybe Text
+
+data LoginPluginRequest
+  messageid :: Int32 via LEB Int32
+  channel :: Text
+  data_ :: ByteString via TakeRest -- if Coercible, ok
+
 data LoginPluginResponse
   messageid :: Int32 via VarInt
   successful :: Bool
   data_ :: Maybe ByteString
 
--- Play state packets
+data LoginStart
+  name :: Text
+  uuid :: UUID
+
+data LoginAcknowledged
+
+data EncryptionResponse
+  sharedsecret :: ByteString
+  verifytoken :: ByteString
+
+-- Configuration
+data FinishConfiguration -- Empty packet
+
+data FeatureFlags
+  flags :: V.Vector Text via V.Vector Identifier
+
+data ServerData
+  motd :: TextComponent
+  icon :: Maybe Text
+  enforcesecurechat :: Bool
+
+data ServerLinks
+  links :: V.Vector Text via V.Vector Identifier
+
+data CustomReportDetails
+  details :: ByteString via TakeRest
+
+data ClientInformationConfiguration
+  locale :: Text
+  viewdistance :: Int8
+  chatmode :: ChatMode via EnumIndex VarInt ChatMode
+  chatcolors :: Bool
+  displayedskinparts :: DisplayedSkinParts via Bitwise Word8 DisplayedSkinParts
+  mainhandright :: Bool
+  enabletextfiltering :: Bool
+  allowserverlistings :: Bool
+  particlestatus :: ParticleStatus via EnumIndex VarInt ParticleStatus
+
+-- Play
 data BundleDelimiter -- empty packet
 
 data SpawnEntity
   entityid :: Int32 via VarInt
   entityuuid :: UUID
   type_ :: Int32 via VarInt
-  -- x :: Double
-  -- y :: Double
-  -- z :: Double
   position :: V3 Double
   rotation :: V2 Int8 via V2 Int8Angle
   data_ :: Int32 via VarInt
   velocity :: V3 Double via V3 (Fixed' Int16 SetEntityVelocityRes Double)
 
-data BlockUpdate
-  location :: Position 
-  blockid :: Int32 via VarInt
-
-data ChatMessage
-  message :: Text
-  timestamp :: Int64
-  salt :: Int64
-  signature :: Maybe ByteString
-  messagecount :: Int32 via VarInt
-  acknowledged :: FixedBitset 20
-
-data ChunkBiomes
-  x :: Int32
-  z :: Int32
-  data_ :: ChunkData
-
-data SetPlayerPosition
+data SpawnExperienceOrb
+  entityid :: Int32 via VarInt
   position :: V3 Double
-  rotation :: V2 Float
-  flags :: TeleportFlags via Bitwise Word8 TeleportFlags
-  teleportid :: Int32 via VarInt
+  count :: Int16
 
 data EntityAnimation
   entityid :: Int32 via VarInt
@@ -259,6 +206,10 @@ data BlockAction
   actionparam :: Word8
   blocktype :: Int32 via VarInt
 
+data BlockUpdate
+  location :: Position 
+  blockid :: Int32 via VarInt
+
 data BossBar
   uuid :: UUID
   action :: BossBarAction
@@ -272,6 +223,11 @@ data ChunkBatchFinished
   batchsize :: Int32 via VarInt
 
 data ChunkBatchStarted
+
+data ChunkBiomes
+  x :: Int32
+  z :: Int32
+  data_ :: ChunkData
 
 data ClearTitles
   reset :: Bool
@@ -336,38 +292,10 @@ data UpdateLight
   chunkz :: Int32 via VarInt
   data_ :: LightData
 
--- Status response packet components
-data Version
-  name :: Text
-  protocol :: Int32 via VarInt
-
-data Players
-  max :: Int32 via VarInt
-  online :: Int32 via VarInt
-  sample :: V.Vector PlayerSample
-
-data PlayerSample
-  name :: Text
-  id :: UUID
-
--- Basic configuration packets
-data FinishConfiguration -- Empty packet
-
-data FeatureFlags
-  flags :: V.Vector Text via V.Vector Identifier
-
--- Chat and messaging
 data SystemChatMessage
   content :: TextComponent
   overlay :: Bool
 
--- Entity-related packets
-data SpawnExperienceOrb
-  entityid :: Int32 via VarInt
-  position :: V3 Double
-  count :: Int16
-
--- World border packets
 data InitializeWorldBorder
   x :: Double
   z :: Double
@@ -378,38 +306,6 @@ data InitializeWorldBorder
   warningtime :: Int32 via VarInt
   warningblocks :: Int32 via VarInt
 
--- Custom types for specific needs
-data TeleportFlags
-  x :: Bool
-  y :: Bool
-  z :: Bool
-  y_rot :: Bool
-  x_rot :: Bool
-
--- Status packet responses
-data PongResponse
-  payload :: Int64
-
--- Login state packets
-data EncryptionResponse
-  sharedsecret :: ByteString
-  verifytoken :: ByteString
-
-data LoginAcknowledged
-
--- Configuration state packets
-data ServerLinks
-  links :: V.Vector Text via V.Vector Identifier
-
-data CustomReportDetails
-  details :: ByteString via TakeRest
-
-data ServerData
-  motd :: TextComponent
-  icon :: Maybe Text
-  enforcesecurechat :: Bool
-
--- Play state packets
 data ConfirmTeleportation
   teleportid :: Int32 via VarInt
 
@@ -458,7 +354,3 @@ runusercoercion
 instance
   (Bits i, Integral i, Pack i, Unpack i) =>
   Bitreppable i DisplayedSkinParts
-
-instance
-  (Bits i, Integral i, Pack i, Unpack i) =>
-  Bitreppable i TeleportFlags
