@@ -112,13 +112,13 @@ withtalkingserver ::
   -- | port
   String ->
   -- | per-connection handler
-  (Connection -> Eff (Talking : es) a) ->
+  Eff (Talking : es) a ->
   -- | final result
   Eff es a
 withtalkingserver u host port handler = withEffToIO u \run -> do
   runTCPServer host port \sock -> do
     withcxfromsocket sock \cx ->
-      run $ runtalking0 cx $ handler cx
+      run $ runtalking0 cx handler
 
 -- | run client with single connection
 withtalkingclient ::
@@ -134,10 +134,10 @@ withtalkingclient ::
   -- | port
   String ->
   -- | handler
-  (Connection -> Eff (Talking : es) a) ->
+  Eff (Talking : es) a ->
   -- | result
   Eff es a
 withtalkingclient u host port handler = withEffToIO u \run -> do
   runTCPClient host port \sock ->
     withcxfromsocket sock \cx ->
-      run $ runtalking0 cx $ handler cx
+      run $ runtalking0 cx handler
