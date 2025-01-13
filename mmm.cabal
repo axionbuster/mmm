@@ -59,8 +59,8 @@ library
       M.Pack.Internal.Types
       M.Position
       M.TODO
+      M.V769
       M.V769.C
-      M.V769.Defs
       M.V769.H
       M.V769.I
       M.V769.L
