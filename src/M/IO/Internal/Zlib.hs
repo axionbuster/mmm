@@ -22,11 +22,8 @@ safedecomp ::
   -- | decompressed data
   IO ByteString
 safedecomp l comp = do
-  let d =
-        B.toStrict $
-          BL.take (fromIntegral l) $
-            decompress $
-              BL.fromStrict comp
-  if B.length d /= l
+  let n = fromIntegral l
+      d = BL.take n $ decompress $ BL.fromStrict comp
+  if BL.length d /= n
     then fail "safedecomp: wrong length"
-    else pure d
+    else pure $ B.toStrict d
