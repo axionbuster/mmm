@@ -86,14 +86,10 @@ pkb ::
   [c] ->
   -- | words; least significant word first.
   [w]
-pkb b = k
+pkb b = e
   where
-    -- k (check): very special initial condition check.
-    -- empty list input is degenerate anyway, but, if
-    -- you do this, you can have the identity upb b (pkb b xs) == xs
-    -- for all inputs, including [].
-    k [] = [] -- prevents returning [0] when [] was given as input.
-    k os
+    -- e: entry point / error guard.
+    e os
       | wsz < csz =
           error $
             printf
