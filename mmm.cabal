@@ -27,6 +27,7 @@ source-repository head
 
 library
   exposed-modules:
+      M.Chunk.Code
       M.Chunk.Net
       M.Collision
       M.Collision.Effectful
