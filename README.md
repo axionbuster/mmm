@@ -34,7 +34,7 @@ Well project is kind of less than well-documented and there's no working entry p
 ## What I'm doing now
 
 - Parse "paletted container" format for chunks.
-- Add a packet state registry (packet type <-> (numeric packet code * protocol state))
+- Add a packet state registry (packet type <-> (who's talking * numeric packet code * protocol state))
   that is decoupled from the actual packet types so that I can reuse the same packet types if there's not been significant changes between versions.
 - Architect a way to make the observer pattern easy to understand / program in.
   Target demographic for programmers is teenagers and young adults with minimal (initial) knowledge of Haskell or FP in general.
