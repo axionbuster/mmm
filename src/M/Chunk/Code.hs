@@ -4,8 +4,7 @@
 -- Copyright: (c) axionbuster, 2025
 -- License: BSD-3-Clause
 --
--- Encode and decode paletted containers. Contents and purpose of
--- the module will change soon.
+-- Encode and decode paletted containers for block states and biomes.
 module M.Chunk.Code (upb, pkb, MkEncoder (..), mkencoder) where
 
 import Data.Bits
@@ -17,26 +16,35 @@ import Data.Vector.Unboxed qualified as V
 import Data.Word
 import M.Pack
 import Text.Printf
-import Debug.Trace
 
--- have not decided to either make this public or private yet
+-- | Configuration for the encoder
 data MkEncoder = MkEncoder
-  { indirlowlim :: !Int,
+  { -- | Minimum palette size (if using palette)
+    indirlowlim :: !Int,
+    -- | Maximum palette size (if using palette)
     indirupplim :: !Int,
+    -- | Bits per entry for direct encoding
     directbpe :: !Int
   }
 
--- for internal use in minecraft block state/biome packets
+-- | Encode values using either direct, indirect (palette), or single value encoding
 mkencoder ::
   forall a.
   (Integral a, FiniteBits a, V.Unbox a) =>
+  -- | Encoder configuration
   MkEncoder ->
+  -- | Function to directly encode individual values. Expected to be
+  -- 'word64BE', but works with other choices.
   (a -> Builder) ->
+  -- | Input values to encode
   V.Vector a ->
+  -- | Encoded data
   Builder
 mkencoder MkEncoder {..} directpack = choose1
   where
+    -- Main strategy selector based on input characteristics
     choose1 vs
+      -- Safety checks
       | finiteBitSize (undefined :: a) > finiteBitSize (undefined :: Int) =
           error "mkencoder/choose1: bit size"
       | indirlowlim <= 0 = error "mkencoder/choose1: indirlowlim"
@@ -44,40 +52,52 @@ mkencoder MkEncoder {..} directpack = choose1
           error "mkencoder/choose1: indirupplim"
       | directbpe <= 0 = "mkencoder/choose1: directbpe"
       | V.null vs = error "mkencoder/choose1: empty"
+      -- Single value case - when vector has only one value
       | Just (v, w) <- V.uncons vs, V.null w = single v
+      -- Single value case - when all values are identical
       | Just (_, m, _) <- computepalette vs, M.size m == 1 = single (V.head vs)
+      -- Try palette encoding if possible
       | Just p <- computepalette vs = indirect p vs
+      -- Fallback to direct encoding
       | otherwise = direct vs
+
+    -- Encode a single value: [0: bpe][value][0: # longs to follow = none]
     single v = word8 0 <> packleb32 v <> word8 0
+
+    -- Palette-based encoding
     indirect (palsiz, pal, pallis) vs =
-      let lg n -- ceiling of log base 2 of n
+      let lg n -- Calculate bits needed to represent n values
             | n <= 1 = 0
             | otherwise = finiteBitSize n - countLeadingZeros (pred n)
-          bpe = lg palsiz
-          lut = map ((pal M.!) . fromIntegral)
-          wor = pkb bpe $ lut $ V.toList vs
-       in packleb32 bpe
-            <> packleb32 palsiz
-            <> pallis
+          bpe = lg palsiz -- Bits per entry
+          lut = map ((pal M.!) . fromIntegral) -- Convert values to pal. indices
+          wor = pkb bpe $ lut $ V.toList vs -- Pack indices into words
+       in packleb32 bpe -- Format: [bpe][palette size]
+            <> packleb32 palsiz -- [palette entries...]
+            <> pallis -- [data length][packed data]
             <> packleb32 (length wor)
             <> foldMap' word64BE wor
+
+    -- Direct encoding without palette
     direct vs =
-      packleb32 directbpe
-        <> packleb32 (V.length vs)
+      packleb32 directbpe -- Format: [bpe][length]
+        <> packleb32 (V.length vs) -- [raw values...]
         <> V.foldMap' directpack vs
+
+    -- Try to create an efficient palette
     computepalette vs =
       let (m', l') = V.foldl' f (M.empty, "") vs
-          f (m, l) (fromIntegral -> v)
-            | v `M.member` m = (m, l)
+          f (m, l) (fromIntegral -> v) -- Build palette map and entry list
+            | v `M.member` m = (m, l) -- Skip if value already in palette
             | otherwise = (M.insert v (M.size m) m, l <> packleb32 v)
        in if
-            | M.size m' < 2 -> Nothing
-            | M.size m' < shift 1 indirlowlim ->
+            | M.size m' < 2 -> Nothing -- Too few unique values
+            | M.size m' < shift 1 indirlowlim -> -- Pad to minimum size
                 let re = foldMap' word8 do
                       take (indirlowlim - M.size m') (repeat 0)
                  in Just (indirlowlim, m', l' <> re)
-            | M.size m' > shift 1 indirupplim -> Nothing
-            | otherwise -> Just (M.size m', m', l')
+            | M.size m' > shift 1 indirupplim -> Nothing -- Too many uniques
+            | otherwise -> Just (M.size m', m', l') -- Just right
 
 -- | unpack a paletted container
 -- (Minecraft, Java Edition, padded words).
