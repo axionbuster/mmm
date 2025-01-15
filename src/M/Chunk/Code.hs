@@ -5,52 +5,63 @@
 -- License: BSD-3-Clause
 --
 -- Encode and decode paletted containers for block states and biomes.
+--
+-- == Notes
+--
+-- The spec for the \"direct\" format isn't clear, so I went with the
+-- interpretation that each word is encoded as a big-endian 64-bit integer.
 module M.Chunk.Code (upb, pkb, MkEncoder (..), mkencoder) where
 
+import Control.Monad
 import Data.Bits
 import Data.ByteString.Builder
 import Data.Foldable
+import Data.Functor
 import Data.Int
 import Data.IntMap.Strict qualified as M
 import Data.Vector.Unboxed qualified as V
 import Data.Word
+import FlatParse.Stateful qualified as F
 import M.Pack
 import Text.Printf
 
 -- | Configuration for the encoder
 data MkEncoder = MkEncoder
   { -- | Minimum palette size (if using palette)
-    indirlowlim :: !Int,
+    eindirlowlim :: !Int,
     -- | Maximum palette size (if using palette)
-    indirupplim :: !Int,
+    eindirupplim :: !Int,
     -- | Bits per entry for direct encoding
-    directbpe :: !Int
+    edirectbpe :: !Int
   }
 
 -- | Encode values using either direct, indirect (palette), or single value encoding
+--
+-- == Usage
+--
+-- Plug in the first argument ('MkEncoder' configuration) and store the
+-- closure in a variable. This closure is the actual encoder function.
+-- Then, use the closure to encode values.
 mkencoder ::
   forall a.
   (Integral a, FiniteBits a, V.Unbox a) =>
   -- | Encoder configuration
   MkEncoder ->
-  -- | Function to directly encode individual values. Expected to be
-  -- 'word64BE', but works with other choices.
-  (a -> Builder) ->
   -- | Input values to encode
   V.Vector a ->
   -- | Encoded data
   Builder
-mkencoder MkEncoder {..} directpack = choose1
+mkencoder MkEncoder {..} = choose1
   where
     -- Main strategy selector based on input characteristics
     choose1 vs
       -- Safety checks
       | finiteBitSize (undefined :: a) > finiteBitSize (undefined :: Int) =
           error "mkencoder/choose1: bit size"
-      | indirlowlim <= 0 = error "mkencoder/choose1: indirlowlim"
-      | indirupplim <= 0 || indirupplim < indirlowlim =
-          error "mkencoder/choose1: indirupplim"
-      | directbpe <= 0 = "mkencoder/choose1: directbpe"
+      | eindirlowlim <= 0 = error "mkencoder/choose1: eindirlowlim"
+      | eindirupplim <= 0 || eindirupplim < eindirlowlim =
+          error "mkencoder/choose1: eindirupplim"
+      | edirectbpe <= 0 = error "mkencoder/choose1: edirectbpe"
       | V.null vs = error "mkencoder/choose1: empty"
       -- Single value case - when vector has only one value
       | Just (v, w) <- V.uncons vs, V.null w = single v
@@ -80,9 +91,9 @@ mkencoder MkEncoder {..} directpack = choose1
 
     -- Direct encoding without palette
     direct vs =
-      packleb32 directbpe -- Format: [bpe][length]
+      packleb32 edirectbpe -- Format: [bpe][length]
         <> packleb32 (V.length vs) -- [raw values...]
-        <> V.foldMap' directpack vs
+        <> V.foldMap' (packfi @Word64) vs
 
     -- Try to create an efficient palette
     computepalette vs =
@@ -92,12 +103,68 @@ mkencoder MkEncoder {..} directpack = choose1
             | otherwise = (M.insert v (M.size m) m, l <> packleb32 v)
        in if
             | M.size m' < 2 -> Nothing -- Too few unique values
-            | M.size m' < shift 1 indirlowlim -> -- Pad to minimum size
+            | M.size m' < shift 1 eindirlowlim -> -- Pad to minimum size
                 let re = foldMap' word8 do
-                      take (indirlowlim - M.size m') (repeat 0)
-                 in Just (indirlowlim, m', l' <> re)
-            | M.size m' > shift 1 indirupplim -> Nothing -- Too many uniques
+                      take (eindirlowlim - M.size m') (repeat 0)
+                 in Just (eindirlowlim, m', l' <> re)
+            | M.size m' > shift 1 eindirupplim -> Nothing -- Too many uniques
             | otherwise -> Just (M.size m', m', l') -- Just right
+
+-- | Configuration for the decoder
+data MkDecoder = MkDecoder
+  { dsinglecount :: !Int,
+    dindirlowlim :: !Int,
+    dindirupplim :: !Int,
+    ddirectbpe :: !Int
+  }
+
+-- | Decode values from a paletted container
+--
+-- == Usage
+--
+-- Plug in the first argument ('MkDecoder' configuration) and store the
+-- closure in a variable. This closure is the actual decoder function.
+-- Then, use the closure to decode values.
+mkdecoder ::
+  (Integral a, V.Unbox a) =>
+  MkDecoder ->
+  Parser st r (V.Vector a)
+mkdecoder MkDecoder {..} = choose1
+  where
+    -- Main decoder selection based on bits-per-entry (bpe)
+    choose1 = do
+      bpe <- unpackleb32 >>= guardnat "mkdecoder/choose1: bits per entry"
+      if
+        -- Select encoding format based on bpe value
+        | bpe == 0 -> single -- Single value encoding
+        | bpe > dindirupplim -> direct -- Direct encoding
+        | otherwise -> paletted bpe -- Palette encoding
+
+    -- Single value format: [0][value][0] -> replicate value n times
+    single = do
+      value <- unpackleb32 -- Read the single value
+      void (unpackleb32 @Int) -- Skip trailing zero
+      pure $ V.replicate dsinglecount value
+
+    -- Palette encoding: [bpe][palsize][pal...][count][packed...]
+    paletted (max dindirlowlim -> bpe) = do
+      pln <- unpackleb32 >>= guardnat "mkdecoder/paletted: palette length"
+      pal <- V.replicateM pln unpackleb32 -- Read palette entries
+      longs <- unpackleb32 >>= guardnat "mkdecoder/paletted: # of longs"
+      -- Read packed words, unpack bits, map through palette
+      replicateM longs (unpack @Word64) <&> V.fromList . map (pal V.!) . upb bpe
+
+    -- Direct encoding format: [bpe][count][value1][value2]...
+    direct = do
+      longs <- unpackleb32 >>= checklongs -- Read # of 64-bit words
+      V.replicateM longs (fromIntegral <$> unpack @Word64)
+      where
+        -- Safety check for number of words
+        checklongs n
+          | n < 0 = F.err "mkdecoder/direct: negative longs"
+          | n < 2048 = pure n -- Arbitrary size limit
+          | otherwise = F.err $ ParseError do
+              "mkdecoder/direct: too many longs (" ++ show n ++ ")"
 
 -- | unpack a paletted container
 -- (Minecraft, Java Edition, padded words).
