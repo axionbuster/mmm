@@ -24,4 +24,19 @@ Ultimate goal:
 
 X/Twitter: @axionbuster
 
+## Immediate help
+
+Well project is kind of less than well-documented and there's no working entry point but here's something I might need help with:
+
+- Review the C OpenSSL adaptor for problems.
+- Review the AI-generated packet formats for errors / omissions.
+
+## What I'm doing now
+
+- Parse "paletted container" format for chunks.
+- Add a packet state registry (packet type <-> (numeric packet code * protocol state))
+  that is decoupled from the actual packet types so that I can reuse the same packet types if there's not been significant changes between versions.
+- Architect a way to make the observer pattern easy to understand / program in.
+  Target demographic for programmers is teenagers and young adults with minimal (initial) knowledge of Haskell or FP in general.
+
 [pg]: https://axionbuster.github.io/mmm
