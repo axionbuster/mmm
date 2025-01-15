@@ -17,12 +17,13 @@ import Data.Vector.Unboxed qualified as V
 import Data.Word
 import M.Pack
 import Text.Printf
+import Debug.Trace
 
 -- have not decided to either make this public or private yet
 data MkEncoder = MkEncoder
   { indirlowlim :: !Int,
     indirupplim :: !Int,
-    directbps :: !Int
+    directbpe :: !Int
   }
 
 -- for internal use in minecraft block state/biome packets
@@ -41,7 +42,7 @@ mkencoder MkEncoder {..} directpack = choose1
       | indirlowlim <= 0 = error "mkencoder/choose1: indirlowlim"
       | indirupplim <= 0 || indirupplim < indirlowlim =
           error "mkencoder/choose1: indirupplim"
-      | directbps <= 0 = "mkencoder/choose1: directbps"
+      | directbpe <= 0 = "mkencoder/choose1: directbpe"
       | V.null vs = error "mkencoder/choose1: empty"
       | Just (v, w) <- V.uncons vs, V.null w = single v
       | Just (_, m, _) <- computepalette vs, M.size m == 1 = single (V.head vs)
@@ -52,16 +53,16 @@ mkencoder MkEncoder {..} directpack = choose1
       let lg n -- ceiling of log base 2 of n
             | n <= 1 = 0
             | otherwise = finiteBitSize n - countLeadingZeros (pred n)
-          bps = lg palsiz
+          bpe = lg palsiz
           lut = map ((pal M.!) . fromIntegral)
-          wor = pkb bps $ lut $ V.toList vs
-       in packleb32 bps
+          wor = pkb bpe $ lut $ V.toList vs
+       in packleb32 bpe
             <> packleb32 palsiz
             <> pallis
             <> packleb32 (length wor)
             <> foldMap' word64BE wor
     direct vs =
-      packleb32 directbps
+      packleb32 directbpe
         <> packleb32 (V.length vs)
         <> V.foldMap' directpack vs
     computepalette vs =
@@ -71,11 +72,11 @@ mkencoder MkEncoder {..} directpack = choose1
             | otherwise = (M.insert v (M.size m) m, l <> packleb32 v)
        in if
             | M.size m' < 2 -> Nothing
-            | M.size m' < indirlowlim ->
+            | M.size m' < shift 1 indirlowlim ->
                 let re = foldMap' word8 do
                       take (indirlowlim - M.size m') (repeat 0)
                  in Just (indirlowlim, m', l' <> re)
-            | M.size m' > indirupplim -> Nothing
+            | M.size m' > shift 1 indirupplim -> Nothing
             | otherwise -> Just (M.size m', m', l')
 
 -- | unpack a paletted container
