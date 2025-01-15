@@ -39,4 +39,8 @@ Well project is kind of less than well-documented and there's no working entry p
 - Architect a way to make the observer pattern easy to understand / program in.
   Target demographic for programmers is teenagers and young adults with minimal (initial) knowledge of Haskell or FP in general.
 
+## Acknowledgements
+
+Algorithms for collision detection and resolution contains portions and adaptations from the [Minestom project](https://github.com/Minestom/Minestom).
+
 [pg]: https://axionbuster.github.io/mmm
