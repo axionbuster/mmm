@@ -6,9 +6,8 @@
 --
 -- Encode and decode paletted containers for block states and biomes.
 module M.Chunk.Code
-  ( MkEncoder (..),
+  ( MkCodec (..),
     mkencoder,
-    MkDecoder (..),
     mkdecoder,
   )
 where
@@ -25,43 +24,45 @@ import FlatParse.Stateful qualified as F
 import M.Pack
 import Text.Printf
 
--- | Configuration for the encoder
-data MkEncoder = MkEncoder
+-- | Configuration for encoding and decoding
+data MkCodec = MkCodec
   { -- | Minimum palette size (if using palette)
-    eindirlowlim :: !Int,
-    -- | Maximum palette size (if using palette)
-    eindirupplim :: !Int,
+    lowlim :: !Int,
+    -- | Maximum palette size (if using palette) 
+    upplim :: !Int,
     -- | Bits per entry for direct encoding
-    edirectbpe :: !Int
+    directbpe :: !Int,
+    -- | Count for single value encoding
+    singlecount :: !Int
   }
 
 -- | Encode values using either direct, indirect (palette), or single value encoding
 --
 -- == Usage
 --
--- Plug in the first argument ('MkEncoder' configuration) and store the
+-- Plug in the first argument ('MkCodec' configuration) and store the
 -- closure in a variable. This closure is the actual encoder function.
 -- Then, use the closure to encode values.
 mkencoder ::
   forall a.
   (Integral a, FiniteBits a, V.Unbox a) =>
   -- | Encoder configuration
-  MkEncoder ->
+  MkCodec ->
   -- | Input values to encode
   V.Vector a ->
   -- | Encoded data
   Builder
-mkencoder MkEncoder {..} = choose1
+mkencoder MkCodec {..} = choose1
   where
     -- Main strategy selector based on input characteristics
     choose1 vs
       -- Safety checks
       | finiteBitSize (undefined :: a) > finiteBitSize (undefined :: Int) =
           error "mkencoder/choose1: bit size"
-      | eindirlowlim <= 0 = error "mkencoder/choose1: eindirlowlim"
-      | eindirupplim <= 0 || eindirupplim < eindirlowlim =
-          error "mkencoder/choose1: eindirupplim"
-      | edirectbpe <= 0 = error "mkencoder/choose1: edirectbpe"
+      | lowlim <= 0 = error "mkencoder/choose1: lowlim"
+      | upplim <= 0 || upplim < lowlim =
+          error "mkencoder/choose1: upplim"
+      | directbpe <= 0 = error "mkencoder/choose1: directbpe"
       | V.null vs = error "mkencoder/choose1: empty"
       -- Single value case - when vector has only one value
       | Just (v, w) <- V.uncons vs, V.null w = single v
@@ -91,8 +92,8 @@ mkencoder MkEncoder {..} = choose1
 
     -- Direct encoding without palette
     direct vs =
-      let p = V.fromList $ pkb edirectbpe $ V.toList vs
-       in packleb32 edirectbpe -- Format: [bpe][length]
+      let p = V.fromList $ pkb directbpe $ V.toList vs
+       in packleb32 directbpe -- Format: [bpe][length]
             <> packleb32 (V.length p) -- [raw values...]
             <> V.foldMap' (pack @Word64) p
 
@@ -104,33 +105,25 @@ mkencoder MkEncoder {..} = choose1
             | otherwise = (M.insert v (M.size m) m, l <> packleb32 v)
        in if
             | M.size m' < 2 -> Nothing -- Too few unique values
-            | M.size m' < shift 1 eindirlowlim -> -- Pad to minimum size
+            | M.size m' < shift 1 lowlim -> -- Pad to minimum size
                 let re = foldMap' word8 do
-                      take (eindirlowlim - M.size m') (repeat 0)
-                 in Just (eindirlowlim, m', l' <> re)
-            | M.size m' > shift 1 eindirupplim -> Nothing -- Too many uniques
+                      take (lowlim - M.size m') (repeat 0)
+                 in Just (lowlim, m', l' <> re)
+            | M.size m' > shift 1 upplim -> Nothing -- Too many uniques
             | otherwise -> Just (M.size m', m', l') -- Just right
-
--- | Configuration for the decoder
-data MkDecoder = MkDecoder
-  { dsinglecount :: !Int,
-    dindirlowlim :: !Int,
-    dindirupplim :: !Int,
-    ddirectbpe :: !Int
-  }
 
 -- | Decode values from a paletted container
 --
 -- == Usage
 --
--- Plug in the first argument ('MkDecoder' configuration) and store the
+-- Plug in the first argument ('MkCodec' configuration) and store the
 -- closure in a variable. This closure is the actual decoder function.
 -- Then, use the closure to decode values.
 mkdecoder ::
   (Integral a, FiniteBits a, V.Unbox a) =>
-  MkDecoder ->
+  MkCodec ->
   Parser st r (V.Vector a)
-mkdecoder MkDecoder {..} = choose1
+mkdecoder MkCodec {..} = choose1
   where
     -- Main decoder selection based on bits-per-entry (bpe)
     choose1 = do
@@ -138,17 +131,17 @@ mkdecoder MkDecoder {..} = choose1
       if
         -- Select encoding format based on bpe value
         | bpe == 0 -> single -- Single value encoding
-        | bpe > dindirupplim -> direct -- Direct encoding
+        | bpe > upplim -> direct -- Direct encoding
         | otherwise -> paletted bpe -- Palette encoding
 
     -- Single value format: [0][value][0] -> replicate value n times
     single = do
       value <- unpackleb32 -- Read the single value
       void (unpackleb32 @Int) -- Skip trailing zero
-      pure $ V.replicate dsinglecount value
+      pure $ V.replicate singlecount value
 
     -- Palette encoding: [bpe][palsize][pal...][count][packed...]
-    paletted (max dindirlowlim -> bpe) = do
+    paletted (max lowlim -> bpe) = do
       pln <- unpackleb32 >>= guardnat "mkdecoder/paletted: palette length"
       pal <- V.replicateM pln unpackleb32 -- Read palette entries
       longs <- unpackleb32 >>= guardnat "mkdecoder/paletted: # of longs"
@@ -158,7 +151,7 @@ mkdecoder MkDecoder {..} = choose1
     -- Direct encoding format: [bpe][count][value1][value2]...
     direct = do
       nlongs <- unpackleb32 >>= checklongs -- Read # of 64-bit words
-      V.fromList . upb ddirectbpe <$> replicateM nlongs (unpack @Word64)
+      V.fromList . upb directbpe <$> replicateM nlongs (unpack @Word64)
       where
         -- Safety check for number of words
         checklongs n
