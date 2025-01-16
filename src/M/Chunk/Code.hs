@@ -5,18 +5,18 @@
 -- License: BSD-3-Clause
 --
 -- Encode and decode paletted containers for block states and biomes.
---
--- == Notes
---
--- The spec for the \"direct\" format isn't clear, so I went with the
--- interpretation that each word is encoded as a big-endian 64-bit integer.
-module M.Chunk.Code (upb, pkb, MkEncoder (..), mkencoder) where
+module M.Chunk.Code
+  ( MkEncoder (..),
+    mkencoder,
+    MkDecoder (..),
+    mkdecoder,
+  )
+where
 
 import Control.Monad
 import Data.Bits
 import Data.ByteString.Builder
 import Data.Foldable
-import Data.Functor
 import Data.Int
 import Data.IntMap.Strict qualified as M
 import Data.Vector.Unboxed qualified as V
@@ -81,8 +81,8 @@ mkencoder MkEncoder {..} = choose1
             | n <= 1 = 0
             | otherwise = finiteBitSize n - countLeadingZeros (pred n)
           bpe = lg palsiz -- Bits per entry
-          lut = map ((pal M.!) . fromIntegral) -- Convert values to pal. indices
-          wor = pkb bpe $ lut $ V.toList vs -- Pack indices into words
+          lut = (pal M.!) . fromIntegral -- Convert values to pal. indices
+          wor = pkb bpe $ V.toList $ V.map lut vs -- Pack indices into words
        in packleb32 bpe -- Format: [bpe][palette size]
             <> packleb32 palsiz -- [palette entries...]
             <> pallis -- [data length][packed data]
@@ -91,9 +91,10 @@ mkencoder MkEncoder {..} = choose1
 
     -- Direct encoding without palette
     direct vs =
-      packleb32 edirectbpe -- Format: [bpe][length]
-        <> packleb32 (V.length vs) -- [raw values...]
-        <> V.foldMap' (packfi @Word64) vs
+      let p = V.fromList $ pkb edirectbpe $ V.toList vs
+       in packleb32 edirectbpe -- Format: [bpe][length]
+            <> packleb32 (V.length p) -- [raw values...]
+            <> V.foldMap' (pack @Word64) p
 
     -- Try to create an efficient palette
     computepalette vs =
@@ -126,7 +127,7 @@ data MkDecoder = MkDecoder
 -- closure in a variable. This closure is the actual decoder function.
 -- Then, use the closure to decode values.
 mkdecoder ::
-  (Integral a, V.Unbox a) =>
+  (Integral a, FiniteBits a, V.Unbox a) =>
   MkDecoder ->
   Parser st r (V.Vector a)
 mkdecoder MkDecoder {..} = choose1
@@ -152,12 +153,12 @@ mkdecoder MkDecoder {..} = choose1
       pal <- V.replicateM pln unpackleb32 -- Read palette entries
       longs <- unpackleb32 >>= guardnat "mkdecoder/paletted: # of longs"
       -- Read packed words, unpack bits, map through palette
-      replicateM longs (unpack @Word64) <&> V.fromList . map (pal V.!) . upb bpe
+      V.fromList . map (pal V.!) . upb bpe <$> replicateM longs (unpack @Word64)
 
     -- Direct encoding format: [bpe][count][value1][value2]...
     direct = do
-      longs <- unpackleb32 >>= checklongs -- Read # of 64-bit words
-      V.replicateM longs (fromIntegral <$> unpack @Word64)
+      nlongs <- unpackleb32 >>= checklongs -- Read # of 64-bit words
+      V.fromList . upb ddirectbpe <$> replicateM nlongs (unpack @Word64)
       where
         -- Safety check for number of words
         checklongs n
