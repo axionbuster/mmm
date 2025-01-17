@@ -25,6 +25,7 @@ import FlatParse.Stateful qualified as F
 import GHC.Generics hiding (S)
 import M.Pack
 import Text.Printf
+import Prelude hiding (words)
 
 -- | a chunk section where @c@ is the numeric type for block states and
 -- @m@ is the same for biomes
@@ -234,12 +235,12 @@ mkdecoder MkCodec {..} = choose1
       pal <- V.replicateM pln unpackleb32 -- Read palette entries
       longs <- unpackleb32 >>= guardnat "mkdecoder/paletted: # of longs"
       -- Read packed words, unpack bits, map through palette
-      V.fromList . map (pal V.!) . upb bpe <$> replicateM longs (unpack @Word64)
+      V.map (pal V.!) . upbv bpe <$> V.replicateM longs (unpack @Word64)
 
     -- Direct encoding format: [bpe][count][value1][value2]...
     direct = do
       nlongs <- unpackleb32 >>= checklongs -- Read # of 64-bit words
-      V.fromList . upb directbpe <$> replicateM nlongs (unpack @Word64)
+      upbv directbpe <$> V.replicateM nlongs (unpack @Word64)
       where
         -- Safety check for number of words
         checklongs n
@@ -252,54 +253,34 @@ mkdecoder MkCodec {..} = choose1
 -- (Minecraft, Java Edition, padded words).
 --
 -- see also: 'pkbv'.
-upb ::
+upbv ::
   forall w c.
-  (FiniteBits w, Integral w, FiniteBits c, Integral c) =>
-  -- | bits per entry
-  Int ->
-  -- | words; least significant word first.
-  [w] ->
-  -- | chars; least significant char first.
-  [c]
-upb b = e
+  ( FiniteBits w,
+    Integral w,
+    V.Unbox w,
+    FiniteBits c,
+    Integral c,
+    V.Unbox c
+  ) =>
+  Int -> V.Vector w -> V.Vector c
+upbv b = e
   where
-    -- e: entry point / error guard.
     e
-      | wsz < csz =
-          error $
-            printf
-              "incorrect bit combination in 'upb': wsz = %d, csz = %d"
-              wsz
-              csz
-      | 1 <= b && b <= csz = f c 0
-      | otherwise = error $ "incorrect bits per entry in 'upb': b = " ++ show b
-    -- f: extract bits from a word64, skip to next word64 when it should.
-    -- case 1: no current word, no more words. halt.
-    -- case 2: not enough bits in word; next word, reset state.
-    -- case 3: extract bits.
-    f _ _ [] = []
-    f n _ (_ : ws) | n < b = f c 0 ws
-    f n s (w : ws)
-      | Just d <- g w s = fi d : f (n - b) (s + b) (w : ws)
-      | otherwise = f (n - b) 0 ws
-    -- g: extract a single value from a word w at shift position s.
-    -- case 1: not enough bits.
-    -- case 2: ok, extract bits.
-    g w s
-      | s + b > wsz = Nothing
-      | otherwise = Just $ (w .&. shift m s) .>>. s
-    -- c: how many complete bit groups fit in a word.
-    c = b * div wsz b
-    -- m: mask; 0...01...1 <- 'b' count of 1's.
-    m = shift 1 b - 1
+      | wsz < csz = error "upbv: incorrect bit combination"
+      | b < 1 || csz < b = error "upbv: incorrect bits per entry"
+      | otherwise = \words ->
+          let m = unsafeShiftL 1 b - 1
+              len = V.length words * cpw
+              cpw = wsz `div` b
+              fi = fromIntegral @w @c
+           in V.generate len \i ->
+                let w = i `div` cpw
+                    c = b * (i `rem` cpw)
+                 in fi $ ((words V.! w) `unsafeShiftR` c) .&. m
     wsz = finiteBitSize (undefined :: w)
     csz = finiteBitSize (undefined :: c)
-    -- fi: take least significant bits from a word.
-    fi = fromIntegral @w @c
-{-# SPECIALIZE upb :: Int -> [Int64] -> [Word8] #-}
-{-# SPECIALIZE upb :: Int -> [Word64] -> [Word8] #-}
 
-data S a = S !Int !a
+data S a = S !Int !a -- shift, accumulator
 
 uns :: S a -> a
 uns (S _ a) = a
