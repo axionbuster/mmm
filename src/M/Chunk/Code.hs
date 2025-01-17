@@ -111,19 +111,19 @@ mkcscodec cse =
    in (encode, decode)
 
 -- Calculate bits needed to represent n values
-lg2 :: (FiniteBits a, Ord a, Num a) => a -> Int
+lg2 :: (FiniteBits a, Ord a, Num a, Num b) => a -> b
 lg2 n
   | n <= 1 = 0
-  | otherwise = finiteBitSize n - countLeadingZeros (n - 1)
+  | otherwise = fromIntegral $ finiteBitSize n - countLeadingZeros (n - 1)
 
 -- | Configuration for encoding and decoding
 data MkCodec = MkCodec
   { -- | Minimum palette size (if using palette)
-    lowlim :: !Int,
+    lowlim :: !Word8,
     -- | Maximum palette size (if using palette)
-    upplim :: !Int,
+    upplim :: !Word8,
     -- | Bits per entry for direct encoding
-    directbpe :: !Int,
+    directbpe :: !Word8,
     -- | Count for single value encoding
     singlecount :: !Int
   }
@@ -173,7 +173,10 @@ mkencoder MkCodec {..} = choose1
       let bpe = lg2 palsiz -- Bits per entry
           lut = (pal M.!) . fromIntegral -- Convert values to pal. indices
           wor = pkbv bpe $ V.map lut vs -- Pack indices into words
-       in packleb32 bpe -- Format: [bpe][palette size]
+          chk
+            | bpe > 8 = error $ printf "mkencoder/indirect: bpe (%d) > 8" bpe
+            | otherwise = fromIntegral bpe
+       in word8 chk -- Format: [bpe][palette size]
             <> packleb32 palsiz -- [palette entries...]
             <> pallis -- [data length][packed data]
             <> packleb32 (V.length wor)
@@ -181,8 +184,8 @@ mkencoder MkCodec {..} = choose1
 
     -- Direct encoding without palette
     direct vs =
-      let p = pkbv directbpe vs
-       in packleb32 directbpe -- Format: [bpe][length]
+      let p = pkbv (fromIntegral directbpe) vs
+       in word8 directbpe -- Format: [bpe][length]
             <> packleb32 (V.length p) -- [raw values...]
             <> V.foldMap' (pack @Word64) p
 
@@ -192,13 +195,15 @@ mkencoder MkCodec {..} = choose1
           f (m, l) (fromIntegral -> v) -- Build palette map and entry list
             | v `M.member` m = (m, l) -- Skip if value already in palette
             | otherwise = (M.insert v (M.size m) m, l <> packleb32 v)
+          lowlim' = fromIntegral lowlim
+          upplim' = fromIntegral upplim
        in if
             | M.size m' < 2 -> Just (M.size m', m', l') -- single-value mode
-            | M.size m' < shift 1 lowlim -> -- Pad to minimum size
+            | M.size m' < shift 1 lowlim' -> -- Pad to minimum size
                 let re = foldMap' word8 do
-                      take (lowlim - M.size m') (repeat 0)
-                 in Just (lowlim, m', l' <> re)
-            | M.size m' > shift 1 upplim -> Nothing -- Too many uniques
+                      take (lowlim' - M.size m') (repeat 0)
+                 in Just (lowlim', m', l' <> re)
+            | M.size m' > shift 1 upplim' -> Nothing -- Too many uniques
             | otherwise -> Just (M.size m', m', l') -- Just right
 
 -- | Decode values from a paletted container
@@ -216,7 +221,7 @@ mkdecoder MkCodec {..} = choose1
   where
     -- Main decoder selection based on bits-per-entry (bpe)
     choose1 = do
-      bpe <- unpackleb32 >>= guardnat "mkdecoder/choose1: bits per entry"
+      bpe <- unpack @Word8
       if
         -- Select encoding format based on bpe value
         | bpe == 0 -> single -- Single value encoding
@@ -230,7 +235,7 @@ mkdecoder MkCodec {..} = choose1
       pure $ V.replicate singlecount value
 
     -- Palette encoding: [bpe][palsize][pal...][count][packed...]
-    paletted (max lowlim -> bpe) = do
+    paletted (fromIntegral . max lowlim -> bpe) = do
       pln <- unpackleb32 >>= guardnat "mkdecoder/paletted: palette length"
       pal <- V.replicateM pln unpackleb32 -- Read palette entries
       longs <- unpackleb32 >>= guardnat "mkdecoder/paletted: # of longs"
@@ -240,7 +245,7 @@ mkdecoder MkCodec {..} = choose1
     -- Direct encoding format: [bpe][count][value1][value2]...
     direct = do
       nlongs <- unpackleb32 >>= checklongs -- Read # of 64-bit words
-      upbv directbpe <$> V.replicateM nlongs (unpack @Word64)
+      upbv (fromIntegral directbpe) <$> V.replicateM nlongs (unpack @Word64)
       where
         -- Safety check for number of words
         checklongs n
@@ -305,7 +310,7 @@ pkbv b = e
       | otherwise = \chars ->
           let cpw = wsz `div` b
               w = (V.length chars + cpw - 1) `div` cpw
-              f (S s a) (fi -> q) = (S (s + b) (a .|. unsafeShiftL q s))
+              f (S s a) (fi -> q) = S (s + b) (a .|. unsafeShiftL q s)
            in V.generate w \i -> uns do
                 let j = i * cpw
                     l = min cpw (V.length chars - i * cpw)
