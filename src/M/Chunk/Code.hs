@@ -163,7 +163,7 @@ mkencoder MkCodec {..} = choose1
             | v `M.member` m = (m, l) -- Skip if value already in palette
             | otherwise = (M.insert v (M.size m) m, l <> packleb32 v)
        in if
-            | M.size m' < 2 -> Nothing -- Too few unique values
+            | M.size m' < 2 -> Just (M.size m', m', l') -- single-value mode
             | M.size m' < shift 1 lowlim -> -- Pad to minimum size
                 let re = foldMap' word8 do
                       take (lowlim - M.size m') (repeat 0)
