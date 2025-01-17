@@ -6,9 +6,9 @@
 --
 -- Encode and decode paletted containers for block states and biomes.
 module M.Chunk.Code
-  ( MkCodec (..),
-    mkencoder,
-    mkdecoder,
+  ( ChunkSection (..),
+    ChunkSectionEncoding (..),
+    mkcscodec,
   )
 where
 
@@ -21,14 +21,76 @@ import Data.IntMap.Strict qualified as M
 import Data.Vector.Unboxed qualified as V
 import Data.Word
 import FlatParse.Stateful qualified as F
+import GHC.Generics
 import M.Pack
 import Text.Printf
+
+-- | a chunk section where @c@ is the numeric type for block states and
+-- @m@ is the same for biomes
+data ChunkSection c m = ChunkSection
+  { -- | number of non-air blocks (tracked for optimization)
+    csnonempty :: !Int16,
+    -- | block states (4,096 entries; 16x16x16, access @[y][z][x]@)
+    csblockstates :: !(V.Vector c),
+    -- | biomes (64 entries; 4x4x4, access @[y][z][x]@)
+    csbiomes :: !(V.Vector m)
+  }
+  deriving (Eq, Ord, Generic)
+
+-- | encoding configuration for @ChunkSection@
+data ChunkSectionEncoding = ChunkSectionEncoding
+  { -- | number of possible block states
+    cseblockstates :: !Int,
+    -- | number of possible biomes
+    csebiomes :: !Int
+  }
+
+-- | create a codec for @ChunkSection@s using the provided settings
+mkcscodec ::
+  (V.Unbox m, V.Unbox c, FiniteBits m, FiniteBits c, Integral m, Integral c) =>
+  -- | encoding settings
+  ChunkSectionEncoding ->
+  -- | a pair of an encoder and a decoder, respectively
+  (ChunkSection c m -> Builder, Parser st r (ChunkSection c m))
+mkcscodec cse =
+  -- the [4, 8] and [1, 3] ranges have been hardcoded in the protocol spec
+  -- for some time
+  let -- configure codecs with protocol-specified ranges
+      bscodec = MkCodec 4 8 (lg2 cse.cseblockstates) cse.cseblockstates
+      bmcodec = MkCodec 1 3 (lg2 cse.csebiomes) cse.csebiomes
+      -- create encoder/decoder pairs for blocks and biomes
+      (bsencode, bmencode) = (mkencoder bscodec, mkencoder bmcodec)
+      (bsdecode, bmdecode) = (mkdecoder bscodec, mkdecoder bmcodec)
+      -- format: [blockcount][blockstates][biomes]
+      encode cs =
+        int16BE cs.csnonempty
+          <> bsencode cs.csblockstates
+          <> bmencode cs.csbiomes
+      decode = do
+        blockcount <- F.anyInt16be >>= checkbc
+        ChunkSection blockcount <$> bsdecode <*> bmdecode
+        where
+          -- verify block count is within Minecraft's limits
+          checkbc n
+            | n < 0 = F.err "mkcscodec/decode: negative non-air block count"
+            | n > 4096 -- max blocks in 16x16x16 section
+              =
+                F.err $ ParseError do
+                  "mkcscodec/decode: non-air block count too many: " ++ show n
+            | otherwise = pure n
+   in (encode, decode)
+
+-- Calculate bits needed to represent n values
+lg2 :: (FiniteBits a, Ord a, Num a) => a -> Int
+lg2 n
+  | n <= 1 = 0
+  | otherwise = finiteBitSize n - countLeadingZeros (n - 1)
 
 -- | Configuration for encoding and decoding
 data MkCodec = MkCodec
   { -- | Minimum palette size (if using palette)
     lowlim :: !Int,
-    -- | Maximum palette size (if using palette) 
+    -- | Maximum palette size (if using palette)
     upplim :: !Int,
     -- | Bits per entry for direct encoding
     directbpe :: !Int,
@@ -78,10 +140,7 @@ mkencoder MkCodec {..} = choose1
 
     -- Palette-based encoding
     indirect (palsiz, pal, pallis) vs =
-      let lg n -- Calculate bits needed to represent n values
-            | n <= 1 = 0
-            | otherwise = finiteBitSize n - countLeadingZeros (pred n)
-          bpe = lg palsiz -- Bits per entry
+      let bpe = lg2 palsiz -- Bits per entry
           lut = (pal M.!) . fromIntegral -- Convert values to pal. indices
           wor = pkb bpe $ V.toList $ V.map lut vs -- Pack indices into words
        in packleb32 bpe -- Format: [bpe][palette size]
@@ -137,7 +196,7 @@ mkdecoder MkCodec {..} = choose1
     -- Single value format: [0][value][0] -> replicate value n times
     single = do
       value <- unpackleb32 -- Read the single value
-      void (unpackleb32 @Int) -- Skip trailing zero
+      F.word8 0 -- Skip trailing zero
       pure $ V.replicate singlecount value
 
     -- Palette encoding: [bpe][palsize][pal...][count][packed...]
