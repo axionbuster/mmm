@@ -15,6 +15,7 @@ where
 import Control.Monad
 import Data.Bits
 import Data.ByteString.Builder
+import Data.Data
 import Data.Foldable
 import Data.Int
 import Data.IntMap.Strict qualified as M
@@ -35,7 +36,34 @@ data ChunkSection c m = ChunkSection
     -- | biomes (64 entries; 4x4x4, access @[y][z][x]@)
     csbiomes :: !(V.Vector m)
   }
-  deriving (Eq, Ord, Generic)
+  deriving (Eq, Ord, Generic, Typeable, Data)
+
+-- | uses paletted view with hard-coded settings to compress what's been shown
+instance
+  ( Show c,
+    Integral c,
+    FiniteBits c,
+    V.Unbox c,
+    Show m,
+    Integral m,
+    FiniteBits m,
+    V.Unbox m
+  ) =>
+  Show (ChunkSection c m)
+  where
+  show ChunkSection {..} =
+    printf
+      "ChunkSection {csnonempty = %d, csblockstates = (length %d numbers; \
+      \paletted view) %s, csbiomes = (length %d numbers; \
+      \paletted view) %s}"
+      csnonempty
+      -- often reasonable encoding settings, since protocol default;
+      -- but could be surprising if using expanded number of block states
+      -- and/or biomes.
+      (V.length csblockstates)
+      (show $ mkencoder (MkCodec 4 8 15 4096) csblockstates)
+      (V.length csbiomes)
+      (show $ mkencoder (MkCodec 1 3 6 64) csbiomes)
 
 -- | encoding configuration for @ChunkSection@
 data ChunkSectionEncoding = ChunkSectionEncoding
@@ -44,6 +72,7 @@ data ChunkSectionEncoding = ChunkSectionEncoding
     -- | number of possible biomes
     csebiomes :: !Int
   }
+  deriving (Show, Read, Eq, Ord, Generic, Data, Typeable)
 
 -- | create a codec for @ChunkSection@s using the provided settings
 mkcscodec ::
@@ -56,8 +85,8 @@ mkcscodec cse =
   -- the [4, 8] and [1, 3] ranges have been hardcoded in the protocol spec
   -- for some time
   let -- configure codecs with protocol-specified ranges
-      bscodec = MkCodec 4 8 (lg2 cse.cseblockstates) cse.cseblockstates
-      bmcodec = MkCodec 1 3 (lg2 cse.csebiomes) cse.csebiomes
+      bscodec = MkCodec 4 8 (lg2 cse.cseblockstates) 4096
+      bmcodec = MkCodec 1 3 (lg2 cse.csebiomes) 64
       -- create encoder/decoder pairs for blocks and biomes
       (bsencode, bmencode) = (mkencoder bscodec, mkencoder bmcodec)
       (bsdecode, bmdecode) = (mkdecoder bscodec, mkdecoder bmcodec)

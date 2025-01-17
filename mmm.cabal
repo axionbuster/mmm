@@ -136,6 +136,7 @@ test-suite mmm-test
   main-is: Spec.hs
   other-modules:
       M.BitSpec
+      M.Chunk.CodeSpec
       M.Collision.BlockModel1
       M.Collision.BoxSpec
       M.Collision.Collision2Spec
