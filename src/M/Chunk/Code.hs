@@ -231,7 +231,7 @@ mkdecoder MkCodec {..} = choose1
     -- Single value format: [0][value][0] -> replicate value n times
     single = do
       value <- unpackleb32 -- Read the single value
-      F.word8 0 -- Skip trailing zero
+      F.cut (F.word8 0) "mkdecoder/single: data array length is not zero"
       pure $ V.replicate singlecount value
 
     -- Palette encoding: [bpe][palsize][pal...][count][packed...]
