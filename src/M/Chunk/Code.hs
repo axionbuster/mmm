@@ -22,7 +22,7 @@ import Data.IntMap.Strict qualified as M
 import Data.Vector.Unboxed qualified as V
 import Data.Word
 import FlatParse.Stateful qualified as F
-import GHC.Generics
+import GHC.Generics hiding (S)
 import M.Pack
 import Text.Printf
 
@@ -171,16 +171,16 @@ mkencoder MkCodec {..} = choose1
     indirect (palsiz, pal, pallis) vs =
       let bpe = lg2 palsiz -- Bits per entry
           lut = (pal M.!) . fromIntegral -- Convert values to pal. indices
-          wor = pkb bpe $ V.toList $ V.map lut vs -- Pack indices into words
+          wor = pkbv bpe $ V.map lut vs -- Pack indices into words
        in packleb32 bpe -- Format: [bpe][palette size]
             <> packleb32 palsiz -- [palette entries...]
             <> pallis -- [data length][packed data]
-            <> packleb32 (length wor)
-            <> foldMap' word64BE wor
+            <> packleb32 (V.length wor)
+            <> V.foldMap' word64BE wor
 
     -- Direct encoding without palette
     direct vs =
-      let p = V.fromList $ pkb directbpe $ V.toList vs
+      let p = pkbv directbpe vs
        in packleb32 directbpe -- Format: [bpe][length]
             <> packleb32 (V.length p) -- [raw values...]
             <> V.foldMap' (pack @Word64) p
@@ -251,7 +251,7 @@ mkdecoder MkCodec {..} = choose1
 -- | unpack a paletted container
 -- (Minecraft, Java Edition, padded words).
 --
--- see also: 'pkb'.
+-- see also: 'pkbv'.
 upb ::
   forall w c.
   (FiniteBits w, Integral w, FiniteBits c, Integral c) =>
@@ -299,49 +299,36 @@ upb b = e
 {-# SPECIALIZE upb :: Int -> [Int64] -> [Word8] #-}
 {-# SPECIALIZE upb :: Int -> [Word64] -> [Word8] #-}
 
+data S a = S !Int !a
+
+uns :: S a -> a
+uns (S _ a) = a
+
 -- | pack bits into a paletted container (list of words).
 --
 -- see also: 'upb'.
---
--- note that 'pkb' is lazy on the list stem, so
---
--- @'take' 10 ('pkb' 5 ('repeat' 1)) :: ['Word64']@
---
--- will converge and return
---
--- @[0x0084210842108421 .. (10 times)]@
---
--- while being strict on the values to prevent thunk buildup.
-pkb ::
+pkbv ::
   forall w c.
-  (FiniteBits w, Integral w, FiniteBits c, Integral c) =>
+  (FiniteBits w, Integral w, V.Unbox w, FiniteBits c, Integral c, V.Unbox c) =>
   -- | bits per entry
   Int ->
   -- | chars; least significant char first.
-  [c] ->
+  V.Vector c ->
   -- | words; least significant word first.
-  [w]
-pkb b = e
+  V.Vector w
+pkbv b = e
   where
-    -- e: entry point / error guard.
-    e os
-      | wsz < csz =
-          error $
-            printf
-              "incorrect bit combination in 'pkb': wsz = %d, csz = %d"
-              wsz
-              csz
-      | 1 <= b && b <= csz = f 0 0 os
-      | otherwise = error $ "incorrect bits per entry in 'pkb': b = " ++ show b
-    -- f: pack char into current word or else skip to next word.
-    -- case 1: there are no chars left. produce word and quit.
-    -- case 2: put char if possible; reset & produce word if not.
-    f _ !w [] = [w]
-    f s !w (c : cs)
-      | s + b > wsz = w : f 0 0 (c : cs)
-      | otherwise = f (s + b) (w .|. shift (fi c) s) cs
+    e
+      | wsz < csz = error "pkbv: incorrect bit combination"
+      | b < 1 || csz < b = error "pkbv: incorrect bits per entry"
+      | otherwise = \chars ->
+          let cpw = wsz `div` b
+              w = (V.length chars + cpw - 1) `div` cpw
+              f (S s a) (fi -> q) = (S (s + b) (a .|. unsafeShiftL q s))
+           in V.generate w \i -> uns do
+                let j = i * cpw
+                    l = min cpw (V.length chars - i * cpw)
+                 in V.foldl' f (S 0 0) $ V.slice j l chars
     wsz = finiteBitSize (undefined :: w)
     csz = finiteBitSize (undefined :: c)
     fi = fromIntegral @c @w
-{-# SPECIALIZE pkb :: Int -> [Word8] -> [Int64] #-}
-{-# SPECIALIZE pkb :: Int -> [Word8] -> [Word64] #-}
