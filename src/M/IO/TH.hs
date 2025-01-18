@@ -3,7 +3,6 @@ module M.IO.TH (ParserStates (..), thparserstates) where
 import Data.HashMap.Strict qualified as H
 import Data.IntMap.Strict qualified as I
 import Language.Haskell.TH hiding (Code)
-import Language.Haskell.TH.Lib
 import M.IO.Internal.Datagram
 import M.IO.Internal.EffectTypes
 import M.Pack
@@ -33,7 +32,7 @@ forceindex = (I.!)
 concat2 :: [a] -> [a] -> [a]
 concat2 = (++)
 
-thparserstates :: [S] -> Q Exp
+thparserstates :: [S] -> Q (Type, Exp)
 thparserstates rows = do
   let genparse l =
         let f s a
@@ -104,4 +103,7 @@ thparserstates rows = do
                   )
                   []
               ]
-  tupE [half gensparse genscode, half gencparse genccode]
+      sig = appT (appT (tupleT 2) (varT 'ParserState)) (varT 'ParserState)
+  s1 <- sig
+  s2 <- tupE [half gensparse genscode, half gencparse genccode]
+  pure (s1, s2)
