@@ -43,6 +43,7 @@ library
       M.IO.Internal.Socket
       M.IO.Internal.Zlib
       M.IO.KeepAlive
+      M.IO.TH
       M.LEB
       M.Misc
       M.NBT
