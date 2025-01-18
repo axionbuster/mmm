@@ -28,7 +28,7 @@
 -- All numerals are hexadecimal.
 module M.IO.TH (ParserStates (..), states) where
 
-import Control.Applicative.Combinators (skipManyTill)
+import Control.Applicative.Combinators (manyTill, skipManyTill)
 import Control.Monad
 import Control.Monad.Fix
 import Data.Char (isLetter, ord)
@@ -198,10 +198,6 @@ hexnumber = do
         _ -> error "hexnumber/digit: impossible"
     d = liftA2 (||) isDigit (flip (elem @[]) "ABCDEFabcdef")
 
--- | Parse a hex number with error reporting
-hexnumber' :: Parser st r Int
-hexnumber' = cut hexnumber "expected a hexadecimal number"
-
 -- | Parse a valid identifier
 -- First char must be letter, underscore or quote
 -- Later chars can also include dots and digits
@@ -251,6 +247,7 @@ ws =
        [|
          case _ of
            " " -> ws
+           "\n" -> ws
            "\t" -> ws
            "\r" -> ws
            "--" -> linecomment
@@ -268,8 +265,8 @@ skipline = skipManyTill anyWord8 (eof <|> skipSatisfyAscii (== '\n'))
 line :: Parser st r S
 line = do
   sna <- ws *> ident' <* colon'
-  recv <- ws *> optional hexnumber' <* colon'
-  send <- ws *> optional hexnumber' <* skipline
+  recv <- ws *> optional hexnumber <* colon'
+  send <- ws *> optional hexnumber <* skipline
   pure S {..}
 
 -- | Parse the complete grammar document
@@ -278,7 +275,7 @@ line = do
 doc :: Parser st r (Name, [S])
 doc = do
   -- name of the pair
-  n <- mkName <$> ident'
+  n <- mkName <$> (ws *> ident')
   -- body
-  m <- many (many skipline *> line)
+  m <- manyTill (line <* ws) eof
   pure (n, m)
