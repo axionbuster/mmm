@@ -155,3 +155,4 @@ lkcodebyid i Reg {regic} = H.lookup i regic
 -- @
 lkobjbyid :: Text -> Reg a -> Maybe a
 lkobjbyid i r = lkcodebyid i r >>= (`lkobjbycode` r)
+{-# INLINE lkobjbyid #-}
