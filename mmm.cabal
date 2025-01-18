@@ -59,6 +59,7 @@ library
       M.Pack.Internal.TH
       M.Pack.Internal.Types
       M.Position
+      M.Reg
       M.TODO
       M.V769.C
       M.V769.H
