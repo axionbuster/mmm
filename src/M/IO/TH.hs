@@ -10,10 +10,10 @@
 --
 -- == Usage
 --
--- Define parser states using the quasi-quoter:
+-- Define parser states using the 'states' quasi-quoter:
 --
 -- @
--- -- creates mystatepair :: ('ParserState', 'ParserState')
+-- -- creates mystatepair :: 'ParserStates'
 -- [states|
 --   mystatepair
 --   Login:1f:2f     -- Login packet: recv=0x1f, send=0x2f
@@ -21,7 +21,7 @@
 --   |]
 -- @
 --
--- The first state is for servers, the second for clients.
+-- See: 'ParserStates', 'forserver', and 'forclient'.
 --
 -- == Note
 --
@@ -188,9 +188,15 @@ thparserstates rows = do
                     )
                     []
                 ]
-      sig = [t|(ParserState, ParserState)|]
+      sig = conT ''ParserStates
   s1 <- sig
-  s2 <- tupE [half gensparse genscode, half gencparse genccode]
+  s2 <-
+    appE
+      ( appE
+          (conE 'ParserStates)
+          (half gensparse genscode)
+      )
+      (half gencparse genccode)
   pure (s1, s2)
 
 -- | Parse a single colon character
