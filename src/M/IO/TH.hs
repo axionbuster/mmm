@@ -24,17 +24,19 @@ import Type.Reflection (SomeTypeRep (..))
 --
 -- @
 -- <name of the pair>
--- \<packet name\>:\<client inbound code\>:\<client outbound code\>:\<server inbound code\>:\<server outbound code\>
--- \<packet name\>:\<client inbound code\>:\<client outbound code\>:\<server inbound code\>:\<server outbound code\>
+-- \<packet name\>:\<recv code\>:\<send code\>
+-- \<packet name\>:\<recv code\>:\<send code\>
 -- ...
 -- @
 --
--- here, only @\<packet name\>@ is mandatory; all others are optional and
--- may be omitted like so:
+-- - @recv@ means the client receives (server sends);
+-- - @send@ means the client sends (server receives).
+--
+-- here, only @\<packet name\>@ is mandatory; codes are optional:
 --
 -- @
 -- myname
--- A.MyPacket1:::33:3f -- client-side numbers are missing
+-- A.MyPacket1::3f  -- recv code is missing
 -- @
 states :: QuasiQuoter
 states =
@@ -61,11 +63,9 @@ data ParserStates = ParserStates
   }
 
 data S = S
-  { sna :: String,
-    sic :: Maybe Int,
-    soc :: Maybe Int,
-    sis :: Maybe Int,
-    sos :: Maybe Int
+  { sna :: String, -- packet name
+    recv :: Maybe Int, -- receive code (client in/server out)
+    send :: Maybe Int -- send code (client out/server in)
   }
 
 fi :: (Integral a, Num b) => a -> b
@@ -108,10 +108,12 @@ thparserstates rows = do
                     (u inbound 'Inbound)
                 )
                 (u outbound 'Outbound)
-      gensparse = genparse sis
-      gencparse = genparse sic
-      genscode = gencode sis sos
-      genccode = gencode sis soc
+      -- Server uses send for inbound, recv for outbound
+      gensparse = genparse send
+      genscode = gencode send recv
+      -- Client uses recv for inbound, send for outbound
+      gencparse = genparse recv
+      genccode = gencode recv send
   argname <- newName "argname" -- some temporary binder
   u <- newName "u" -- uninterpreted (essentially code * rest of packet)
   a <- newName "a" -- the parsing list
@@ -238,11 +240,8 @@ skipline = skipManyTill anyWord8 (eof <|> skipSatisfyAscii (== '\n'))
 line :: Parser st r S
 line = do
   sna <- ws *> ident' <* colon'
-  sic <- ws *> optional hexnumber' <* colon'
-  soc <- ws *> optional hexnumber' <* colon'
-  sis <- ws *> optional hexnumber' <* colon'
-  sos <- ws *> optional hexnumber' <* colon'
-  skipline
+  recv <- ws *> optional hexnumber' <* colon'
+  send <- ws *> optional hexnumber' <* skipline
   pure S {..}
 
 doc :: Parser st r (Name, [S])
