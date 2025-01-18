@@ -251,7 +251,6 @@ ws =
        [|
          case _ of
            " " -> ws
-           "\n" -> ws
            "\t" -> ws
            "\r" -> ws
            "--" -> linecomment
@@ -280,7 +279,6 @@ doc :: Parser st r (Name, [S])
 doc = do
   -- name of the pair
   n <- mkName <$> ident'
-  skipline
   -- body
-  m <- many line
+  m <- many (many skipline *> line)
   pure (n, m)
