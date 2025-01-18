@@ -1,3 +1,31 @@
+-- |
+-- Module: M.IO.TH
+-- Description: Template Haskell generators for packet parsing states
+-- Copyright: (c) axionbuster, 2025
+-- License: BSD-3-Clause
+--
+-- This module provides Template Haskell functionality to generate parser states
+-- for client-server packet handling. It uses a simple grammar to define packet
+-- mappings and their associated codes.
+--
+-- == Usage
+--
+-- Define parser states using the quasi-quoter:
+--
+-- @
+-- -- creates mystatepair :: ('ParserState', 'ParserState')
+-- [states|
+--   mystatepair
+--   Login:1f:2f     -- Login packet: recv=0x1f, send=0x2f
+--   Handshake::3f   -- Handshake packet: send=0x3f only
+--   |]
+-- @
+--
+-- The first state is for servers, the second for clients.
+--
+-- == Note
+--
+-- All numerals are hexadecimal.
 module M.IO.TH (ParserStates (..), states) where
 
 import Control.Applicative.Combinators (skipManyTill)
@@ -18,26 +46,8 @@ import M.IO.Internal.EffectTypes
 import M.Pack
 import Type.Reflection (SomeTypeRep (..))
 
--- | the state quasi-quoter generation of parser states:
---
--- == Grammar
---
--- @
--- <name of the pair>
--- \<packet name\>:\<recv code\>:\<send code\>
--- \<packet name\>:\<recv code\>:\<send code\>
--- ...
--- @
---
--- - @recv@ means the client receives (server sends);
--- - @send@ means the client sends (server receives).
---
--- here, only @\<packet name\>@ is mandatory; codes are optional:
---
--- @
--- myname
--- A.MyPacket1::3f  -- recv code is missing
--- @
+-- | A quasi-quoter for generating parser states.
+-- Parses the input grammar and generates appropriate ParserState pairs.
 states :: QuasiQuoter
 states =
   QuasiQuoter
@@ -56,28 +66,35 @@ states =
       quoteType = error "states quasiquoter cannot be used in a type"
     }
 
--- | a pair of 'ParserState's: one for servers, and the other for clients
+-- | Represents a pair of parser states - one for server-side parsing and one for client-side.
+-- The states contain mappings between packet types, codes and identifiers.
 data ParserStates = ParserStates
   { forserver :: ParserState,
     forclient :: ParserState
   }
 
+-- | Internal representation of a single packet definition line from the grammar.
+-- Contains the packet name and optional receive/send codes.
 data S = S
   { sna :: String, -- packet name
     recv :: Maybe Int, -- receive code (client in/server out)
     send :: Maybe Int -- send code (client out/server in)
   }
 
+-- | Helper for integer conversion
 fi :: (Integral a, Num b) => a -> b
 fi = fromIntegral
 
+-- | Lookup with runtime error on missing key
 forceindex :: I.IntMap a -> Int -> a
 forceindex = (I.!)
 
+-- | List concatenation helper
 concat2 :: [a] -> [a] -> [a]
 concat2 = (++)
 
--- generate type signature and expression for a pair of ParserStates
+-- | Generate Template Haskell type signature and expression for a ParserStates pair.
+-- Takes a list of packet definitions and produces corresponding parser states.
 thparserstates :: [S] -> Q (Type, Exp)
 thparserstates rows = do
   let genparse l =
@@ -156,12 +173,16 @@ thparserstates rows = do
   s2 <- tupE [half gensparse genscode, half gencparse genccode]
   pure (s1, s2)
 
+-- | Parse a single colon character
 colon :: Parser st r ()
 colon = skipSatisfyAscii (== ':')
 
+-- | Parse a colon with error reporting
 colon' :: Parser st r ()
 colon' = cut colon "expected colon (:)"
 
+-- | Parse a hexadecimal number into an Int
+-- Supports both uppercase and lowercase hex digits
 hexnumber :: Parser st r Int
 hexnumber = do
   (p, n) <- chainr f digit (pure (1, 0))
@@ -177,9 +198,13 @@ hexnumber = do
         _ -> error "hexnumber/digit: impossible"
     d = liftA2 (||) isDigit (flip (elem @[]) "ABCDEFabcdef")
 
+-- | Parse a hex number with error reporting
 hexnumber' :: Parser st r Int
 hexnumber' = cut hexnumber "expected a hexadecimal number"
 
+-- | Parse a valid identifier
+-- First char must be letter, underscore or quote
+-- Later chars can also include dots and digits
 ident :: Parser st r String
 ident =
   liftA2
@@ -191,12 +216,11 @@ ident =
     firstchar = liftany [(== '\''), (== '_'), isLetter]
     laterchar = liftany [(== '.'), (== '_'), (== '\''), isDigit, isLetter]
 
+-- | Parse an identifier with error reporting
 ident' :: Parser st r String
 ident' = cut ident "expected an identifier"
 
--- the three parsers below i borrowed from the example at
--- https://github.com/AndrasKovacs/flatparse/blob/main/src/FlatParse/Examples/BasicLambda/Lexer.hs
-
+-- | Skip a line comment starting with --
 linecomment :: Parser st r ()
 linecomment =
   withOption
@@ -204,7 +228,8 @@ linecomment =
     (\case 10 -> ws; _ -> linecomment)
     (pure ())
 
--- parse a potentially nested multi-line comment
+-- | Skip a multi-line comment between {- and -}
+-- Handles nested comments correctly
 multilinecomment :: Parser st r ()
 multilinecomment =
   (1 :: Int) & fix \f -> \case
@@ -219,6 +244,7 @@ multilinecomment =
              |]
        )
 
+-- | Skip whitespace and comments
 ws :: Parser st r ()
 ws =
   $( switch
@@ -234,9 +260,12 @@ ws =
          |]
    )
 
+-- | Skip to end of current line
 skipline :: Parser st r ()
 skipline = skipManyTill anyWord8 (eof <|> skipSatisfyAscii (== '\n'))
 
+-- | Parse a single packet definition line
+-- Format: <name>:<recv code>:<send code>
 line :: Parser st r S
 line = do
   sna <- ws *> ident' <* colon'
@@ -244,6 +273,9 @@ line = do
   send <- ws *> optional hexnumber' <* skipline
   pure S {..}
 
+-- | Parse the complete grammar document
+-- First line contains state name
+-- Remaining lines contain packet definitions
 doc :: Parser st r (Name, [S])
 doc = do
   -- name of the pair
