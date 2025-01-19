@@ -98,6 +98,18 @@ library:
   - -Wno-unused-parameter
   - -O2
 
+executables:
+  mmm-run:
+    main: Main.hs
+    source-dirs: app
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    dependencies:
+    - mmm
+    - optparse-applicative
+
 tests:
   mmm-test:
     main:                Spec.hs

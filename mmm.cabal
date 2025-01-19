@@ -136,6 +136,70 @@ library
     , zlib
   default-language: GHC2021
 
+executable mmm-run
+  main-is: Main.hs
+  other-modules:
+      Paths_mmm
+  autogen-modules:
+      Paths_mmm
+  hs-source-dirs:
+      app
+  default-extensions:
+      AllowAmbiguousTypes
+      BlockArguments
+      DataKinds
+      DefaultSignatures
+      DeriveAnyClass
+      DerivingStrategies
+      DerivingVia
+      DuplicateRecordFields
+      LambdaCase
+      LinearTypes
+      MultiWayIf
+      OverloadedStrings
+      OverloadedLists
+      OverloadedRecordDot
+      PatternSynonyms
+      QuasiQuotes
+      RecordWildCards
+      ScopedTypeVariables
+      TemplateHaskell
+      TypeApplications
+      TypeFamilies
+      UndecidableInstances
+      ViewPatterns
+  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints -threaded -rtsopts -with-rtsopts=-N
+  build-depends:
+      adjunctions
+    , async
+    , base >=4.7 && <5
+    , bytestring
+    , containers
+    , deepseq
+    , effectful
+    , effectful-th
+    , flatparse
+    , hashable
+    , io-streams
+    , lens
+    , linear
+    , mmm
+    , network
+    , network-run
+    , optparse-applicative
+    , parser-combinators
+    , random
+    , stm
+    , template-haskell
+    , text
+    , th-serde
+    , unliftio
+    , unordered-containers
+    , uuid-types
+    , vector
+    , zlib
+  default-language: GHC2021
+
 test-suite mmm-test
   type: exitcode-stdio-1.0
   main-is: Spec.hs
