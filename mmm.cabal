@@ -43,7 +43,9 @@ library
       M.IO.Internal.Socket
       M.IO.Internal.Zlib
       M.IO.KeepAlive
+      M.IO.Obs
       M.IO.TH
+      M.IO.Tick
       M.LEB
       M.Misc
       M.NBT
