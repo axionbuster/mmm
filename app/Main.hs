@@ -56,6 +56,7 @@ chunk0 x y =
 greeting :: (IOE :> es, Fail :> es, Talking' es) => Eff es ()
 greeting = do
   -- handshake
+  liftIO $ putStrLn "starting"
   do
     hs <- hear @H.HandshakePacket Eventually
     unless (hs.protocolversion == 0) do
