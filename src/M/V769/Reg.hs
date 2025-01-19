@@ -1,3 +1,23 @@
+-- |
+-- Module: M.V769.Reg
+-- Description: Protocol version 769 packet state registrations
+-- Copyright: (c) axionbuster, 2025
+-- License: BSD-3-Clause
+--
+-- Defines packet state registrations for protocol version 769 using Template Haskell.
+-- This module maps packet types to their numeric codes for different connection states:
+-- 'handshake', 'status', 'login', 'configuration' and 'play'.
+--
+-- == States
+--
+-- * Handshake - Initial connection handshake
+-- * Status - Server status/ping
+-- * Login - Authentication and encryption
+-- * Configuration - Server/client capability exchange
+-- * Play - Main game state
+--
+-- Each state defines bidirectional packet mappings using the 'states' quasi-quoter.
+-- Packet definitions include receive (client->server) and send (server->client) codes.
 module M.V769.Reg (handshake, status, login, configuration, play) where
 
 import M.IO.TH
