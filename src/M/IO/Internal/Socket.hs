@@ -17,6 +17,7 @@ import M.IO.Internal.Datagram
 import Network.Socket
 import System.IO.Streams (InputStream, OutputStream)
 import System.IO.Streams.Network (socketToStreams)
+import Debug.Trace
 
 -- | a connection to either a server or a client
 data Connection = Connection
@@ -33,12 +34,14 @@ data Connection = Connection
 -- | create a connection from a socket
 withcxfromsocket :: Socket -> (Connection -> IO a) -> IO a
 withcxfromsocket sk cont = do
+  traceIO "withcxfromsocket begins"
   th <- newTVarIO (-1) -- compression off by default
   (i0, o0) <- socketToStreams sk
   (ef, df) <- liftA2 (,) (newTVarIO pure) (newTVarIO pure)
   (i1, o1) <- liftA2 (,) (makedecrypting df i0) (makeencrypting ef o0)
   (i2, o2) <- liftA2 (,) (makepacketstreami th i1) (makepacketstreamo th o1)
   k <- newTVarIO Nothing
+  traceIO "withcxfromsocket: past k"
   -- need to go from the easy way to the hard way.
   -- why? because Datagram.hs expects functions to be passed in
   -- for crypto, so we need to convert encryption keys to
@@ -62,7 +65,9 @@ withcxfromsocket sk cont = do
               atomically do
                 writeTVar ef (aesupdate aese)
                 writeTVar df (aesupdate aesd)
-  withAsync watchk \_ ->
+  withAsync watchk \s -> do
+    link s
+    traceIO "withcxfromsocket: about to call 'cont'"
     cont
       Connection
         { cxkey = k,

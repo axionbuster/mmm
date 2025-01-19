@@ -31,6 +31,7 @@ import M.Pack
 import Network.Run.TCP (runTCPClient, runTCPServer)
 import System.IO.Streams
 import Prelude hiding (read)
+import Debug.Trace
 
 -- https://hackage.haskell.org/package/effectful-core-2.5.1.0/docs/Effectful.html#g:13
 -- SeqUnlift: fail when calling 'run' (=unlift) from outside the spawning thread
@@ -122,10 +123,15 @@ withtalkingserver ::
   Eff (Talking : es) a ->
   -- | final result
   Eff es a
-withtalkingserver u host port handler = withEffToIO u \run -> do
-  runTCPServer host port \sock -> do
-    withcxfromsocket sock \cx ->
-      run $ runtalking0 cx handler
+withtalkingserver u host port handler = do
+  liftIO $ traceIO "withtalkingserver: up"
+  withEffToIO u \run -> do
+    liftIO $ traceIO "withtalkingserver: inside withEffToIO"
+    runTCPServer host port \sock -> do
+      liftIO $ traceIO "withtalkingserver: inside runTCPServer"
+      withcxfromsocket sock \cx -> do
+        liftIO $ traceIO "withtalkingserver: inside withcxfromsocket"
+        run $ runtalking0 cx handler
 
 -- | run client with single connection
 withtalkingclient ::

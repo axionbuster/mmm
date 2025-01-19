@@ -75,8 +75,8 @@ main =
           . evalStateShared (forserver handshake)
           $ do
             withtalkingserver
-              do SeqUnlift
-              do Nothing
-              do "25565"
+              do ConcUnlift Persistent Unlimited
+              do Just "0.0.0.0"
+              do "1"
               do greeting
    in action >>= print
