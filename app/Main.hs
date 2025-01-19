@@ -1,5 +1,6 @@
 module Main (main) where
 
+import Control.Monad
 import Data.Bits
 import Data.ByteString (ByteString)
 import Data.ByteString qualified as B
@@ -9,11 +10,23 @@ import Data.Int
 import Data.Semigroup
 import Data.Vector.Unboxed qualified as VU
 import Data.Word
+import Effectful
+import Effectful.Concurrent
+import Effectful.Fail
+import Effectful.NonDet
+import Effectful.State.Dynamic
 import M.Chunk.Code
 import M.Chunk.Net
+import M.IO
 import M.NBT
 import M.Pack
+import M.V769.C qualified as C
+import M.V769.H qualified as H
+import M.V769.I qualified as I
+import M.V769.L qualified as L
 import M.V769.P qualified as P
+import M.V769.Reg
+import M.V769.S qualified as S
 
 reifybuilder :: Builder -> ByteString
 reifybuilder = B.toStrict . BB.toLazyByteString
@@ -40,5 +53,29 @@ chunk0 x y =
       ldata = LightData bszero bszero bszero bszero [] []
    in pack packet
 
+greeting :: (IOE :> es, Fail :> es, Talking' es) => Eff es ()
+greeting = do
+  -- handshake
+  do
+    hs <- hear @H.HandshakePacket Eventually
+    unless (hs.protocolversion == 0) do
+      fail "unsupported protocol version"
+    unless (hs.nextstate == 2 {- LOGIN -}) do
+      fail "state not LOGIN"
+  liftIO $ putStrLn "i'm here"
+
 main :: IO ()
-main = print (chunk0 0 0)
+main =
+  let action =
+        runEff
+          . runConcurrent
+          . runNonDet OnEmptyKeep
+          . runFail
+          . evalStateShared (forserver handshake)
+          $ do
+            withtalkingserver
+              do SeqUnlift
+              do Nothing
+              do "25565"
+              do greeting
+   in action >>= print

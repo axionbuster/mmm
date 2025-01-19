@@ -18,7 +18,15 @@
 --
 -- Each state defines bidirectional packet mappings using the 'states' quasi-quoter.
 -- Packet definitions include receive (client->server) and send (server->client) codes.
-module M.V769.Reg (handshake, status, login, configuration, play) where
+module M.V769.Reg
+  ( handshake,
+    status,
+    login,
+    configuration,
+    play,
+    ParserStates (..),
+  )
+where
 
 import M.IO.TH
 import M.V769.C qualified as C
