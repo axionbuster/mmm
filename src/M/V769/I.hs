@@ -13,10 +13,13 @@ module M.V769.I where
 
 import Control.DeepSeq
 import Data.Bits
+import Data.ByteString (ByteString)
 import Data.Data
 import Data.Fixed
 import Data.Hashable
+import Data.Int
 import Data.Serde.QQ
+import Data.Text (Text)
 import GHC.Generics
 import Language.Haskell.TH.Syntax (Lift)
 import M.Pack
@@ -54,6 +57,31 @@ data BossBarColor
   deriving stock (Eq, Ord, Show, Read)
   deriving stock (Enum, Bounded, Generic, Data, Typeable, Lift)
   deriving anyclass (NFData, Hashable)
+
+-- Shared packet types between states
+newtype KeepAlive = KeepAlive
+  {id :: Int64}
+  deriving newtype (Show, Read, NFData, Eq, Ord, Pack, Unpack)
+  deriving stock (Data, Typeable, Generic)
+
+data PluginMessage = PluginMessage
+  { channel :: Text,
+    data_ :: ByteString
+  }
+  deriving (Show, Read, Data, Typeable, Generic, NFData, Eq, Ord)
+  deriving (Pack, Unpack)
+
+data ResourcePack = ResourcePack
+  { url :: Text,
+    hash :: Text
+  }
+  deriving (Show, Read, Data, Typeable, Generic, NFData, Eq, Ord)
+  deriving (Pack, Unpack)
+
+newtype Ping = Ping
+  {id :: Int32}
+  deriving newtype (Show, Read, NFData, Eq, Ord, Pack, Unpack)
+  deriving stock (Data, Typeable, Generic)
 
 [serde|
 .derive

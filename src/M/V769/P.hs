@@ -153,10 +153,6 @@ data ChatSuggestions
   id :: Int32 via VarInt
   suggestions :: V.Vector Text
 
-data ClientboundPluginMessage
-  channel :: Text
-  data_ :: ByteString
-
 data DamageEvent
   entityid :: Int32 via VarInt
   sourceid :: Int32 via VarInt
@@ -220,9 +216,6 @@ data InitializeWorldBorder
   portalteleportboundary :: Int32 via VarInt
   warningtime :: Int32 via VarInt
   warningblocks :: Int32 via VarInt
-
-data ClientboundKeepAlive
-  id :: Int64
 
 data ChunkDataAndUpdateLight
   chunkx :: Int32
@@ -684,10 +677,6 @@ data CookieResponsePlay
   key :: Text
   value :: Text
 
-data ServerboundPluginMessagePlay
-  channel :: Text
-  data_ :: ByteString
-
 data DebugSampleSubscription
   data_ :: ByteString via TakeRest
 
@@ -711,9 +700,6 @@ data JigsawGenerate
   location :: Position
   levels :: Int32 via VarInt
   keepjigsaws :: Bool
-
-data ServerboundKeepAlive
-  id :: Int64
 
 data LockDifficulty
   locked :: Bool

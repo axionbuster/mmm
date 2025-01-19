@@ -33,20 +33,10 @@ import Prelude hiding (id)
 data CookieRequest
   key :: Text
 
-data ClientboundPluginMessage
-  channel :: Text
-  data_ :: ByteString
-
 data Disconnect
   reason :: Text
 
 data FinishConfiguration -- Empty packet
-
-data ClientboundKeepAlive
-  id :: Int64
-
-data Ping
-  id :: Int64
 
 data ResetChat -- Empty packet
 
@@ -54,10 +44,6 @@ data RegistryData
   data_ :: ByteString
 
 data RemoveResourcePack -- Empty packet
-
-data AddResourcePack
-  url :: Text
-  hash :: Text
 
 data StoreCookie
   key :: Text
@@ -73,7 +59,7 @@ data FeatureFlags
 data UpdateTags
   tags :: ByteString via TakeRest
 
-data ClientboundKnownPacks
+data KnownPacks
   packs :: ByteString via TakeRest
 
 data CustomReportDetails
@@ -98,24 +84,14 @@ data CookieResponse
   key :: Text
   value :: Text
 
-data ServerboundPluginMessage
-  channel :: Text
-  data_ :: ByteString
-
 data AcknowledgeFinishConfiguration -- Empty packet
-
-data ServerboundKeepAlive
-  id :: Int64
 
 data Pong
   id :: Int64
 
 data ResourcePackResponse
   status :: VarInt
-
-data ServerboundKnownPacks
-  packs :: ByteString via TakeRest
-|]
+  |]
 
 -- provided by "th-serde": Data.Serde.QQ
 runusercoercion

@@ -3,6 +3,7 @@ module M.V769.Reg (handshake, status, login, configuration, play) where
 import M.IO.TH
 import M.V769.C qualified as C
 import M.V769.H qualified as H
+import M.V769.I qualified as I
 import M.V769.L qualified as L
 import M.V769.P qualified as P
 import M.V769.S qualified as S
@@ -20,7 +21,7 @@ import M.V769.S qualified as S
   -- name:hex recv:hex send
   S.StatusRequest:0:
   S.StatusResponse::0
-  S.PongResponse::1
+  I.KeepAlive::1  -- Now using shared KeepAlive type
   |]
 
 [states|
@@ -42,31 +43,27 @@ import M.V769.S qualified as S
   configuration
   -- name:hex recv:hex send
   C.CookieRequest::0
-  C.ClientboundPluginMessage::1
+  I.PluginMessage:2:1
   C.Disconnect::2
   C.FinishConfiguration::3
-  C.ClientboundKeepAlive::4
-  C.Ping::5
+  I.KeepAlive:4:4  -- Using shared KeepAlive
+  I.Ping:5:5       -- Using shared Ping type
   C.ResetChat::6
   C.RegistryData::7
   C.RemoveResourcePack::8
-  C.AddResourcePack::9
+  I.ResourcePack::9
   C.StoreCookie::a
   C.Transfer::b
   C.FeatureFlags::c
   C.UpdateTags::d
-  C.ClientboundKnownPacks::e
+  C.KnownPacks:7:e
   C.CustomReportDetails::f
   C.ServerLinks::10
 
   C.ClientInformationConfiguration:0:
   C.CookieResponse:1:
-  C.ServerboundPluginMessage:2:
   C.AcknowledgeFinishConfiguration:3:
-  C.ServerboundKeepAlive:4:
-  C.Pong:5:
   C.ResourcePackResponse:6:
-  C.ServerboundKnownPacks:7:
   |]
 
 [states|
@@ -98,7 +95,7 @@ import M.V769.S qualified as S
   P.CookieRequest::16
   P.SetCooldown::17
   P.ChatSuggestions::18
-  P.ClientboundPluginMessage::19
+  I.PluginMessage:14:19
   P.DamageEvent::1a
   P.DebugSample::1b
   P.DeleteMessage::1c
@@ -112,7 +109,7 @@ import M.V769.S qualified as S
   P.OpenHorseScreen::24
   P.HurtAnimation::25
   P.InitializeWorldBorder::26
-  P.ClientboundKeepAlive::27
+  I.KeepAlive:1a:27
   P.ChunkDataAndUpdateLight::28
   P.WorldEvent::29
   P.ParticleEffect::2a
@@ -210,13 +207,11 @@ import M.V769.S qualified as S
   P.CloseContainerServerbound:11:
   P.ChangeContainerSlotState:12:
   P.CookieResponsePlay:13:
-  P.ServerboundPluginMessagePlay:14:
   P.DebugSampleSubscription:15:
   P.EditBook:16:
   P.QueryEntityTag:17:
   P.Interact:18:
   P.JigsawGenerate:19:
-  P.ServerboundKeepAlive:1a:
   P.LockDifficulty:1b:
   P.SetPlayerPosition:1c:
   P.SetPlayerPositionAndRotation:1d:
