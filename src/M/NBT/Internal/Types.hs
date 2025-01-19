@@ -14,7 +14,9 @@ import Data.Data
 import Data.HashMap.Strict (HashMap)
 import Data.Hashable
 import Data.Int
+import Data.String (IsString (..))
 import Data.Text (Text)
+import Data.Text qualified as T
 import Data.Vector qualified as V
 import Data.Vector.Unboxed qualified as VU
 import Data.Word
@@ -71,6 +73,9 @@ data Tg where
   LongArray :: (VU.Vector Int64) %1 -> Tg
   deriving stock (Eq, Ord, Show, Read, Generic, Typeable, Data)
   deriving anyclass (NFData)
+
+instance IsString Tg where
+  fromString = String . T.pack
 
 -- | get the type of a tag
 getty :: Tg -> Ty
