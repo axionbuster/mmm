@@ -10,6 +10,7 @@ import Data.Int
 import Data.Semigroup
 import Data.Vector.Unboxed qualified as VU
 import Data.Word
+import Debug.Trace
 import Effectful
 import Effectful.Concurrent
 import Effectful.Fail
@@ -56,12 +57,14 @@ chunk0 x y =
 greeting :: (IOE :> es, Fail :> es, Talking' es) => Eff es ()
 greeting = do
   -- handshake
-  liftIO $ putStrLn "starting"
+  liftIO $ traceIO "starting"
   do
     hs <- hear @H.HandshakePacket Eventually
     unless (hs.protocolversion == 0) do
+      liftIO $ traceIO "a!"
       fail "unsupported protocol version"
     unless (hs.nextstate == 2 {- LOGIN -}) do
+      liftIO $ traceIO "b!"
       fail "state not LOGIN"
   liftIO $ putStrLn "i'm here"
 
@@ -76,7 +79,7 @@ main =
           $ do
             withtalkingserver
               do ConcUnlift Persistent Unlimited
-              do Just "0.0.0.0"
+              do Just "127.0.0.1"
               do "25565"
               do greeting
    in action >>= print
