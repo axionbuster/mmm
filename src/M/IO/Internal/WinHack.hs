@@ -23,7 +23,7 @@ import Debug.Trace
 import Control.Concurrent
 import Control.Concurrent.Async
 import Control.Monad
-import Foreign
+import Foreign hiding (void)
 import Foreign.C.Types
 
 -- | Get the current process handle (Win32 API)
