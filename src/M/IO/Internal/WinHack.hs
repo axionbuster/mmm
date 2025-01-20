@@ -16,8 +16,8 @@
 module M.IO.Internal.WinHack (killonexc) where
 
 import Control.Exception
-import Control.Monad
 import Debug.Trace
+import Control.Monad
 
 #ifdef mingw32_HOST_OS
 
