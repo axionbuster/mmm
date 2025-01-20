@@ -78,7 +78,7 @@ instance Show SomePack where
 
 -- | cast a 'SomePack' to a type
 castsomepack :: (Typeable a) => SomePack -> Maybe a
-castsomepack = cast
+castsomepack (SomePack a) = cast a
 {-# INLINE castsomepack #-}
 
 -- | retrieve a 'Parser' for a type
@@ -109,7 +109,7 @@ unpacksome = SomeUnpack <$> unpack @a
 
 -- | cast a 'SomeUnpack' to a type
 castsomeunpack :: (Typeable a) => SomeUnpack -> Maybe a
-castsomeunpack = cast
+castsomeunpack (SomeUnpack a) = cast a
 {-# INLINE castsomeunpack #-}
 
 -- | generic implementor of 'Pack'

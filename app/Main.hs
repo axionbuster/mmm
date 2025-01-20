@@ -28,6 +28,7 @@ import M.V769.L qualified as L
 import M.V769.P qualified as P
 import M.V769.Reg
 import M.V769.S qualified as S
+import Text.Printf
 
 reifybuilder :: Builder -> ByteString
 reifybuilder = B.toStrict . BB.toLazyByteString
@@ -60,6 +61,7 @@ greeting = do
   liftIO $ traceIO "starting"
   do
     hs <- hear @H.HandshakePacket Eventually
+    liftIO $ traceIO $ printf "hs = %s" (show hs)
     unless (hs.protocolversion == 0) do
       liftIO $ traceIO "a!"
       fail "unsupported protocol version"

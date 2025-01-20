@@ -32,6 +32,7 @@ import M.IO.Internal.WinHack
 import M.Pack
 import Network.Run.TCP (runTCPClient, runTCPServer)
 import System.IO.Streams
+import Text.Printf
 import Prelude hiding (read)
 
 -- https://hackage.haskell.org/package/effectful-core-2.5.1.0/docs/Effectful.html#g:13
@@ -61,11 +62,20 @@ runtalking0 ::
   (IOE :> es, NonDet :> es, State ParserState :> es, Concurrent :> es) =>
   Connection -> Eff (Talking : es) a -> Eff es a
 runtalking0 cx = interpret_ \case
-  Hear i -> case i of
-    Immediately ->
-      handleheara_immediate cx.cxinput
-        <&> fromJust . castsomeunpack
-    Eventually -> handleheara cx.cxinput <&> fromJust . castsomeunpack
+  Hear i -> do
+    liftIO $ traceIO $ printf "Hear i: i = %s" (show i)
+    let x = case i of
+          Immediately ->
+            handleheara_immediate cx.cxinput
+              <&> fromJust . castsomeunpack
+          Eventually -> handleheara cx.cxinput <&> fromJust . castsomeunpack
+    y <- x
+    liftIO $ traceIO $ printf "Hear i: will return something"
+    handle
+      do \(e :: SomeException) -> do liftIO $ traceIO $ printf "Hear i: deser exception: %s" (displayException e); undefined
+      do evaluate y
+    liftIO $ traceIO $ printf "Hear i: evaluate was successful"
+    pure y
   HearU i -> case i of
     Immediately -> handlehearu_immediate cx.cxinput
     Eventually -> handlehearu cx.cxinput
@@ -95,14 +105,19 @@ handleheara ::
   (IOE :> es, State ParserState :> es) =>
   InputStream Uninterpreted -> Eff es SomeUnpack
 handleheara i = do
+  liftIO $ traceIO "h..a: entered"
   u <- handlehearu i
+  liftIO $ traceIO $ printf "h..a: read u: %s" (show u)
   ParserState p <- get
-  pure $ p (Parse u)
+  let v = p (Parse u)
+  liftIO $ traceIO $ printf "h..a: v = %s" (show v)
+  pure v
 
 handleheara_immediate ::
   (IOE :> es, State ParserState :> es, NonDet :> es) =>
   InputStream Uninterpreted -> Eff es SomeUnpack
 handleheara_immediate i = do
+  liftIO $ traceIO "h..a_immediate: entered"
   u <- handlehearu_immediate i
   ParserState p <- get
   pure $ p (Parse u)
