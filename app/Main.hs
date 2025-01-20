@@ -76,7 +76,7 @@ main =
         runEff
           . runConcurrent
           . runNonDet OnEmptyKeep
-          . runFail
+          . runFailIO
           . evalStateShared (forserver handshake)
           $ do
             withtalkingserver
