@@ -16,8 +16,8 @@
 module M.IO.Internal.WinHack (killonexc) where
 
 import Control.Exception
-import Debug.Trace
 import Control.Monad
+import Debug.Trace
 
 #ifdef mingw32_HOST_OS
 
@@ -69,7 +69,8 @@ killonexc k =
         -- traceIO: print to stderr + newline + flush
         -- also, unwrap exception if from 'k'
         case e of
-          _ | Just (ExceptionInLinkedThread _ f) <- fromException e ->
+          _ | Just (ExceptionInLinkedThread y f) <- fromException e,
+              asyncThreadId x == asyncThreadId y ->
             traceIO $ "killonexc: " <> displayException f
           _ -> traceIO $ "killonexc: " <> displayException e
         -- dirty termination. unfortunately required
