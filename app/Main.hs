@@ -77,6 +77,6 @@ main =
             withtalkingserver
               do ConcUnlift Persistent Unlimited
               do Just "0.0.0.0"
-              do "1"
+              do "25565"
               do greeting
    in action >>= print

@@ -12,12 +12,12 @@ import Control.Concurrent.Async
 import Control.Concurrent.STM
 import Control.Monad
 import Data.ByteString
+import Debug.Trace
 import M.Crypto
 import M.IO.Internal.Datagram
 import Network.Socket
 import System.IO.Streams (InputStream, OutputStream)
 import System.IO.Streams.Network (socketToStreams)
-import Debug.Trace
 
 -- | a connection to either a server or a client
 data Connection = Connection

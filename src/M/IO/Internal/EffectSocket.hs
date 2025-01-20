@@ -18,6 +18,7 @@ import Data.ByteString.Builder (Builder, toLazyByteString)
 import Data.Data
 import Data.Functor
 import Data.Maybe
+import Debug.Trace
 import Effectful
 import Effectful.Concurrent.STM
 import Effectful.Dispatch.Dynamic
@@ -27,11 +28,11 @@ import Effectful.State.Dynamic
 import M.IO.Internal.Datagram
 import M.IO.Internal.EffectTypes
 import M.IO.Internal.Socket
+import M.IO.Internal.WinHack
 import M.Pack
 import Network.Run.TCP (runTCPClient, runTCPServer)
 import System.IO.Streams
 import Prelude hiding (read)
-import Debug.Trace
 
 -- https://hackage.haskell.org/package/effectful-core-2.5.1.0/docs/Effectful.html#g:13
 -- SeqUnlift: fail when calling 'run' (=unlift) from outside the spawning thread
@@ -127,11 +128,15 @@ withtalkingserver u host port handler = do
   liftIO $ traceIO "withtalkingserver: up"
   withEffToIO u \run -> do
     liftIO $ traceIO "withtalkingserver: inside withEffToIO"
-    runTCPServer host port \sock -> do
-      liftIO $ traceIO "withtalkingserver: inside runTCPServer"
-      withcxfromsocket sock \cx -> do
-        liftIO $ traceIO "withtalkingserver: inside withcxfromsocket"
-        run $ runtalking0 cx handler
+    -- 'network' package on Windows is broken. server gets stuck.
+    -- workaround: forcibly kill process on exception.
+    killonexc do -- see M.IO.Internal.WinHack for docs on 'killonexc'
+      liftIO $ traceIO "withtalkingserver: inside killonexc"
+      runTCPServer host port \sock -> do
+        liftIO $ traceIO "withtalkingserver: inside runTCPServer"
+        withcxfromsocket sock \cx -> do
+          liftIO $ traceIO "withtalkingserver: inside withcxfromsocket"
+          run $ runtalking0 cx handler
 
 -- | run client with single connection
 withtalkingclient ::
