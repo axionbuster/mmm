@@ -23,18 +23,19 @@ import Debug.Trace
 
 import Control.Concurrent
 import Control.Concurrent.Async
+import Data.Void
 import Foreign hiding (void)
 import Foreign.C.Types
 
 -- | Get the current process handle (Win32 API)
 foreign import ccall unsafe "GetCurrentProcess"
-  getcurrentprocess :: Ptr () -- constant value of -1, or 0xfff...fff
+  getcurrentprocess :: Ptr Void -- constant value of -1, or 0xfff...fff
 
 -- | Terminate a process given its handle (Win32 API)
 foreign import ccall safe "TerminateProcess"
   -- return nonzero if successful; zero if fails
   -- ^ relevant only for terminating other processes
-  terminateprocess :: Ptr () -> CUInt -> IO CBool
+  terminateprocess :: Ptr Void -> CUInt -> IO CBool
 
 -- | Wrap an IO action with exception handling that forcefully terminates the process
 -- when network errors occur. This is specifically needed because the "network" package
