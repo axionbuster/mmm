@@ -41,7 +41,8 @@ withcxfromsocket sk cont = do
   th <- newTVarIO (-1) -- compression off by default
   (i0, o0) <- socketToStreams sk
   (ef, df) <- liftA2 (,) (newTVarIO pure) (newTVarIO pure)
-  (i1, o1) <- liftA2 (,) (makedecrypting df i0) (makeencrypting ef o0)
+  -- (i1, o1) <- liftA2 (,) (makedecrypting df i0) (makeencrypting ef o0)
+  let (i1, o1) = (i0, o0)
   (i2, o2) <- liftA2 (,) (makepacketstreami th i1) (makepacketstreamo th o1)
   k <- newTVarIO Nothing
   traceIO "withcxfromsocket: past k"
