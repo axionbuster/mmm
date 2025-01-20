@@ -13,6 +13,7 @@ module M.IO.Internal.EffectSocket
   )
 where
 
+import Control.DeepSeq
 import Data.ByteString qualified as B
 import Data.ByteString.Builder (Builder, toLazyByteString)
 import Data.Data
@@ -127,7 +128,8 @@ withtalkingserver ::
   ( IOE :> es,
     State ParserState :> es,
     Concurrent :> es,
-    NonDet :> es
+    NonDet :> es,
+    NFData a
   ) =>
   -- | unlift strategy
   UnliftStrategy ->

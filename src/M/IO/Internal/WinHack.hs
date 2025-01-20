@@ -23,6 +23,7 @@ import Debug.Trace
 
 import Control.Concurrent
 import Control.Concurrent.Async
+import Control.DeepSeq
 import Data.Void
 import Foreign hiding (void)
 import Foreign.C.Types
@@ -36,6 +37,10 @@ foreign import ccall safe "TerminateProcess"
   -- return nonzero if successful; zero if fails
   -- ^ relevant only for terminating other processes
   terminateprocess :: Ptr Void -> CUInt -> IO CBool
+
+-- from unliftio
+catchDeep :: (Exception e, NFData a) => IO a -> (e -> IO a) -> IO a
+catchDeep m = catch (m >>= (evaluate $!!))
 
 -- | Wrap an IO action with exception handling that forcefully terminates the process
 -- when network errors occur. This is specifically needed because the "network" package
@@ -56,7 +61,7 @@ foreign import ccall safe "TerminateProcess"
 --     'killonexc' do  -- Forces process termination on network errors
 --       runTCPServer host port \sock -> ...
 -- @
-killonexc :: IO a -> IO a
+killonexc :: (NFData a) => IO a -> IO a
 killonexc k =
   -- run process 'k' off the main thread
   withAsync k \x -> do
@@ -66,7 +71,7 @@ killonexc k =
     -- only used to make main thread interruptible.
     -- also this part needs to be on the main thread
     -- to catch stuff like UserInterrupt properly
-    catch (forever do threadDelay 500_000) \(e :: SomeException) -> do
+    catchDeep (forever do threadDelay 500_000) \(e :: SomeException) -> do
         -- traceIO: print to stderr + newline + flush
         -- also, unwrap exception if from 'k'
         case e of
