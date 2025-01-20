@@ -27,7 +27,7 @@ import Foreign hiding (void)
 import Foreign.C.Types
 
 -- | Get the current process handle (Win32 API)
-foreign import ccall safe "GetCurrentProcess"
+foreign import ccall unsafe "GetCurrentProcess"
   getcurrentprocess :: Ptr () -- constant value of -1, or 0xfff...fff
 
 -- | Terminate a process given its handle (Win32 API)
