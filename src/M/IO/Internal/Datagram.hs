@@ -22,6 +22,7 @@ where
 import Codec.Compression.Zlib
 import Control.Concurrent.STM
 import Control.DeepSeq
+import Control.Exception
 import Control.Exception hiding (throw)
 import Control.Monad.IO.Class
 import Data.ByteString (ByteString)
@@ -40,6 +41,7 @@ import M.IO.Internal.Zlib
 import M.Pack hiding (Parser)
 import System.IO.Streams hiding (compress)
 import Text.Printf
+import Debug.Trace
 import Prelude hiding (read)
 
 -- | uninterpreted packet
@@ -71,7 +73,7 @@ makepacketstreami c s =
   where
     takepacket threshold b = do
       t <- parseio0 @ParseError b checkedlength
-      u <- readExactly t b
+      u <- catch (readExactly t b) \(e :: SomeException) -> do traceIO ("takepacket: %s" ++ (displayException e)); throwIO e
       let p
             | threshold >= 0 = parsepostcomp
             | otherwise = parseprecomp

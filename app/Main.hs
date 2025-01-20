@@ -62,9 +62,8 @@ greeting = do
   do
     hs <- hear @H.HandshakePacket Eventually
     liftIO $ traceIO $ printf "hs = %s" (show hs)
-    unless (hs.protocolversion == 0) do
+    unless (hs.protocolversion == 769) do
       liftIO $ traceIO "a!"
-      error "a!!!!"
       fail "unsupported protocol version"
     unless (hs.nextstate == 2 {- LOGIN -}) do
       liftIO $ traceIO "b!"

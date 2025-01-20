@@ -91,7 +91,7 @@ runtalking0 cx = interpret_ \case
   Setencryption key -> atomically $ writeTVar cx.cxkey (Just key)
 
 handlehearu :: (IOE :> es) => InputStream Uninterpreted -> Eff es Uninterpreted
-handlehearu i = liftIO (read i) >>= maybe (throwIO EOF) pure
+handlehearu i = liftIO (read i) >>= maybe (do liftIO $ traceIO "EOF"; throwIO EOF) pure
 
 handlehearu_immediate ::
   (IOE :> es, NonDet :> es) =>
