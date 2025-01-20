@@ -20,16 +20,21 @@ import Debug.Trace
 
 #ifdef mingw32_HOST_OS
 
+import Control.Concurrent
+import Control.Concurrent.Async
+import Control.Monad
 import Foreign
 import Foreign.C.Types
 
 -- | Get the current process handle (Win32 API)
 foreign import ccall safe "GetCurrentProcess"
-  getcurrentprocess :: Ptr () -- constant
+  getcurrentprocess :: Ptr () -- constant value of -1, or 0xfff...fff
 
 -- | Terminate a process given its handle (Win32 API)
 foreign import ccall safe "TerminateProcess"
-  terminateprocess :: Ptr () -> CUInt -> IO ()
+  -- return nonzero if successful; zero if fails
+  -- ^ relevant only for terminating other processes
+  terminateprocess :: Ptr () -> CUInt -> IO CBool
 
 -- | Wrap an IO action with exception handling that forcefully terminates the process
 -- when network errors occur. This is specifically needed because the "network" package
@@ -51,11 +56,26 @@ foreign import ccall safe "TerminateProcess"
 --       runTCPServer host port \sock -> ...
 -- @
 killonexc :: IO a -> IO a
-killonexc =
-  handle \(e :: SomeException) -> do
-    traceIO $ displayException e -- print to stderr + newline + flush
-    terminateprocess getcurrentprocess 0 -- infallible according to Microsoft
-    error "killonexc/Win32: impossible to get here"
+killonexc k =
+  -- run process 'k' off the main thread
+  withAsync k \x -> do
+    -- link: if k throws, catch the exception here
+    link x
+    -- waiting time does NOT matter at all.
+    -- only used to make main thread interruptible.
+    -- also this part needs to be on the main thread
+    -- to catch stuff like UserInterrupt properly
+    catch (forever do threadDelay 500_000) \(e :: SomeException) -> do
+        -- traceIO: print to stderr + newline + flush
+        -- also, unwrap exception if from 'k'
+        case e of
+          _ | Just (ExceptionInLinkedThread _ f) <- fromException e ->
+            traceIO $ "killonexc: " <> displayException f
+          _ -> traceIO $ "killonexc: " <> displayException e
+        -- dirty termination. unfortunately required
+        -- due the state of the "network" package
+        void $ terminateprocess getcurrentprocess 0
+        error "killonexc/Win32: impossible to get here"
 
 #else
 
@@ -83,7 +103,8 @@ import System.Exit
 killonexc :: IO a -> IO a
 killonexc =
   handle \(e :: SomeException) -> do
-    traceIO $ displayException e -- print to stderr + newline + flush
+    -- print to stderr + newline + flush
+    traceIO $ "killonexc: " <> displayException e
     void exitSuccess
     error "killonexc/Non-Win32: impossible to get here"
 

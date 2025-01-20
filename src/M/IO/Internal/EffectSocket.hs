@@ -130,7 +130,8 @@ withtalkingserver u host port handler = do
     liftIO $ traceIO "withtalkingserver: inside withEffToIO"
     -- 'network' package on Windows is broken. server gets stuck.
     -- workaround: forcibly kill process on exception.
-    killonexc do -- see M.IO.Internal.WinHack for docs on 'killonexc'
+    killonexc do
+      -- see M.IO.Internal.WinHack for docs on 'killonexc'
       liftIO $ traceIO "withtalkingserver: inside killonexc"
       runTCPServer host port \sock -> do
         liftIO $ traceIO "withtalkingserver: inside runTCPServer"
