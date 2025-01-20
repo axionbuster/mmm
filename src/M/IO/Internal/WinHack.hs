@@ -41,7 +41,7 @@ foreign import ccall safe "TerminateProcess"
 -- on Windows can leave sockets in an unresponsive state after exceptions, particularly
 -- during accept/recv operations.
 --
--- Used in 'm.io.internal.effectsocket.withtalkingserver' to ensure the server can be restarted cleanly after
+-- Used in 'M.IO.Internal.EffectSocket.withtalkingserver' to ensure the server can be restarted cleanly after
 -- network failures.
 --
 -- The handler will:
@@ -87,7 +87,7 @@ import System.Exit
 -- package's socket unresponsiveness issues, this handler maintains a consistent
 -- interface with the Windows version.
 --
--- Used in 'm.io.internal.effectsocket.withtalkingserver' to handle network failures uniformly across platforms.
+-- Used in 'M.IO.Internal.EffectSocket.withtalkingserver' to handle network failures uniformly across platforms.
 --
 -- The handler will:
 --
