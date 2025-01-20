@@ -16,13 +16,13 @@
 module M.IO.Internal.WinHack (killonexc) where
 
 import Control.Exception
+import Control.Monad
 import Debug.Trace
 
 #ifdef mingw32_HOST_OS
 
 import Control.Concurrent
 import Control.Concurrent.Async
-import Control.Monad
 import Foreign hiding (void)
 import Foreign.C.Types
 
@@ -79,7 +79,6 @@ killonexc k =
 
 #else
 
-import Control.Monad
 import System.Exit
 
 -- | Wrap an IO action with exception handling that exits the process gracefully
