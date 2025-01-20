@@ -64,6 +64,7 @@ greeting = do
     liftIO $ traceIO $ printf "hs = %s" (show hs)
     unless (hs.protocolversion == 0) do
       liftIO $ traceIO "a!"
+      error "a!!!!"
       fail "unsupported protocol version"
     unless (hs.nextstate == 2 {- LOGIN -}) do
       liftIO $ traceIO "b!"
@@ -74,8 +75,8 @@ main :: IO ()
 main =
   let action =
         runEff
-          . runConcurrent
           . runNonDet OnEmptyKeep
+          . runConcurrent
           . runFailIO
           . evalStateShared (forserver handshake)
           $ do

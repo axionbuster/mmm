@@ -10,7 +10,9 @@ module M.IO.Internal.Socket (Connection (..), withcxfromsocket) where
 
 import Control.Concurrent.Async
 import Control.Concurrent.STM
+import Control.Exception
 import Control.Monad
+import Control.Monad.IO.Class
 import Data.ByteString
 import Debug.Trace
 import M.Crypto
@@ -18,6 +20,7 @@ import M.IO.Internal.Datagram
 import Network.Socket
 import System.IO.Streams (InputStream, OutputStream)
 import System.IO.Streams.Network (socketToStreams)
+import Text.Printf
 
 -- | a connection to either a server or a client
 data Connection = Connection
@@ -68,10 +71,13 @@ withcxfromsocket sk cont = do
   withAsync watchk \s -> do
     link s
     traceIO "withcxfromsocket: about to call 'cont'"
-    cont
-      Connection
-        { cxkey = k,
-          cxcompth = th,
-          cxinput = i2,
-          cxoutput = o2
-        }
+    handle
+      do \(e :: SomeException) -> do liftIO $ traceIO $ printf "with..et caught: %s" (displayException e); throwIO e
+      do
+        cont
+          Connection
+            { cxkey = k,
+              cxcompth = th,
+              cxinput = i2,
+              cxoutput = o2
+            }
