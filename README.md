@@ -55,6 +55,8 @@ On Ubuntu or Fedora, OpenSSL is found in `libssl-dev` and `openssl-devel`, respe
 
 On Ubuntu, you need to install `libgmp-dev`. On Fedora, install `gmp-devel`.
 
+You also need `zlib`: `zlib1g-dev` on Ubuntu, `zlib-devel` on Fedora.
+
 You also need a working C compiler and `pkg-config`. `pkg-config` is found in the Ubuntu package `pkgconf` and the Fedora package `pkgconf-pkg-config`.
 
 ## Immediate help
