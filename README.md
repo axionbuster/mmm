@@ -24,6 +24,21 @@ Ultimate goal:
 
 X/Twitter: @axionbuster
 
+## How to build (Windows)
+
+On all operating systems, you need the development version of OpenSSL installed.
+
+Since this project uses Stack, and Stack comes with its own MSYS2 environment, you should install it like this:
+
+```sh
+# first, update the package index
+# (do this many times until it stops updating)
+stack exec -- pacman -Syu
+
+# now, install OpenSSL
+stack exec -- pacman -S mingw-w64-x86_64-openssl
+```
+
 ## Immediate help
 
 Well project is kind of less than well-documented and there's no working entry point but here's something I might need help with:
