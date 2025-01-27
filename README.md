@@ -24,9 +24,19 @@ Ultimate goal:
 
 X/Twitter: @axionbuster
 
-## How to build (Windows)
+## How to build (common)
 
-On all operating systems, you need the development version of OpenSSL installed.
+On all operating systems, you need the development version of OpenSSL installed. There may be more dependencies.
+
+Use the system-specific instructions below to install all needed dependencies.
+
+Once all the necessary dependencies have been installed, run:
+
+```
+stack build
+```
+
+## How to build (Windows)
 
 Since this project uses Stack, and Stack comes with its own MSYS2 environment, you should install it like this:
 
@@ -38,6 +48,14 @@ stack exec -- pacman -Syu
 # now, install OpenSSL
 stack exec -- pacman -S mingw-w64-x86_64-openssl
 ```
+
+## How to build (Ubuntu or Fedora)
+
+On Ubuntu or Fedora, OpenSSL is found in `libssl-dev` and `openssl-devel`, respectively. Download these packages, first.
+
+On Ubuntu, you need to install `libgmp-dev`. On Fedora, install `gmp-devel`.
+
+You also need a working C compiler and `pkg-config`. `pkg-config` is found in the Ubuntu package `pkgconf` and the Fedora package `pkgconf-pkg-config`.
 
 ## Immediate help
 
