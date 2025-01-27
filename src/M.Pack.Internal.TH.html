@@ -1,0 +1,80 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span class="hs-comment">-- |</span><span>
+</span><span id="line-2"></span><span class="hs-comment">-- Module: M.Pack.Internal.TH</span><span>
+</span><span id="line-3"></span><span class="hs-comment">-- Description: Template Haskell serialization utilities</span><span>
+</span><span id="line-4"></span><span class="hs-comment">-- Copyright: (c) axionbuster, 2025</span><span>
+</span><span id="line-5"></span><span class="hs-comment">-- License: BSD-3-Clause</span><span>
+</span><span id="line-6"></span><span class="hs-comment">--</span><span>
+</span><span id="line-7"></span><span class="hs-comment">-- Provides Template Haskell machinery for automatically deriving Pack and</span><span>
+</span><span id="line-8"></span><span class="hs-comment">-- Unpack instances, including support for shadowing and proper derivation.</span><span>
+</span><span id="line-9"></span><span class="hs-keyword">module</span><span> </span><span class="hs-identifier">M.Pack.Internal.TH</span><span>
+</span><span id="line-10"></span><span>  </span><span class="hs-special">(</span><span> </span><span class="annot"><a href="M.Pack.Internal.TH.html#borrowderivepackunpack"><span class="hs-identifier">borrowderivepackunpack</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-11"></span><span>    </span><span class="annot"><a href="M.Pack.Internal.TH.html#properderivepackunpack"><span class="hs-identifier">properderivepackunpack</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-12"></span><span>    </span><span class="annot"><a href="M.Pack.Internal.TH.html#borrowderivenothing"><span class="hs-identifier">borrowderivenothing</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-13"></span><span>  </span><span class="hs-special">)</span><span>
+</span><span id="line-14"></span><span class="hs-keyword">where</span><span>
+</span><span id="line-15"></span><span>
+</span><span id="line-16"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Functor</span></span><span>
+</span><span id="line-17"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Serde.QQ</span></span><span>
+</span><span id="line-18"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Language.Haskell.TH</span></span><span>
+</span><span id="line-19"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html"><span class="hs-identifier">M.Pack.Internal.Types</span></a></span><span>
+</span><span id="line-20"></span><span>
+</span><span id="line-21"></span><span class="annot"><span class="hs-comment">-- | shadow-derive 'Pack' and 'Unpack' instances for a type</span></span><span>
+</span><span id="line-22"></span><span class="annot"><a href="M.Pack.Internal.TH.html#borrowderivepackunpack"><span class="hs-identifier hs-type">borrowderivepackunpack</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">RunUserCoercion</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Q</span></span><span> </span><span class="hs-special">[</span><span class="annot"><span class="hs-identifier hs-type">Dec</span></span><span class="hs-special">]</span><span>
+</span><span id="line-23"></span><span id="borrowderivepackunpack"><span class="annot"><span class="annottext">borrowderivepackunpack :: RunUserCoercion -&gt; Q [Dec]
+</span><a href="M.Pack.Internal.TH.html#borrowderivepackunpack"><span class="hs-identifier hs-var hs-var">borrowderivepackunpack</span></a></span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">RunUserCoercion</span></span><span> </span><span class="hs-special">{</span><span id="local-6989586621681605648"><span id="local-6989586621681605649"><span id="local-6989586621681605650"><span id="local-6989586621681605651"><span id="local-6989586621681605652"><span id="local-6989586621681605653"><span class="annot"><span class="annottext">Q Exp
+Q Pat
+Q Type
+patnormal :: Q Pat
+patshadow :: Q Pat
+appnormal :: Q Exp
+appshadow :: Q Exp
+datatyp :: Q Type
+shadowdatatyp :: Q Type
+appnormal :: RunUserCoercion -&gt; Q Exp
+appshadow :: RunUserCoercion -&gt; Q Exp
+datatyp :: RunUserCoercion -&gt; Q Type
+patnormal :: RunUserCoercion -&gt; Q Pat
+patshadow :: RunUserCoercion -&gt; Q Pat
+shadowdatatyp :: RunUserCoercion -&gt; Q Type
+</span><a href="#local-6989586621681605648"><span class="hs-glyph hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">..</span></a></span></span></span></span></span></span></span><span class="hs-special">}</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-24"></span><span>  </span><span class="hs-special">[d|</span><span>
+</span><span id="line-25"></span><span>    </span><span class="hs-keyword">instance</span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#Pack"><span class="hs-identifier hs-type">Pack</span></a></span><span> </span><span class="hs-special">$</span><span class="annot"><span class="annottext">Q Type
+</span><a href="#local-6989586621681605652"><span class="hs-identifier hs-var">datatyp</span></a></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-26"></span><span>      </span><span class="annot"><a href="M.Pack.Internal.Types.html#pack"><span class="hs-identifier hs-var hs-var">pack</span></a></span><span> </span><span class="hs-special">$</span><span class="annot"><span class="annottext">Q Pat
+</span><a href="#local-6989586621681605648"><span class="hs-identifier hs-var">patnormal</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#pack"><span class="hs-identifier hs-type">pack</span></a></span><span> </span><span class="hs-special">$</span><span class="annot"><span class="annottext">Q Exp
+</span><a href="#local-6989586621681605651"><span class="hs-identifier hs-var">appshadow</span></a></span><span>
+</span><span id="line-27"></span><span>      </span><span class="hs-pragma">{-# INLINEABLE</span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#pack"><span class="hs-pragma hs-type">pack</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-28"></span><span>
+</span><span id="line-29"></span><span>    </span><span class="hs-keyword">instance</span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#Unpack"><span class="hs-identifier hs-type">Unpack</span></a></span><span> </span><span class="hs-special">$</span><span class="annot"><span class="annottext">Q Type
+</span><a href="#local-6989586621681605652"><span class="hs-identifier hs-var">datatyp</span></a></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-30"></span><span>      </span><span class="annot"><a href="M.Pack.Internal.Types.html#unpack"><span class="hs-identifier hs-var hs-var">unpack</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#unpack"><span class="hs-identifier hs-type">unpack</span></a></span><span> </span><span class="annot"><span class="hs-operator hs-type">&lt;&amp;&gt;</span></span><span> </span><span class="hs-glyph">\</span><span class="hs-special">(</span><span class="hs-special">$</span><span class="annot"><span class="annottext">Q Pat
+</span><a href="#local-6989586621681605649"><span class="hs-identifier hs-var">patshadow</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">$</span><span class="annot"><span class="annottext">Q Exp
+</span><a href="#local-6989586621681605650"><span class="hs-identifier hs-var">appnormal</span></a></span><span>
+</span><span id="line-31"></span><span>      </span><span class="hs-pragma">{-# INLINEABLE</span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#unpack"><span class="hs-pragma hs-type">unpack</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-32"></span><span>    </span><span class="hs-special">|]</span><span>
+</span><span id="line-33"></span><span>
+</span><span id="line-34"></span><span class="annot"><a href="M.Pack.Internal.TH.html#properderivepackunpack"><span class="hs-identifier hs-type">properderivepackunpack</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Name</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Q</span></span><span> </span><span class="hs-special">[</span><span class="annot"><span class="hs-identifier hs-type">Dec</span></span><span class="hs-special">]</span><span>
+</span><span id="line-35"></span><span id="properderivepackunpack"><span class="annot"><span class="annottext">properderivepackunpack :: Name -&gt; Q [Dec]
+</span><a href="M.Pack.Internal.TH.html#properderivepackunpack"><span class="hs-identifier hs-var hs-var">properderivepackunpack</span></a></span></span><span> </span><span id="local-6989586621681605663"><span class="annot"><span class="annottext">Name
+</span><a href="#local-6989586621681605663"><span class="hs-identifier hs-var">n</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-36"></span><span>  </span><span class="hs-special">[d|</span><span>
+</span><span id="line-37"></span><span>    </span><span class="hs-keyword">instance</span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#Pack"><span class="hs-identifier hs-type">Pack</span></a></span><span> </span><span class="hs-special">$</span><span class="hs-special">(</span><span class="annot"><span class="annottext">Name -&gt; Q Type
+forall (m :: * -&gt; *). Quote m =&gt; Name -&gt; m Type
+</span><span class="hs-identifier hs-var">conT</span></span><span> </span><span class="annot"><span class="annottext">Name
+</span><a href="#local-6989586621681605663"><span class="hs-identifier hs-var">n</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-38"></span><span>
+</span><span id="line-39"></span><span>    </span><span class="hs-keyword">instance</span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#Unpack"><span class="hs-identifier hs-type">Unpack</span></a></span><span> </span><span class="hs-special">$</span><span class="hs-special">(</span><span class="annot"><span class="annottext">Name -&gt; Q Type
+forall (m :: * -&gt; *). Quote m =&gt; Name -&gt; m Type
+</span><span class="hs-identifier hs-var">conT</span></span><span> </span><span class="annot"><span class="annottext">Name
+</span><a href="#local-6989586621681605663"><span class="hs-identifier hs-var">n</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-40"></span><span>    </span><span class="hs-special">|]</span><span>
+</span><span id="line-41"></span><span>
+</span><span id="line-42"></span><span class="annot"><span class="hs-comment">-- | literally do nothing</span></span><span>
+</span><span id="line-43"></span><span class="annot"><a href="M.Pack.Internal.TH.html#borrowderivenothing"><span class="hs-identifier hs-type">borrowderivenothing</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">RunUserCoercion</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Q</span></span><span> </span><span class="hs-special">[</span><span class="annot"><span class="hs-identifier hs-type">Dec</span></span><span class="hs-special">]</span><span>
+</span><span id="line-44"></span><span id="borrowderivenothing"><span class="annot"><span class="annottext">borrowderivenothing :: RunUserCoercion -&gt; Q [Dec]
+</span><a href="M.Pack.Internal.TH.html#borrowderivenothing"><span class="hs-identifier hs-var hs-var">borrowderivenothing</span></a></span></span><span> </span><span class="annot"><span class="annottext">RunUserCoercion
+</span><span class="hs-identifier">_</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">[Dec] -&gt; Q [Dec]
+forall a. a -&gt; Q a
+forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><span class="hs-identifier hs-var">pure</span></span><span> </span><span class="hs-special">[</span><span class="hs-special">]</span><span>
+</span><span id="line-45"></span></pre></body></html>

@@ -1,0 +1,45 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span id="local-6989586621681624601"><span id="local-6989586621681624602"></span></span><span class="hs-pragma">{-# OPTIONS_GHC -Wno-missing-export-lists #-}</span><span>
+</span><span id="line-2"></span><span>
+</span><span id="line-3"></span><span class="hs-comment">-- |</span><span>
+</span><span id="line-4"></span><span class="hs-comment">-- Module: M.V769.H</span><span>
+</span><span id="line-5"></span><span class="hs-comment">-- Description: Protocol handshake packets (AI-generated)</span><span>
+</span><span id="line-6"></span><span class="hs-comment">-- Copyright: (c) axionbuster, 2025</span><span>
+</span><span id="line-7"></span><span class="hs-comment">-- License: BSD-3-Clause</span><span>
+</span><span id="line-8"></span><span class="hs-comment">--</span><span>
+</span><span id="line-9"></span><span class="hs-comment">-- Implements packet structures for the initial handshake phase of protocol</span><span>
+</span><span id="line-10"></span><span class="hs-comment">-- version 769, where clients establish basic connection parameters including</span><span>
+</span><span id="line-11"></span><span class="hs-comment">-- protocol version and intended next state.</span><span>
+</span><span id="line-12"></span><span class="hs-keyword">module</span><span> </span><span class="hs-identifier">M.V769.H</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-13"></span><span>
+</span><span id="line-14"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Control.DeepSeq</span></span><span>
+</span><span id="line-15"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Data</span></span><span>
+</span><span id="line-16"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Int</span></span><span>
+</span><span id="line-17"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Serde.QQ</span></span><span>
+</span><span id="line-18"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Text</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">Text</span></span><span class="hs-special">)</span><span>
+</span><span id="line-19"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Word</span></span><span>
+</span><span id="line-20"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">GHC.Generics</span></span><span>
+</span><span id="line-21"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="M.LEB.html"><span class="hs-identifier">M.LEB</span></a></span><span>
+</span><span id="line-22"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="M.Pack.html"><span class="hs-identifier">M.Pack</span></a></span><span>
+</span><span id="line-23"></span><span>
+</span><span id="line-24"></span><span id="HandshakePacket"><span id="HandshakePacket__"><span id="local-6989586621681624613"><span id="local-6989586621681624624"><span id="local-6989586621681624628"><span id="local-6989586621681624631"><span id="local-6989586621681624635"><span id="local-6989586621681624638"><span id="local-6989586621681624659"><span id="local-6989586621681624664"><span id="local-6989586621681624673"><span id="local-6989586621681624679"><span id="local-6989586621681624681"><span id="local-6989586621681624683"><span id="local-6989586621681624689"><span id="local-6989586621681624694"><span id="local-6989586621681624697"><span id="local-6989586621681624700"><span id="local-6989586621681624703"><span id="local-6989586621681624706"><span id="local-6989586621681624709"><span id="local-6989586621681624714"><span id="local-6989586621681624719"><span id="HandshakePacket__"><span id="nextstate__"><span id="serverport__"><span id="serveraddress__"><span id="protocolversion__"><span id="HandshakePacket"><span id="nextstate"><span id="serverport"><span id="serveraddress"><span id="protocolversion"></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span><span class="">[serde|
+.derive
+  Show Read Data Typeable
+
+-- Handshaking
+data HandshakePacket
+  protocolversion :: Int32 via VarInt
+  serveraddress :: Text 
+  serverport :: Word16
+  nextstate :: Int32 via VarInt
+ |]</span><span>
+</span><span id="line-35"></span><span>
+</span><span id="line-36"></span><span id="local-6989586621681624740"><span id="local-6989586621681624749"><span id="local-6989586621681624755"><span id="local-6989586621681624759"><span id="local-6989586621681624762"><span id="local-6989586621681624765"><span id="local-6989586621681624768"><span id="local-6989586621681624774"><span id="local-6989586621681624782"><span id="local-6989586621681624789"><span id="local-6989586621681624793"><span id="local-6989586621681624796"><span id="local-6989586621681624799"><span id="local-6989586621681624802"><span id="local-6989586621681624805"><span id="local-6989586621681624814"><span id="local-6989586621681624817"><span id="local-6989586621681624825"><span id="local-6989586621681624828"><span id="local-6989586621681624836"><span id="local-6989586621681624844"><span id="local-6989586621681624846"><span id="local-6989586621681624848"><span id="local-6989586621681624850"><span id="local-6989586621681624852"><span id="local-6989586621681624862"><span id="local-6989586621681624870"><span id="local-6989586621681624876"><span class="hs-identifier">runusercoercion</span><span>
+</span><span id="line-37"></span><span>  </span><span class="hs-identifier">borrowderivepackunpack</span><span>
+</span><span id="line-38"></span><span>  </span><span class="hs-identifier">properderivepackunpack</span><span>
+</span><span id="line-39"></span><span>  </span><span class="hs-comment">-- preparations for shadow types</span><span>
+</span><span id="line-40"></span><span>  </span><span class="hs-special">[</span><span> </span><span class="hs-special">''</span><span class="hs-identifier">Generic</span><span class="hs-special">,</span><span>
+</span><span id="line-41"></span><span>    </span><span class="hs-special">''</span><span class="hs-identifier">NFData</span><span class="hs-special">,</span><span>
+</span><span id="line-42"></span><span>    </span><span class="hs-special">''</span><span class="hs-identifier">Eq</span><span class="hs-special">,</span><span>
+</span><span id="line-43"></span><span>    </span><span class="hs-special">''</span><span class="hs-identifier">Ord</span><span>
+</span><span id="line-44"></span><span>  </span><span class="hs-special">]</span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span><span>
+</span><span id="line-45"></span></pre></body></html>

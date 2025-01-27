@@ -1,0 +1,253 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span class="hs-comment">-- |</span><span>
+</span><span id="line-2"></span><span class="hs-comment">-- Module: M.IO.Internal.Socket</span><span>
+</span><span id="line-3"></span><span class="hs-comment">-- Description: Socket connection handling for Minecraft protocol</span><span>
+</span><span id="line-4"></span><span class="hs-comment">-- Copyright: (c) axionbuster, 2025</span><span>
+</span><span id="line-5"></span><span class="hs-comment">-- License: BSD-3-Clause</span><span>
+</span><span id="line-6"></span><span class="hs-comment">--</span><span>
+</span><span id="line-7"></span><span class="hs-comment">-- Implements reliable duplex stream connections for the Java Minecraft protocol,</span><span>
+</span><span id="line-8"></span><span class="hs-comment">-- handling encryption and compression.</span><span>
+</span><span id="line-9"></span><span class="hs-keyword">module</span><span> </span><span class="hs-identifier">M.IO.Internal.Socket</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="M.IO.Internal.Socket.html#Connection"><span class="hs-identifier">Connection</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span> </span><span class="annot"><a href="M.IO.Internal.Socket.html#withcxfromsocket"><span class="hs-identifier">withcxfromsocket</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-10"></span><span>
+</span><span id="line-11"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Control.Concurrent.Async</span></span><span>
+</span><span id="line-12"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Control.Concurrent.STM</span></span><span>
+</span><span id="line-13"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Control.Monad</span></span><span>
+</span><span id="line-14"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.ByteString</span></span><span>
+</span><span id="line-15"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="M.Crypto.html"><span class="hs-identifier">M.Crypto</span></a></span><span>
+</span><span id="line-16"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="M.IO.Internal.Datagram.html"><span class="hs-identifier">M.IO.Internal.Datagram</span></a></span><span>
+</span><span id="line-17"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Network.Socket</span></span><span>
+</span><span id="line-18"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">System.IO.Streams</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">InputStream</span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier">OutputStream</span></span><span class="hs-special">)</span><span>
+</span><span id="line-19"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">System.IO.Streams.Network</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">socketToStreams</span></span><span class="hs-special">)</span><span>
+</span><span id="line-20"></span><span>
+</span><span id="line-21"></span><span class="annot"><span class="hs-comment">-- | a connection to either a server or a client</span></span><span>
+</span><span id="line-22"></span><span class="hs-keyword">data</span><span> </span><span id="Connection"><span class="annot"><a href="M.IO.Internal.Socket.html#Connection"><span class="hs-identifier hs-var">Connection</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="Connection"><span class="annot"><a href="M.IO.Internal.Socket.html#Connection"><span class="hs-identifier hs-var">Connection</span></a></span></span><span>
+</span><span id="line-23"></span><span>  </span><span class="hs-special">{</span><span> </span><span class="annot"><span class="hs-comment">-- | encryption key, AES-128-CFB8; doubles as IV</span></span><span>
+</span><span id="line-24"></span><span>    </span><span id="cxkey"><span class="annot"><span class="annottext">Connection -&gt; TVar (Maybe ByteString)
+</span><a href="M.IO.Internal.Socket.html#cxkey"><span class="hs-identifier hs-var hs-var">cxkey</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">TVar</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">Maybe</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">ByteString</span></span><span class="hs-special">)</span><span class="hs-special">,</span><span>
+</span><span id="line-25"></span><span>    </span><span class="annot"><span class="hs-comment">-- | compression threshold; negative = off, non-negative = on with threshold</span></span><span>
+</span><span id="line-26"></span><span>    </span><span id="cxcompth"><span class="annot"><span class="annottext">Connection -&gt; TVar Int
+</span><a href="M.IO.Internal.Socket.html#cxcompth"><span class="hs-identifier hs-var hs-var">cxcompth</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">TVar</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Int</span></span><span class="hs-special">,</span><span>
+</span><span id="line-27"></span><span>    </span><span class="annot"><span class="hs-comment">-- | input stream</span></span><span>
+</span><span id="line-28"></span><span>    </span><span id="cxinput"><span class="annot"><span class="annottext">Connection -&gt; InputStream Uninterpreted
+</span><a href="M.IO.Internal.Socket.html#cxinput"><span class="hs-identifier hs-var hs-var">cxinput</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">InputStream</span></span><span> </span><span class="annot"><a href="M.IO.Internal.Datagram.html#Uninterpreted"><span class="hs-identifier hs-type">Uninterpreted</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-29"></span><span>    </span><span class="annot"><span class="hs-comment">-- | output stream</span></span><span>
+</span><span id="line-30"></span><span>    </span><span id="cxoutput"><span class="annot"><span class="annottext">Connection -&gt; OutputStream Uninterpreted
+</span><a href="M.IO.Internal.Socket.html#cxoutput"><span class="hs-identifier hs-var hs-var">cxoutput</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">OutputStream</span></span><span> </span><span class="annot"><a href="M.IO.Internal.Datagram.html#Uninterpreted"><span class="hs-identifier hs-type">Uninterpreted</span></a></span><span>
+</span><span id="line-31"></span><span>  </span><span class="hs-special">}</span><span>
+</span><span id="line-32"></span><span>
+</span><span id="line-33"></span><span class="annot"><span class="hs-comment">-- | create a connection from a socket</span></span><span>
+</span><span id="line-34"></span><span id="local-6989586621681617405"><span class="annot"><a href="M.IO.Internal.Socket.html#withcxfromsocket"><span class="hs-identifier hs-type">withcxfromsocket</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Socket</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="M.IO.Internal.Socket.html#Connection"><span class="hs-identifier hs-type">Connection</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">IO</span></span><span> </span><span class="annot"><a href="#local-6989586621681617405"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">IO</span></span><span> </span><span class="annot"><a href="#local-6989586621681617405"><span class="hs-identifier hs-type">a</span></a></span></span><span>
+</span><span id="line-35"></span><span id="withcxfromsocket"><span class="annot"><span class="annottext">withcxfromsocket :: forall a. Socket -&gt; (Connection -&gt; IO a) -&gt; IO a
+</span><a href="M.IO.Internal.Socket.html#withcxfromsocket"><span class="hs-identifier hs-var hs-var">withcxfromsocket</span></a></span></span><span> </span><span id="local-6989586621681617485"><span class="annot"><span class="annottext">Socket
+</span><a href="#local-6989586621681617485"><span class="hs-identifier hs-var">sk</span></a></span></span><span> </span><span id="local-6989586621681617486"><span class="annot"><span class="annottext">Connection -&gt; IO a
+</span><a href="#local-6989586621681617486"><span class="hs-identifier hs-var">cont</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-36"></span><span>  </span><span id="local-6989586621681617487"><span class="annot"><span class="annottext">TVar Int
+</span><a href="#local-6989586621681617487"><span class="hs-identifier hs-var">th</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">Int -&gt; IO (TVar Int)
+forall a. a -&gt; IO (TVar a)
+</span><span class="hs-identifier hs-var">newTVarIO</span></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">-</span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">1</span></span><span class="hs-special">)</span><span> </span><span class="hs-comment">-- compression off by default</span><span>
+</span><span id="line-37"></span><span>  </span><span class="hs-special">(</span><span id="local-6989586621681617489"><span class="annot"><span class="annottext">InputStream ByteString
+</span><a href="#local-6989586621681617489"><span class="hs-identifier hs-var">i0</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621681617490"><span class="annot"><span class="annottext">OutputStream ByteString
+</span><a href="#local-6989586621681617490"><span class="hs-identifier hs-var">o0</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">Socket -&gt; IO (InputStream ByteString, OutputStream ByteString)
+</span><span class="hs-identifier hs-var">socketToStreams</span></span><span> </span><span class="annot"><span class="annottext">Socket
+</span><a href="#local-6989586621681617485"><span class="hs-identifier hs-var">sk</span></a></span><span>
+</span><span id="line-38"></span><span>  </span><span class="hs-special">(</span><span id="local-6989586621681617491"><span class="annot"><span class="annottext">TVar (ByteString -&gt; IO ByteString)
+</span><a href="#local-6989586621681617491"><span class="hs-identifier hs-var">ef</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621681617492"><span class="annot"><span class="annottext">TVar (ByteString -&gt; IO ByteString)
+</span><a href="#local-6989586621681617492"><span class="hs-identifier hs-var">df</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">(TVar (ByteString -&gt; IO ByteString)
+ -&gt; TVar (ByteString -&gt; IO ByteString)
+ -&gt; (TVar (ByteString -&gt; IO ByteString),
+     TVar (ByteString -&gt; IO ByteString)))
+-&gt; IO (TVar (ByteString -&gt; IO ByteString))
+-&gt; IO (TVar (ByteString -&gt; IO ByteString))
+-&gt; IO
+     (TVar (ByteString -&gt; IO ByteString),
+      TVar (ByteString -&gt; IO ByteString))
+forall a b c. (a -&gt; b -&gt; c) -&gt; IO a -&gt; IO b -&gt; IO c
+forall (f :: * -&gt; *) a b c.
+Applicative f =&gt;
+(a -&gt; b -&gt; c) -&gt; f a -&gt; f b -&gt; f c
+</span><span class="hs-identifier hs-var">liftA2</span></span><span> </span><span class="hs-special">(</span><span class="hs-special">,</span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">(ByteString -&gt; IO ByteString)
+-&gt; IO (TVar (ByteString -&gt; IO ByteString))
+forall a. a -&gt; IO (TVar a)
+</span><span class="hs-identifier hs-var">newTVarIO</span></span><span> </span><span class="annot"><span class="annottext">ByteString -&gt; IO ByteString
+forall a. a -&gt; IO a
+forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><span class="hs-identifier hs-var">pure</span></span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">(ByteString -&gt; IO ByteString)
+-&gt; IO (TVar (ByteString -&gt; IO ByteString))
+forall a. a -&gt; IO (TVar a)
+</span><span class="hs-identifier hs-var">newTVarIO</span></span><span> </span><span class="annot"><span class="annottext">ByteString -&gt; IO ByteString
+forall a. a -&gt; IO a
+forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><span class="hs-identifier hs-var">pure</span></span><span class="hs-special">)</span><span>
+</span><span id="line-39"></span><span>  </span><span class="hs-special">(</span><span id="local-6989586621681617494"><span class="annot"><span class="annottext">InputStream ByteString
+</span><a href="#local-6989586621681617494"><span class="hs-identifier hs-var">i1</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621681617495"><span class="annot"><span class="annottext">OutputStream ByteString
+</span><a href="#local-6989586621681617495"><span class="hs-identifier hs-var">o1</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">(InputStream ByteString
+ -&gt; OutputStream ByteString
+ -&gt; (InputStream ByteString, OutputStream ByteString))
+-&gt; IO (InputStream ByteString)
+-&gt; IO (OutputStream ByteString)
+-&gt; IO (InputStream ByteString, OutputStream ByteString)
+forall a b c. (a -&gt; b -&gt; c) -&gt; IO a -&gt; IO b -&gt; IO c
+forall (f :: * -&gt; *) a b c.
+Applicative f =&gt;
+(a -&gt; b -&gt; c) -&gt; f a -&gt; f b -&gt; f c
+</span><span class="hs-identifier hs-var">liftA2</span></span><span> </span><span class="hs-special">(</span><span class="hs-special">,</span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">TVar (ByteString -&gt; IO ByteString)
+-&gt; InputStream ByteString -&gt; IO (InputStream ByteString)
+</span><a href="M.IO.Internal.Datagram.html#makedecrypting"><span class="hs-identifier hs-var">makedecrypting</span></a></span><span> </span><span class="annot"><span class="annottext">TVar (ByteString -&gt; IO ByteString)
+</span><a href="#local-6989586621681617492"><span class="hs-identifier hs-var">df</span></a></span><span> </span><span class="annot"><span class="annottext">InputStream ByteString
+</span><a href="#local-6989586621681617489"><span class="hs-identifier hs-var">i0</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">TVar (ByteString -&gt; IO ByteString)
+-&gt; OutputStream ByteString -&gt; IO (OutputStream ByteString)
+</span><a href="M.IO.Internal.Datagram.html#makeencrypting"><span class="hs-identifier hs-var">makeencrypting</span></a></span><span> </span><span class="annot"><span class="annottext">TVar (ByteString -&gt; IO ByteString)
+</span><a href="#local-6989586621681617491"><span class="hs-identifier hs-var">ef</span></a></span><span> </span><span class="annot"><span class="annottext">OutputStream ByteString
+</span><a href="#local-6989586621681617490"><span class="hs-identifier hs-var">o0</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-40"></span><span>  </span><span class="hs-special">(</span><span id="local-6989586621681617498"><span class="annot"><span class="annottext">InputStream Uninterpreted
+</span><a href="#local-6989586621681617498"><span class="hs-identifier hs-var">i2</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621681617499"><span class="annot"><span class="annottext">OutputStream Uninterpreted
+</span><a href="#local-6989586621681617499"><span class="hs-identifier hs-var">o2</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">(InputStream Uninterpreted
+ -&gt; OutputStream Uninterpreted
+ -&gt; (InputStream Uninterpreted, OutputStream Uninterpreted))
+-&gt; IO (InputStream Uninterpreted)
+-&gt; IO (OutputStream Uninterpreted)
+-&gt; IO (InputStream Uninterpreted, OutputStream Uninterpreted)
+forall a b c. (a -&gt; b -&gt; c) -&gt; IO a -&gt; IO b -&gt; IO c
+forall (f :: * -&gt; *) a b c.
+Applicative f =&gt;
+(a -&gt; b -&gt; c) -&gt; f a -&gt; f b -&gt; f c
+</span><span class="hs-identifier hs-var">liftA2</span></span><span> </span><span class="hs-special">(</span><span class="hs-special">,</span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">TVar Int
+-&gt; InputStream ByteString -&gt; IO (InputStream Uninterpreted)
+</span><a href="M.IO.Internal.Datagram.html#makepacketstreami"><span class="hs-identifier hs-var">makepacketstreami</span></a></span><span> </span><span class="annot"><span class="annottext">TVar Int
+</span><a href="#local-6989586621681617487"><span class="hs-identifier hs-var">th</span></a></span><span> </span><span class="annot"><span class="annottext">InputStream ByteString
+</span><a href="#local-6989586621681617494"><span class="hs-identifier hs-var">i1</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">TVar Int
+-&gt; OutputStream ByteString -&gt; IO (OutputStream Uninterpreted)
+</span><a href="M.IO.Internal.Datagram.html#makepacketstreamo"><span class="hs-identifier hs-var">makepacketstreamo</span></a></span><span> </span><span class="annot"><span class="annottext">TVar Int
+</span><a href="#local-6989586621681617487"><span class="hs-identifier hs-var">th</span></a></span><span> </span><span class="annot"><span class="annottext">OutputStream ByteString
+</span><a href="#local-6989586621681617495"><span class="hs-identifier hs-var">o1</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-41"></span><span>  </span><span id="local-6989586621681617502"><span class="annot"><span class="annottext">TVar (Maybe ByteString)
+</span><a href="#local-6989586621681617502"><span class="hs-identifier hs-var">k</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">Maybe ByteString -&gt; IO (TVar (Maybe ByteString))
+forall a. a -&gt; IO (TVar a)
+</span><span class="hs-identifier hs-var">newTVarIO</span></span><span> </span><span class="annot"><span class="annottext">Maybe ByteString
+forall a. Maybe a
+</span><span class="hs-identifier hs-var">Nothing</span></span><span>
+</span><span id="line-42"></span><span>  </span><span class="hs-comment">-- need to go from the easy way to the hard way.</span><span>
+</span><span id="line-43"></span><span>  </span><span class="hs-comment">-- why? because Datagram.hs expects functions to be passed in</span><span>
+</span><span id="line-44"></span><span>  </span><span class="hs-comment">-- for crypto, so we need to convert encryption keys to</span><span>
+</span><span id="line-45"></span><span>  </span><span class="hs-comment">-- encryption functions</span><span>
+</span><span id="line-46"></span><span>  </span><span class="hs-keyword">let</span><span> </span><span id="local-6989586621681617503"><span class="annot"><span class="annottext">watchk :: IO Any
+</span><a href="#local-6989586621681617503"><span class="hs-identifier hs-var hs-var">watchk</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-47"></span><span>        </span><span id="local-6989586621681617504"><span class="annot"><span class="annottext">TVar (Maybe ByteString)
+</span><a href="#local-6989586621681617504"><span class="hs-identifier hs-var">kold</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">Maybe ByteString -&gt; IO (TVar (Maybe ByteString))
+forall a. a -&gt; IO (TVar a)
+</span><span class="hs-identifier hs-var">newTVarIO</span></span><span> </span><span class="annot"><span class="annottext">Maybe ByteString
+forall a. Maybe a
+</span><span class="hs-identifier hs-var">Nothing</span></span><span>
+</span><span id="line-48"></span><span>        </span><span class="annot"><span class="annottext">IO () -&gt; IO Any
+forall (f :: * -&gt; *) a b. Applicative f =&gt; f a -&gt; f b
+</span><span class="hs-identifier hs-var">forever</span></span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-49"></span><span>          </span><span id="local-6989586621681617506"><span class="annot"><span class="annottext">Maybe ByteString
+</span><a href="#local-6989586621681617506"><span class="hs-identifier hs-var">k'</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">STM (Maybe ByteString) -&gt; IO (Maybe ByteString)
+forall a. STM a -&gt; IO a
+</span><span class="hs-identifier hs-var">atomically</span></span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-50"></span><span>            </span><span id="local-6989586621681617508"><span class="annot"><span class="annottext">Maybe ByteString
+</span><a href="#local-6989586621681617508"><span class="hs-identifier hs-var">kold'</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">TVar (Maybe ByteString) -&gt; STM (Maybe ByteString)
+forall a. TVar a -&gt; STM a
+</span><span class="hs-identifier hs-var">readTVar</span></span><span> </span><span class="annot"><span class="annottext">TVar (Maybe ByteString)
+</span><a href="#local-6989586621681617504"><span class="hs-identifier hs-var">kold</span></a></span><span>
+</span><span id="line-51"></span><span>            </span><span id="local-6989586621681617510"><span class="annot"><span class="annottext">Maybe ByteString
+</span><a href="#local-6989586621681617510"><span class="hs-identifier hs-var">knew</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">TVar (Maybe ByteString) -&gt; STM (Maybe ByteString)
+forall a. TVar a -&gt; STM a
+</span><span class="hs-identifier hs-var">readTVar</span></span><span> </span><span class="annot"><span class="annottext">TVar (Maybe ByteString)
+</span><a href="#local-6989586621681617502"><span class="hs-identifier hs-var">k</span></a></span><span>
+</span><span id="line-52"></span><span>            </span><span class="annot"><span class="annottext">Bool -&gt; STM () -&gt; STM ()
+forall (f :: * -&gt; *). Applicative f =&gt; Bool -&gt; f () -&gt; f ()
+</span><span class="hs-identifier hs-var">when</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Maybe ByteString
+</span><a href="#local-6989586621681617510"><span class="hs-identifier hs-var">knew</span></a></span><span> </span><span class="annot"><span class="annottext">Maybe ByteString -&gt; Maybe ByteString -&gt; Bool
+forall a. Eq a =&gt; a -&gt; a -&gt; Bool
+</span><span class="hs-operator hs-var">==</span></span><span> </span><span class="annot"><span class="annottext">Maybe ByteString
+</span><a href="#local-6989586621681617508"><span class="hs-identifier hs-var">kold'</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">STM ()
+forall a. STM a
+</span><span class="hs-identifier hs-var">retry</span></span><span>
+</span><span id="line-53"></span><span>            </span><span class="annot"><span class="annottext">TVar (Maybe ByteString) -&gt; Maybe ByteString -&gt; STM ()
+forall a. TVar a -&gt; a -&gt; STM ()
+</span><span class="hs-identifier hs-var">writeTVar</span></span><span> </span><span class="annot"><span class="annottext">TVar (Maybe ByteString)
+</span><a href="#local-6989586621681617504"><span class="hs-identifier hs-var">kold</span></a></span><span> </span><span class="annot"><span class="annottext">Maybe ByteString
+</span><a href="#local-6989586621681617510"><span class="hs-identifier hs-var">knew</span></a></span><span>
+</span><span id="line-54"></span><span>            </span><span class="annot"><span class="annottext">Maybe ByteString -&gt; STM (Maybe ByteString)
+forall a. a -&gt; STM a
+forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><span class="hs-identifier hs-var">pure</span></span><span> </span><span class="annot"><span class="annottext">Maybe ByteString
+</span><a href="#local-6989586621681617510"><span class="hs-identifier hs-var">knew</span></a></span><span>
+</span><span id="line-55"></span><span>          </span><span class="hs-keyword">case</span><span> </span><span class="annot"><span class="annottext">Maybe ByteString
+</span><a href="#local-6989586621681617506"><span class="hs-identifier hs-var">k'</span></a></span><span> </span><span class="hs-keyword">of</span><span>
+</span><span id="line-56"></span><span>            </span><span class="annot"><span class="annottext">Maybe ByteString
+</span><span class="hs-identifier hs-var">Nothing</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">STM () -&gt; IO ()
+forall a. STM a -&gt; IO a
+</span><span class="hs-identifier hs-var">atomically</span></span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-57"></span><span>              </span><span class="annot"><span class="annottext">TVar (ByteString -&gt; IO ByteString)
+-&gt; (ByteString -&gt; IO ByteString) -&gt; STM ()
+forall a. TVar a -&gt; a -&gt; STM ()
+</span><span class="hs-identifier hs-var">writeTVar</span></span><span> </span><span class="annot"><span class="annottext">TVar (ByteString -&gt; IO ByteString)
+</span><a href="#local-6989586621681617491"><span class="hs-identifier hs-var">ef</span></a></span><span> </span><span class="annot"><span class="annottext">ByteString -&gt; IO ByteString
+forall a. a -&gt; IO a
+forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><span class="hs-identifier hs-var">pure</span></span><span>
+</span><span id="line-58"></span><span>              </span><span class="annot"><span class="annottext">TVar (ByteString -&gt; IO ByteString)
+-&gt; (ByteString -&gt; IO ByteString) -&gt; STM ()
+forall a. TVar a -&gt; a -&gt; STM ()
+</span><span class="hs-identifier hs-var">writeTVar</span></span><span> </span><span class="annot"><span class="annottext">TVar (ByteString -&gt; IO ByteString)
+</span><a href="#local-6989586621681617492"><span class="hs-identifier hs-var">df</span></a></span><span> </span><span class="annot"><span class="annottext">ByteString -&gt; IO ByteString
+forall a. a -&gt; IO a
+forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><span class="hs-identifier hs-var">pure</span></span><span>
+</span><span id="line-59"></span><span>            </span><span class="annot"><span class="hs-identifier hs-type">Just</span></span><span> </span><span id="local-6989586621681617514"><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621681617514"><span class="hs-identifier hs-var">key</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-60"></span><span>              </span><span id="local-6989586621681617515"><span class="annot"><span class="annottext">AES 'Encrypt
+</span><a href="#local-6989586621681617515"><span class="hs-identifier hs-var">aese</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">forall (mode :: Mode). AESClass mode =&gt; ByteString -&gt; IO (AES mode)
+</span><a href="M.Crypto.html#aesnew"><span class="hs-identifier hs-var">aesnew</span></a></span><span> </span><span class="hs-glyph">@</span><span class="hs-special">'</span><span class="annot"><a href="M.Crypto.html#Encrypt"><span class="hs-identifier hs-type">Encrypt</span></a></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621681617514"><span class="hs-identifier hs-var">key</span></a></span><span>
+</span><span id="line-61"></span><span>              </span><span id="local-6989586621681617517"><span class="annot"><span class="annottext">AES 'Decrypt
+</span><a href="#local-6989586621681617517"><span class="hs-identifier hs-var">aesd</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">forall (mode :: Mode). AESClass mode =&gt; ByteString -&gt; IO (AES mode)
+</span><a href="M.Crypto.html#aesnew"><span class="hs-identifier hs-var">aesnew</span></a></span><span> </span><span class="hs-glyph">@</span><span class="hs-special">'</span><span class="annot"><a href="M.Crypto.html#Decrypt"><span class="hs-identifier hs-type">Decrypt</span></a></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621681617514"><span class="hs-identifier hs-var">key</span></a></span><span>
+</span><span id="line-62"></span><span>              </span><span class="annot"><span class="annottext">STM () -&gt; IO ()
+forall a. STM a -&gt; IO a
+</span><span class="hs-identifier hs-var">atomically</span></span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-63"></span><span>                </span><span class="annot"><span class="annottext">TVar (ByteString -&gt; IO ByteString)
+-&gt; (ByteString -&gt; IO ByteString) -&gt; STM ()
+forall a. TVar a -&gt; a -&gt; STM ()
+</span><span class="hs-identifier hs-var">writeTVar</span></span><span> </span><span class="annot"><span class="annottext">TVar (ByteString -&gt; IO ByteString)
+</span><a href="#local-6989586621681617491"><span class="hs-identifier hs-var">ef</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">AES 'Encrypt -&gt; ByteString -&gt; IO ByteString
+forall (mode :: Mode).
+AESClass mode =&gt;
+AES mode -&gt; ByteString -&gt; IO ByteString
+</span><a href="M.Crypto.html#aesupdate"><span class="hs-identifier hs-var">aesupdate</span></a></span><span> </span><span class="annot"><span class="annottext">AES 'Encrypt
+</span><a href="#local-6989586621681617515"><span class="hs-identifier hs-var">aese</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-64"></span><span>                </span><span class="annot"><span class="annottext">TVar (ByteString -&gt; IO ByteString)
+-&gt; (ByteString -&gt; IO ByteString) -&gt; STM ()
+forall a. TVar a -&gt; a -&gt; STM ()
+</span><span class="hs-identifier hs-var">writeTVar</span></span><span> </span><span class="annot"><span class="annottext">TVar (ByteString -&gt; IO ByteString)
+</span><a href="#local-6989586621681617492"><span class="hs-identifier hs-var">df</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">AES 'Decrypt -&gt; ByteString -&gt; IO ByteString
+forall (mode :: Mode).
+AESClass mode =&gt;
+AES mode -&gt; ByteString -&gt; IO ByteString
+</span><a href="M.Crypto.html#aesupdate"><span class="hs-identifier hs-var">aesupdate</span></a></span><span> </span><span class="annot"><span class="annottext">AES 'Decrypt
+</span><a href="#local-6989586621681617517"><span class="hs-identifier hs-var">aesd</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-65"></span><span>  </span><span class="annot"><span class="annottext">IO Any -&gt; (Async Any -&gt; IO a) -&gt; IO a
+forall a b. IO a -&gt; (Async a -&gt; IO b) -&gt; IO b
+</span><span class="hs-identifier hs-var">withAsync</span></span><span> </span><span class="annot"><span class="annottext">IO Any
+</span><a href="#local-6989586621681617503"><span class="hs-identifier hs-var">watchk</span></a></span><span> </span><span class="hs-glyph">\</span><span class="annot"><span class="annottext">Async Any
+</span><span class="hs-identifier">_</span></span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-66"></span><span>    </span><span class="annot"><span class="annottext">Connection -&gt; IO a
+</span><a href="#local-6989586621681617486"><span class="hs-identifier hs-var">cont</span></a></span><span>
+</span><span id="line-67"></span><span>      </span><span class="annot"><a href="M.IO.Internal.Socket.html#Connection"><span class="hs-identifier hs-type">Connection</span></a></span><span>
+</span><span id="line-68"></span><span>        </span><span class="hs-special">{</span><span> </span><span class="annot"><span class="annottext">cxkey :: TVar (Maybe ByteString)
+</span><a href="M.IO.Internal.Socket.html#cxkey"><span class="hs-identifier hs-var">cxkey</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">TVar (Maybe ByteString)
+</span><a href="#local-6989586621681617502"><span class="hs-identifier hs-var">k</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-69"></span><span>          </span><span class="annot"><span class="annottext">cxcompth :: TVar Int
+</span><a href="M.IO.Internal.Socket.html#cxcompth"><span class="hs-identifier hs-var">cxcompth</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">TVar Int
+</span><a href="#local-6989586621681617487"><span class="hs-identifier hs-var">th</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-70"></span><span>          </span><span class="annot"><span class="annottext">cxinput :: InputStream Uninterpreted
+</span><a href="M.IO.Internal.Socket.html#cxinput"><span class="hs-identifier hs-var">cxinput</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">InputStream Uninterpreted
+</span><a href="#local-6989586621681617498"><span class="hs-identifier hs-var">i2</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-71"></span><span>          </span><span class="annot"><span class="annottext">cxoutput :: OutputStream Uninterpreted
+</span><a href="M.IO.Internal.Socket.html#cxoutput"><span class="hs-identifier hs-var">cxoutput</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">OutputStream Uninterpreted
+</span><a href="#local-6989586621681617499"><span class="hs-identifier hs-var">o2</span></a></span><span>
+</span><span id="line-72"></span><span>        </span><span class="hs-special">}</span><span>
+</span><span id="line-73"></span></pre></body></html>

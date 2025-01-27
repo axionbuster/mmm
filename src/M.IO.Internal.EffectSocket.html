@@ -1,0 +1,532 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span class="hs-comment">-- |</span><span>
+</span><span id="line-2"></span><span class="hs-comment">-- Module: M.IO.Internal.EffectSocket</span><span>
+</span><span id="line-3"></span><span class="hs-comment">-- Description: Socket-based effect interpretation</span><span>
+</span><span id="line-4"></span><span class="hs-comment">-- Copyright: (c) axionbuster, 2025</span><span>
+</span><span id="line-5"></span><span class="hs-comment">-- License: BSD-3-Clause</span><span>
+</span><span id="line-6"></span><span class="hs-comment">--</span><span>
+</span><span id="line-7"></span><span class="hs-comment">-- Implements the interpretation of the 'Talking' effect in terms of socket</span><span>
+</span><span id="line-8"></span><span class="hs-comment">-- connections, providing both client and server capabilities.</span><span>
+</span><span id="line-9"></span><span class="hs-keyword">module</span><span> </span><span class="hs-identifier">M.IO.Internal.EffectSocket</span><span>
+</span><span id="line-10"></span><span>  </span><span class="hs-special">(</span><span> </span><span class="annot"><a href="M.IO.Internal.EffectSocket.html#SocketTalkingError"><span class="hs-identifier">SocketTalkingError</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span>
+</span><span id="line-11"></span><span>    </span><span class="annot"><a href="M.IO.Internal.EffectSocket.html#withtalkingserver"><span class="hs-identifier">withtalkingserver</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-12"></span><span>    </span><span class="annot"><a href="M.IO.Internal.EffectSocket.html#withtalkingclient"><span class="hs-identifier">withtalkingclient</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-13"></span><span>  </span><span class="hs-special">)</span><span>
+</span><span id="line-14"></span><span class="hs-keyword">where</span><span>
+</span><span id="line-15"></span><span>
+</span><span id="line-16"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.ByteString</span></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">B</span></span><span>
+</span><span id="line-17"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.ByteString.Builder</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">Builder</span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier">toLazyByteString</span></span><span class="hs-special">)</span><span>
+</span><span id="line-18"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Data</span></span><span>
+</span><span id="line-19"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Functor</span></span><span>
+</span><span id="line-20"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Maybe</span></span><span>
+</span><span id="line-21"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Effectful</span></span><span>
+</span><span id="line-22"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Effectful.Concurrent.STM</span></span><span>
+</span><span id="line-23"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Effectful.Dispatch.Dynamic</span></span><span>
+</span><span id="line-24"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Effectful.Exception</span></span><span>
+</span><span id="line-25"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Effectful.NonDet</span></span><span>
+</span><span id="line-26"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Effectful.State.Dynamic</span></span><span>
+</span><span id="line-27"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="M.IO.Internal.Datagram.html"><span class="hs-identifier">M.IO.Internal.Datagram</span></a></span><span>
+</span><span id="line-28"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="M.IO.Internal.EffectTypes.html"><span class="hs-identifier">M.IO.Internal.EffectTypes</span></a></span><span>
+</span><span id="line-29"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="M.IO.Internal.Socket.html"><span class="hs-identifier">M.IO.Internal.Socket</span></a></span><span>
+</span><span id="line-30"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="M.Pack.html"><span class="hs-identifier">M.Pack</span></a></span><span>
+</span><span id="line-31"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Network.Run.TCP</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">runTCPClient</span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier">runTCPServer</span></span><span class="hs-special">)</span><span>
+</span><span id="line-32"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">System.IO.Streams</span></span><span>
+</span><span id="line-33"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Prelude</span></span><span> </span><span class="hs-keyword">hiding</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">read</span></span><span class="hs-special">)</span><span>
+</span><span id="line-34"></span><span>
+</span><span id="line-35"></span><span class="hs-comment">-- https://hackage.haskell.org/package/effectful-core-2.5.1.0/docs/Effectful.html#g:13</span><span>
+</span><span id="line-36"></span><span class="hs-comment">-- SeqUnlift: fail when calling 'run' (=unlift) from outside the spawning thread</span><span>
+</span><span id="line-37"></span><span class="hs-comment">-- SeqForkUnlift: fork (-&gt; gain independence) at unlift</span><span>
+</span><span id="line-38"></span><span class="hs-comment">-- ConcUnlift: allow concurrent access</span><span>
+</span><span id="line-39"></span><span>
+</span><span id="line-40"></span><span class="annot"><span class="hs-comment">-- | error in communication</span></span><span>
+</span><span id="line-41"></span><span class="hs-keyword">data</span><span> </span><span id="SocketTalkingError"><span class="annot"><a href="M.IO.Internal.EffectSocket.html#SocketTalkingError"><span class="hs-identifier hs-var">SocketTalkingError</span></a></span></span><span>
+</span><span id="line-42"></span><span>  </span><span class="hs-glyph">=</span><span> </span><span id="UnknownCode"><span class="annot"><a href="M.IO.Internal.EffectSocket.html#UnknownCode"><span class="hs-identifier hs-var">UnknownCode</span></a></span></span><span> </span><span class="annot"><a href="M.IO.Internal.EffectTypes.html#Direction"><span class="hs-identifier hs-type">Direction</span></a></span><span> </span><span class="annot"><span class="hs-identifier hs-type">TypeRep</span></span><span>
+</span><span id="line-43"></span><span>  </span><span class="hs-glyph">|</span><span> </span><span id="Mismatch"><span class="annot"><a href="M.IO.Internal.EffectSocket.html#Mismatch"><span class="hs-identifier hs-var">Mismatch</span></a></span></span><span> </span><span class="annot"><a href="M.IO.Internal.EffectTypes.html#Direction"><span class="hs-identifier hs-type">Direction</span></a></span><span> </span><span class="annot"><span class="hs-identifier hs-type">TypeRep</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">TypeRep</span></span><span>
+</span><span id="line-44"></span><span>  </span><span class="hs-keyword">deriving</span><span> </span><span class="hs-special">(</span><span id="local-6989586621681619378"><span id="local-6989586621681619387"><span class="annot"><span class="annottext">SocketTalkingError -&gt; SocketTalkingError -&gt; Bool
+(SocketTalkingError -&gt; SocketTalkingError -&gt; Bool)
+-&gt; (SocketTalkingError -&gt; SocketTalkingError -&gt; Bool)
+-&gt; Eq SocketTalkingError
+forall a. (a -&gt; a -&gt; Bool) -&gt; (a -&gt; a -&gt; Bool) -&gt; Eq a
+$c== :: SocketTalkingError -&gt; SocketTalkingError -&gt; Bool
+== :: SocketTalkingError -&gt; SocketTalkingError -&gt; Bool
+$c/= :: SocketTalkingError -&gt; SocketTalkingError -&gt; Bool
+/= :: SocketTalkingError -&gt; SocketTalkingError -&gt; Bool
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Eq</span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621681619392"><span id="local-6989586621681619404"><span id="local-6989586621681619408"><span class="annot"><span class="annottext">Int -&gt; SocketTalkingError -&gt; ShowS
+[SocketTalkingError] -&gt; ShowS
+SocketTalkingError -&gt; String
+(Int -&gt; SocketTalkingError -&gt; ShowS)
+-&gt; (SocketTalkingError -&gt; String)
+-&gt; ([SocketTalkingError] -&gt; ShowS)
+-&gt; Show SocketTalkingError
+forall a.
+(Int -&gt; a -&gt; ShowS) -&gt; (a -&gt; String) -&gt; ([a] -&gt; ShowS) -&gt; Show a
+$cshowsPrec :: Int -&gt; SocketTalkingError -&gt; ShowS
+showsPrec :: Int -&gt; SocketTalkingError -&gt; ShowS
+$cshow :: SocketTalkingError -&gt; String
+show :: SocketTalkingError -&gt; String
+$cshowList :: [SocketTalkingError] -&gt; ShowS
+showList :: [SocketTalkingError] -&gt; ShowS
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Show</span></span></span></span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Typeable</span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621681619416"><span id="local-6989586621681619420"><span id="local-6989586621681619423"><span class="annot"><span class="annottext">Show SocketTalkingError
+Typeable SocketTalkingError
+(Typeable SocketTalkingError, Show SocketTalkingError) =&gt;
+(SocketTalkingError -&gt; SomeException)
+-&gt; (SomeException -&gt; Maybe SocketTalkingError)
+-&gt; (SocketTalkingError -&gt; String)
+-&gt; Exception SocketTalkingError
+SomeException -&gt; Maybe SocketTalkingError
+SocketTalkingError -&gt; String
+SocketTalkingError -&gt; SomeException
+forall e.
+(Typeable e, Show e) =&gt;
+(e -&gt; SomeException)
+-&gt; (SomeException -&gt; Maybe e) -&gt; (e -&gt; String) -&gt; Exception e
+$ctoException :: SocketTalkingError -&gt; SomeException
+toException :: SocketTalkingError -&gt; SomeException
+$cfromException :: SomeException -&gt; Maybe SocketTalkingError
+fromException :: SomeException -&gt; Maybe SocketTalkingError
+$cdisplayException :: SocketTalkingError -&gt; String
+displayException :: SocketTalkingError -&gt; String
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Exception</span></span></span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-45"></span><span>
+</span><span id="line-46"></span><span id="local-6989586621681619258"><span class="annot"><a href="M.IO.Internal.EffectSocket.html#reify"><span class="hs-identifier hs-type">reify</span></a></span><span> </span><span class="hs-glyph">::</span><span>
+</span><span id="line-47"></span><span>  </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">State</span></span><span> </span><span class="annot"><a href="M.IO.Internal.EffectTypes.html#ParserState"><span class="hs-identifier hs-type">ParserState</span></a></span><span> </span><span class="annot"><span class="hs-operator hs-type">:&gt;</span></span><span> </span><span class="annot"><a href="#local-6989586621681619258"><span class="hs-identifier hs-type">es</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=&gt;</span><span>
+</span><span id="line-48"></span><span>  </span><span class="annot"><span class="hs-identifier hs-type">TypeRep</span></span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-49"></span><span>  </span><span class="annot"><span class="hs-identifier hs-type">Builder</span></span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-50"></span><span>  </span><span class="annot"><span class="hs-identifier hs-type">Eff</span></span><span> </span><span class="annot"><a href="#local-6989586621681619258"><span class="hs-identifier hs-type">es</span></a></span><span> </span><span class="annot"><a href="M.IO.Internal.Datagram.html#Uninterpreted"><span class="hs-identifier hs-type">Uninterpreted</span></a></span></span><span>
+</span><span id="line-51"></span><span id="reify"><span class="annot"><span class="annottext">reify :: forall (es :: [Effect]).
+(State ParserState :&gt; es) =&gt;
+TypeRep -&gt; Builder -&gt; Eff es Uninterpreted
+</span><a href="M.IO.Internal.EffectSocket.html#reify"><span class="hs-identifier hs-var hs-var">reify</span></a></span></span><span> </span><span id="local-6989586621681619438"><span class="annot"><span class="annottext">TypeRep
+</span><a href="#local-6989586621681619438"><span class="hs-identifier hs-var">t</span></a></span></span><span> </span><span id="local-6989586621681619439"><span class="annot"><span class="annottext">Builder
+</span><a href="#local-6989586621681619439"><span class="hs-identifier hs-var">b</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-52"></span><span>  </span><span class="annot"><a href="M.IO.Internal.EffectTypes.html#ParserState"><span class="hs-identifier hs-type">ParserState</span></a></span><span> </span><span id="local-6989586621681619441"><span class="annot"><span class="annottext">forall r. Op r -&gt; r
+</span><a href="#local-6989586621681619441"><span class="hs-identifier hs-var">p</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">Eff es ParserState
+forall s (es :: [Effect]).
+(HasCallStack, State s :&gt; es) =&gt;
+Eff es s
+</span><span class="hs-identifier hs-var">get</span></span><span>
+</span><span id="line-53"></span><span>  </span><span class="hs-keyword">case</span><span> </span><span class="annot"><span class="annottext">Op (Maybe Word8) -&gt; Maybe Word8
+forall r. Op r -&gt; r
+</span><a href="#local-6989586621681619441"><span class="hs-identifier hs-var">p</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Direction -&gt; TypeRep -&gt; Op (Maybe Word8)
+</span><a href="M.IO.Internal.EffectTypes.html#Code"><span class="hs-identifier hs-var">Code</span></a></span><span> </span><span class="annot"><span class="annottext">Direction
+</span><a href="M.IO.Internal.EffectTypes.html#Outbound"><span class="hs-identifier hs-var">Outbound</span></a></span><span> </span><span class="annot"><span class="annottext">TypeRep
+</span><a href="#local-6989586621681619438"><span class="hs-identifier hs-var">t</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-keyword">of</span><span>
+</span><span id="line-54"></span><span>    </span><span class="annot"><span class="hs-identifier hs-type">Just</span></span><span> </span><span id="local-6989586621681619445"><span class="annot"><span class="annottext">Word8
+</span><a href="#local-6989586621681619445"><span class="hs-identifier hs-var">u</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Uninterpreted -&gt; Eff es Uninterpreted
+forall a. a -&gt; Eff es a
+forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><span class="hs-identifier hs-var">pure</span></span><span> </span><span class="annot"><span class="annottext">(Uninterpreted -&gt; Eff es Uninterpreted)
+-&gt; Uninterpreted -&gt; Eff es Uninterpreted
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">Word8 -&gt; ByteString -&gt; Uninterpreted
+</span><a href="M.IO.Internal.Datagram.html#Uninterpreted"><span class="hs-identifier hs-var">Uninterpreted</span></a></span><span> </span><span class="annot"><span class="annottext">Word8
+</span><a href="#local-6989586621681619445"><span class="hs-identifier hs-var">u</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">LazyByteString -&gt; ByteString
+</span><span class="hs-identifier hs-var">B.toStrict</span></span><span> </span><span class="annot"><span class="annottext">(LazyByteString -&gt; ByteString) -&gt; LazyByteString -&gt; ByteString
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">Builder -&gt; LazyByteString
+</span><span class="hs-identifier hs-var">toLazyByteString</span></span><span> </span><span class="annot"><span class="annottext">Builder
+</span><a href="#local-6989586621681619439"><span class="hs-identifier hs-var">b</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-55"></span><span>    </span><span class="annot"><span class="annottext">Maybe Word8
+</span><span class="hs-identifier hs-var">Nothing</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">SocketTalkingError -&gt; Eff es Uninterpreted
+forall e (es :: [Effect]) a.
+(HasCallStack, Exception e) =&gt;
+e -&gt; Eff es a
+</span><span class="hs-identifier hs-var">throwIO</span></span><span> </span><span class="annot"><span class="annottext">(SocketTalkingError -&gt; Eff es Uninterpreted)
+-&gt; SocketTalkingError -&gt; Eff es Uninterpreted
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">Direction -&gt; TypeRep -&gt; SocketTalkingError
+</span><a href="M.IO.Internal.EffectSocket.html#UnknownCode"><span class="hs-identifier hs-var">UnknownCode</span></a></span><span> </span><span class="annot"><span class="annottext">Direction
+</span><a href="M.IO.Internal.EffectTypes.html#Outbound"><span class="hs-identifier hs-var">Outbound</span></a></span><span> </span><span class="annot"><span class="annottext">TypeRep
+</span><a href="#local-6989586621681619438"><span class="hs-identifier hs-var">t</span></a></span><span>
+</span><span id="line-56"></span><span>
+</span><span id="line-57"></span><span class="hs-comment">-- Run a computation with Talking effect using a Connection</span><span>
+</span><span id="line-58"></span><span id="local-6989586621681619283"><span id="local-6989586621681619288"><span class="annot"><a href="M.IO.Internal.EffectSocket.html#runtalking0"><span class="hs-identifier hs-type">runtalking0</span></a></span><span> </span><span class="hs-glyph">::</span><span>
+</span><span id="line-59"></span><span>  </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">IOE</span></span><span> </span><span class="annot"><span class="hs-operator hs-type">:&gt;</span></span><span> </span><span class="annot"><a href="#local-6989586621681619283"><span class="hs-identifier hs-type">es</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier hs-type">NonDet</span></span><span> </span><span class="annot"><span class="hs-operator hs-type">:&gt;</span></span><span> </span><span class="annot"><a href="#local-6989586621681619283"><span class="hs-identifier hs-type">es</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier hs-type">State</span></span><span> </span><span class="annot"><a href="M.IO.Internal.EffectTypes.html#ParserState"><span class="hs-identifier hs-type">ParserState</span></a></span><span> </span><span class="annot"><span class="hs-operator hs-type">:&gt;</span></span><span> </span><span class="annot"><a href="#local-6989586621681619283"><span class="hs-identifier hs-type">es</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Concurrent</span></span><span> </span><span class="annot"><span class="hs-operator hs-type">:&gt;</span></span><span> </span><span class="annot"><a href="#local-6989586621681619283"><span class="hs-identifier hs-type">es</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=&gt;</span><span>
+</span><span id="line-60"></span><span>  </span><span class="annot"><a href="M.IO.Internal.Socket.html#Connection"><span class="hs-identifier hs-type">Connection</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Eff</span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="M.IO.Internal.EffectTypes.html#Talking"><span class="hs-identifier hs-type">Talking</span></a></span><span> </span><span class="annot"><span class="hs-glyph hs-type">:</span></span><span> </span><span class="annot"><a href="#local-6989586621681619283"><span class="hs-identifier hs-type">es</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><a href="#local-6989586621681619288"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Eff</span></span><span> </span><span class="annot"><a href="#local-6989586621681619283"><span class="hs-identifier hs-type">es</span></a></span><span> </span><span class="annot"><a href="#local-6989586621681619288"><span class="hs-identifier hs-type">a</span></a></span></span></span><span>
+</span><span id="line-61"></span><span id="runtalking0"><span class="annot"><span class="annottext">runtalking0 :: forall (es :: [Effect]) a.
+(IOE :&gt; es, NonDet :&gt; es, State ParserState :&gt; es,
+ Concurrent :&gt; es) =&gt;
+Connection -&gt; Eff (Talking : es) a -&gt; Eff es a
+</span><a href="M.IO.Internal.EffectSocket.html#runtalking0"><span class="hs-identifier hs-var hs-var">runtalking0</span></a></span></span><span> </span><span id="local-6989586621681619458"><span class="annot"><span class="annottext">Connection
+</span><a href="#local-6989586621681619458"><span class="hs-identifier hs-var">cx</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">EffectHandler_ Talking es -&gt; Eff (Talking : es) a -&gt; Eff es a
+forall (e :: Effect) (es :: [Effect]) a.
+(HasCallStack, DispatchOf e ~ 'Dynamic) =&gt;
+EffectHandler_ e es -&gt; Eff (e : es) a -&gt; Eff es a
+</span><span class="hs-identifier hs-var">interpret_</span></span><span> </span><span class="hs-glyph">\</span><span class="hs-glyph">case</span><span>
+</span><span id="line-62"></span><span>  </span><span class="annot"><a href="M.IO.Internal.EffectTypes.html#Hear"><span class="hs-identifier hs-type">Hear</span></a></span><span> </span><span id="local-6989586621681619480"><span class="annot"><span class="annottext">Immediately
+</span><a href="#local-6989586621681619480"><span class="hs-identifier hs-var">i</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-keyword">case</span><span> </span><span class="annot"><span class="annottext">Immediately
+</span><a href="#local-6989586621681619480"><span class="hs-identifier hs-var">i</span></a></span><span> </span><span class="hs-keyword">of</span><span>
+</span><span id="line-63"></span><span>    </span><span class="annot"><span class="annottext">Immediately
+</span><a href="M.IO.Internal.EffectTypes.html#Immediately"><span class="hs-identifier hs-var">Immediately</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-64"></span><span>      </span><span class="annot"><span class="annottext">InputStream Uninterpreted -&gt; Eff es SomeUnpack
+forall (es :: [Effect]).
+(IOE :&gt; es, State ParserState :&gt; es, NonDet :&gt; es) =&gt;
+InputStream Uninterpreted -&gt; Eff es SomeUnpack
+</span><a href="M.IO.Internal.EffectSocket.html#handleheara_immediate"><span class="hs-identifier hs-var">handleheara_immediate</span></a></span><span> </span><span class="annot"><span class="annottext">Connection
+</span><a href="#local-6989586621681619458"><span class="hs-identifier hs-var">cx</span></a></span><span class="hs-operator">.</span><span class="hs-identifier">cxinput</span><span>
+</span><span id="line-65"></span><span>        </span><span class="annot"><span class="annottext">Eff es SomeUnpack -&gt; (SomeUnpack -&gt; a) -&gt; Eff es a
+forall (f :: * -&gt; *) a b. Functor f =&gt; f a -&gt; (a -&gt; b) -&gt; f b
+</span><span class="hs-operator hs-var">&lt;&amp;&gt;</span></span><span> </span><span class="annot"><span class="annottext">Maybe a -&gt; a
+forall a. HasCallStack =&gt; Maybe a -&gt; a
+</span><span class="hs-identifier hs-var">fromJust</span></span><span> </span><span class="annot"><span class="annottext">(Maybe a -&gt; a) -&gt; (SomeUnpack -&gt; Maybe a) -&gt; SomeUnpack -&gt; a
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">SomeUnpack -&gt; Maybe a
+forall a. Typeable a =&gt; SomeUnpack -&gt; Maybe a
+</span><a href="M.Pack.Internal.Types.html#castsomeunpack"><span class="hs-identifier hs-var">castsomeunpack</span></a></span><span>
+</span><span id="line-66"></span><span>    </span><span class="annot"><span class="annottext">Immediately
+</span><a href="M.IO.Internal.EffectTypes.html#Eventually"><span class="hs-identifier hs-var">Eventually</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">InputStream Uninterpreted -&gt; Eff es SomeUnpack
+forall (es :: [Effect]).
+(IOE :&gt; es, State ParserState :&gt; es) =&gt;
+InputStream Uninterpreted -&gt; Eff es SomeUnpack
+</span><a href="M.IO.Internal.EffectSocket.html#handleheara"><span class="hs-identifier hs-var">handleheara</span></a></span><span> </span><span class="annot"><span class="annottext">Connection
+</span><a href="#local-6989586621681619458"><span class="hs-identifier hs-var">cx</span></a></span><span class="hs-operator">.</span><span class="hs-identifier">cxinput</span><span> </span><span class="annot"><span class="annottext">Eff es SomeUnpack -&gt; (SomeUnpack -&gt; a) -&gt; Eff es a
+forall (f :: * -&gt; *) a b. Functor f =&gt; f a -&gt; (a -&gt; b) -&gt; f b
+</span><span class="hs-operator hs-var">&lt;&amp;&gt;</span></span><span> </span><span class="annot"><span class="annottext">Maybe a -&gt; a
+forall a. HasCallStack =&gt; Maybe a -&gt; a
+</span><span class="hs-identifier hs-var">fromJust</span></span><span> </span><span class="annot"><span class="annottext">(Maybe a -&gt; a) -&gt; (SomeUnpack -&gt; Maybe a) -&gt; SomeUnpack -&gt; a
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">SomeUnpack -&gt; Maybe a
+forall a. Typeable a =&gt; SomeUnpack -&gt; Maybe a
+</span><a href="M.Pack.Internal.Types.html#castsomeunpack"><span class="hs-identifier hs-var">castsomeunpack</span></a></span><span>
+</span><span id="line-67"></span><span>  </span><span class="annot"><a href="M.IO.Internal.EffectTypes.html#HearU"><span class="hs-identifier hs-type">HearU</span></a></span><span> </span><span id="local-6989586621681619496"><span class="annot"><span class="annottext">Immediately
+</span><a href="#local-6989586621681619496"><span class="hs-identifier hs-var">i</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-keyword">case</span><span> </span><span class="annot"><span class="annottext">Immediately
+</span><a href="#local-6989586621681619496"><span class="hs-identifier hs-var">i</span></a></span><span> </span><span class="hs-keyword">of</span><span>
+</span><span id="line-68"></span><span>    </span><span class="annot"><span class="annottext">Immediately
+</span><a href="M.IO.Internal.EffectTypes.html#Immediately"><span class="hs-identifier hs-var">Immediately</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">InputStream Uninterpreted -&gt; Eff es Uninterpreted
+forall (es :: [Effect]).
+(IOE :&gt; es, NonDet :&gt; es) =&gt;
+InputStream Uninterpreted -&gt; Eff es Uninterpreted
+</span><a href="M.IO.Internal.EffectSocket.html#handlehearu_immediate"><span class="hs-identifier hs-var">handlehearu_immediate</span></a></span><span> </span><span class="annot"><span class="annottext">Connection
+</span><a href="#local-6989586621681619458"><span class="hs-identifier hs-var">cx</span></a></span><span class="hs-operator">.</span><span class="hs-identifier">cxinput</span><span>
+</span><span id="line-69"></span><span>    </span><span class="annot"><span class="annottext">Immediately
+</span><a href="M.IO.Internal.EffectTypes.html#Eventually"><span class="hs-identifier hs-var">Eventually</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">InputStream Uninterpreted -&gt; Eff es Uninterpreted
+forall (es :: [Effect]).
+(IOE :&gt; es) =&gt;
+InputStream Uninterpreted -&gt; Eff es Uninterpreted
+</span><a href="M.IO.Internal.EffectSocket.html#handlehearu"><span class="hs-identifier hs-var">handlehearu</span></a></span><span> </span><span class="annot"><span class="annottext">Connection
+</span><a href="#local-6989586621681619458"><span class="hs-identifier hs-var">cx</span></a></span><span class="hs-operator">.</span><span class="hs-identifier">cxinput</span><span>
+</span><span id="line-70"></span><span>  </span><span class="annot"><a href="M.IO.Internal.EffectTypes.html#HearA"><span class="hs-identifier hs-type">HearA</span></a></span><span> </span><span id="local-6989586621681619508"><span class="annot"><span class="annottext">Immediately
+</span><a href="#local-6989586621681619508"><span class="hs-identifier hs-var">i</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-keyword">case</span><span> </span><span class="annot"><span class="annottext">Immediately
+</span><a href="#local-6989586621681619508"><span class="hs-identifier hs-var">i</span></a></span><span> </span><span class="hs-keyword">of</span><span>
+</span><span id="line-71"></span><span>    </span><span class="annot"><span class="annottext">Immediately
+</span><a href="M.IO.Internal.EffectTypes.html#Immediately"><span class="hs-identifier hs-var">Immediately</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">InputStream Uninterpreted -&gt; Eff es SomeUnpack
+forall (es :: [Effect]).
+(IOE :&gt; es, State ParserState :&gt; es, NonDet :&gt; es) =&gt;
+InputStream Uninterpreted -&gt; Eff es SomeUnpack
+</span><a href="M.IO.Internal.EffectSocket.html#handleheara_immediate"><span class="hs-identifier hs-var">handleheara_immediate</span></a></span><span> </span><span class="annot"><span class="annottext">Connection
+</span><a href="#local-6989586621681619458"><span class="hs-identifier hs-var">cx</span></a></span><span class="hs-operator">.</span><span class="hs-identifier">cxinput</span><span>
+</span><span id="line-72"></span><span>    </span><span class="annot"><span class="annottext">Immediately
+</span><a href="M.IO.Internal.EffectTypes.html#Eventually"><span class="hs-identifier hs-var">Eventually</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">InputStream Uninterpreted -&gt; Eff es SomeUnpack
+forall (es :: [Effect]).
+(IOE :&gt; es, State ParserState :&gt; es) =&gt;
+InputStream Uninterpreted -&gt; Eff es SomeUnpack
+</span><a href="M.IO.Internal.EffectSocket.html#handleheara"><span class="hs-identifier hs-var">handleheara</span></a></span><span> </span><span class="annot"><span class="annottext">Connection
+</span><a href="#local-6989586621681619458"><span class="hs-identifier hs-var">cx</span></a></span><span class="hs-operator">.</span><span class="hs-identifier">cxinput</span><span>
+</span><span id="line-73"></span><span>  </span><span class="hs-comment">-- todo: it's possible to create a stream that accepts Builder instead</span><span>
+</span><span id="line-74"></span><span>  </span><span class="hs-comment">-- of ByteString for the sake of efficiency (from io-streams itself)</span><span>
+</span><span id="line-75"></span><span>  </span><span class="hs-comment">-- but I haven't given it much thought yet</span><span>
+</span><span id="line-76"></span><span>  </span><span class="annot"><a href="M.IO.Internal.EffectTypes.html#Say"><span class="hs-identifier hs-type">Say</span></a></span><span> </span><span id="local-6989586621681619520"><span class="annot"><span class="annottext">a1
+</span><a href="#local-6989586621681619520"><span class="hs-identifier hs-var">p</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">TypeRep -&gt; Builder -&gt; Eff es Uninterpreted
+forall (es :: [Effect]).
+(State ParserState :&gt; es) =&gt;
+TypeRep -&gt; Builder -&gt; Eff es Uninterpreted
+</span><a href="M.IO.Internal.EffectSocket.html#reify"><span class="hs-identifier hs-var">reify</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">a1 -&gt; TypeRep
+forall a. Typeable a =&gt; a -&gt; TypeRep
+</span><span class="hs-identifier hs-var">typeOf</span></span><span> </span><span class="annot"><span class="annottext">a1
+</span><a href="#local-6989586621681619520"><span class="hs-identifier hs-var">p</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">a1 -&gt; Builder
+forall a. Pack a =&gt; a -&gt; Builder
+</span><a href="M.Pack.Internal.Types.html#pack"><span class="hs-identifier hs-var">pack</span></a></span><span> </span><span class="annot"><span class="annottext">a1
+</span><a href="#local-6989586621681619520"><span class="hs-identifier hs-var">p</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Eff es Uninterpreted -&gt; (Uninterpreted -&gt; Eff es a) -&gt; Eff es a
+forall a b. Eff es a -&gt; (a -&gt; Eff es b) -&gt; Eff es b
+forall (m :: * -&gt; *) a b. Monad m =&gt; m a -&gt; (a -&gt; m b) -&gt; m b
+</span><span class="hs-operator hs-var">&gt;&gt;=</span></span><span> </span><span class="annot"><span class="annottext">IO a -&gt; Eff es a
+forall a. IO a -&gt; Eff es a
+forall (m :: * -&gt; *) a. MonadIO m =&gt; IO a -&gt; m a
+</span><span class="hs-identifier hs-var">liftIO</span></span><span> </span><span class="annot"><span class="annottext">(IO a -&gt; Eff es a)
+-&gt; (Uninterpreted -&gt; IO a) -&gt; Uninterpreted -&gt; Eff es a
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">OutputStream Uninterpreted -&gt; Maybe Uninterpreted -&gt; IO ()
+forall a. OutputStream a -&gt; Maybe a -&gt; IO ()
+</span><span class="hs-identifier hs-var">writeTo</span></span><span> </span><span class="annot"><span class="annottext">Connection
+</span><a href="#local-6989586621681619458"><span class="hs-identifier hs-var">cx</span></a></span><span class="hs-operator">.</span><span class="hs-identifier">cxoutput</span><span> </span><span class="annot"><span class="annottext">(Maybe Uninterpreted -&gt; IO a)
+-&gt; (Uninterpreted -&gt; Maybe Uninterpreted) -&gt; Uninterpreted -&gt; IO a
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">Uninterpreted -&gt; Maybe Uninterpreted
+forall a. a -&gt; Maybe a
+</span><span class="hs-identifier hs-var">Just</span></span><span>
+</span><span id="line-77"></span><span>  </span><span class="annot"><a href="M.IO.Internal.EffectTypes.html#Setcompression"><span class="hs-identifier hs-type">Setcompression</span></a></span><span> </span><span id="local-6989586621681619529"><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621681619529"><span class="hs-identifier hs-var">th</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">STM () -&gt; Eff es ()
+forall (es :: [Effect]) a. (Concurrent :&gt; es) =&gt; STM a -&gt; Eff es a
+</span><span class="hs-identifier hs-var">atomically</span></span><span> </span><span class="annot"><span class="annottext">(STM () -&gt; Eff es ()) -&gt; STM () -&gt; Eff es ()
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">TVar Int -&gt; Int -&gt; STM ()
+forall a. TVar a -&gt; a -&gt; STM ()
+</span><span class="hs-identifier hs-var">writeTVar</span></span><span> </span><span class="annot"><span class="annottext">Connection
+</span><a href="#local-6989586621681619458"><span class="hs-identifier hs-var">cx</span></a></span><span class="hs-operator">.</span><span class="hs-identifier">cxcompth</span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621681619529"><span class="hs-identifier hs-var">th</span></a></span><span>
+</span><span id="line-78"></span><span>  </span><span class="annot"><a href="M.IO.Internal.EffectTypes.html#Setencryption"><span class="hs-identifier hs-type">Setencryption</span></a></span><span> </span><span id="local-6989586621681619536"><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621681619536"><span class="hs-identifier hs-var">key</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">STM () -&gt; Eff es ()
+forall (es :: [Effect]) a. (Concurrent :&gt; es) =&gt; STM a -&gt; Eff es a
+</span><span class="hs-identifier hs-var">atomically</span></span><span> </span><span class="annot"><span class="annottext">(STM () -&gt; Eff es ()) -&gt; STM () -&gt; Eff es ()
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">TVar (Maybe ByteString) -&gt; Maybe ByteString -&gt; STM ()
+forall a. TVar a -&gt; a -&gt; STM ()
+</span><span class="hs-identifier hs-var">writeTVar</span></span><span> </span><span class="annot"><span class="annottext">Connection
+</span><a href="#local-6989586621681619458"><span class="hs-identifier hs-var">cx</span></a></span><span class="hs-operator">.</span><span class="hs-identifier">cxkey</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">ByteString -&gt; Maybe ByteString
+forall a. a -&gt; Maybe a
+</span><span class="hs-identifier hs-var">Just</span></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621681619536"><span class="hs-identifier hs-var">key</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-79"></span><span>
+</span><span id="line-80"></span><span id="local-6989586621681619319"><span class="annot"><a href="M.IO.Internal.EffectSocket.html#handlehearu"><span class="hs-identifier hs-type">handlehearu</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">IOE</span></span><span> </span><span class="annot"><span class="hs-operator hs-type">:&gt;</span></span><span> </span><span class="annot"><a href="#local-6989586621681619319"><span class="hs-identifier hs-type">es</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">InputStream</span></span><span> </span><span class="annot"><a href="M.IO.Internal.Datagram.html#Uninterpreted"><span class="hs-identifier hs-type">Uninterpreted</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Eff</span></span><span> </span><span class="annot"><a href="#local-6989586621681619319"><span class="hs-identifier hs-type">es</span></a></span><span> </span><span class="annot"><a href="M.IO.Internal.Datagram.html#Uninterpreted"><span class="hs-identifier hs-type">Uninterpreted</span></a></span></span><span>
+</span><span id="line-81"></span><span id="handlehearu"><span class="annot"><span class="annottext">handlehearu :: forall (es :: [Effect]).
+(IOE :&gt; es) =&gt;
+InputStream Uninterpreted -&gt; Eff es Uninterpreted
+</span><a href="M.IO.Internal.EffectSocket.html#handlehearu"><span class="hs-identifier hs-var hs-var">handlehearu</span></a></span></span><span> </span><span id="local-6989586621681619545"><span class="annot"><span class="annottext">InputStream Uninterpreted
+</span><a href="#local-6989586621681619545"><span class="hs-identifier hs-var">i</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">IO (Maybe Uninterpreted) -&gt; Eff es (Maybe Uninterpreted)
+forall a. IO a -&gt; Eff es a
+forall (m :: * -&gt; *) a. MonadIO m =&gt; IO a -&gt; m a
+</span><span class="hs-identifier hs-var">liftIO</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">InputStream Uninterpreted -&gt; IO (Maybe Uninterpreted)
+forall a. InputStream a -&gt; IO (Maybe a)
+</span><span class="hs-identifier hs-var">read</span></span><span> </span><span class="annot"><span class="annottext">InputStream Uninterpreted
+</span><a href="#local-6989586621681619545"><span class="hs-identifier hs-var">i</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Eff es (Maybe Uninterpreted)
+-&gt; (Maybe Uninterpreted -&gt; Eff es Uninterpreted)
+-&gt; Eff es Uninterpreted
+forall a b. Eff es a -&gt; (a -&gt; Eff es b) -&gt; Eff es b
+forall (m :: * -&gt; *) a b. Monad m =&gt; m a -&gt; (a -&gt; m b) -&gt; m b
+</span><span class="hs-operator hs-var">&gt;&gt;=</span></span><span> </span><span class="annot"><span class="annottext">Eff es Uninterpreted
+-&gt; (Uninterpreted -&gt; Eff es Uninterpreted)
+-&gt; Maybe Uninterpreted
+-&gt; Eff es Uninterpreted
+forall b a. b -&gt; (a -&gt; b) -&gt; Maybe a -&gt; b
+</span><span class="hs-identifier hs-var">maybe</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">EOF -&gt; Eff es Uninterpreted
+forall e (es :: [Effect]) a.
+(HasCallStack, Exception e) =&gt;
+e -&gt; Eff es a
+</span><span class="hs-identifier hs-var">throwIO</span></span><span> </span><span class="annot"><span class="annottext">EOF
+</span><a href="M.IO.Internal.Datagram.html#EOF"><span class="hs-identifier hs-var">EOF</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Uninterpreted -&gt; Eff es Uninterpreted
+forall a. a -&gt; Eff es a
+forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><span class="hs-identifier hs-var">pure</span></span><span>
+</span><span id="line-82"></span><span>
+</span><span id="line-83"></span><span id="local-6989586621681619318"><span class="annot"><a href="M.IO.Internal.EffectSocket.html#handlehearu_immediate"><span class="hs-identifier hs-type">handlehearu_immediate</span></a></span><span> </span><span class="hs-glyph">::</span><span>
+</span><span id="line-84"></span><span>  </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">IOE</span></span><span> </span><span class="annot"><span class="hs-operator hs-type">:&gt;</span></span><span> </span><span class="annot"><a href="#local-6989586621681619318"><span class="hs-identifier hs-type">es</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier hs-type">NonDet</span></span><span> </span><span class="annot"><span class="hs-operator hs-type">:&gt;</span></span><span> </span><span class="annot"><a href="#local-6989586621681619318"><span class="hs-identifier hs-type">es</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=&gt;</span><span>
+</span><span id="line-85"></span><span>  </span><span class="annot"><span class="hs-identifier hs-type">InputStream</span></span><span> </span><span class="annot"><a href="M.IO.Internal.Datagram.html#Uninterpreted"><span class="hs-identifier hs-type">Uninterpreted</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Eff</span></span><span> </span><span class="annot"><a href="#local-6989586621681619318"><span class="hs-identifier hs-type">es</span></a></span><span> </span><span class="annot"><a href="M.IO.Internal.Datagram.html#Uninterpreted"><span class="hs-identifier hs-type">Uninterpreted</span></a></span></span><span>
+</span><span id="line-86"></span><span id="handlehearu_immediate"><span class="annot"><span class="annottext">handlehearu_immediate :: forall (es :: [Effect]).
+(IOE :&gt; es, NonDet :&gt; es) =&gt;
+InputStream Uninterpreted -&gt; Eff es Uninterpreted
+</span><a href="M.IO.Internal.EffectSocket.html#handlehearu_immediate"><span class="hs-identifier hs-var hs-var">handlehearu_immediate</span></a></span></span><span> </span><span id="local-6989586621681619557"><span class="annot"><span class="annottext">InputStream Uninterpreted
+</span><a href="#local-6989586621681619557"><span class="hs-identifier hs-var">i</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-87"></span><span>  </span><span id="local-6989586621681619558"><span class="annot"><span class="annottext">Maybe Uninterpreted
+</span><a href="#local-6989586621681619558"><span class="hs-identifier hs-var">mv</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">IO (Maybe Uninterpreted) -&gt; Eff es (Maybe Uninterpreted)
+forall a. IO a -&gt; Eff es a
+forall (m :: * -&gt; *) a. MonadIO m =&gt; IO a -&gt; m a
+</span><span class="hs-identifier hs-var">liftIO</span></span><span> </span><span class="annot"><span class="annottext">(IO (Maybe Uninterpreted) -&gt; Eff es (Maybe Uninterpreted))
+-&gt; IO (Maybe Uninterpreted) -&gt; Eff es (Maybe Uninterpreted)
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">InputStream Uninterpreted -&gt; IO (Maybe Uninterpreted)
+forall a. InputStream a -&gt; IO (Maybe a)
+</span><span class="hs-identifier hs-var">peek</span></span><span> </span><span class="annot"><span class="annottext">InputStream Uninterpreted
+</span><a href="#local-6989586621681619557"><span class="hs-identifier hs-var">i</span></a></span><span>
+</span><span id="line-88"></span><span>  </span><span class="hs-keyword">case</span><span> </span><span class="annot"><span class="annottext">Maybe Uninterpreted
+</span><a href="#local-6989586621681619558"><span class="hs-identifier hs-var">mv</span></a></span><span> </span><span class="hs-keyword">of</span><span>
+</span><span id="line-89"></span><span>    </span><span class="annot"><span class="annottext">Maybe Uninterpreted
+</span><span class="hs-identifier hs-var">Nothing</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Eff es Uninterpreted
+forall a. Eff es a
+forall (f :: * -&gt; *) a. Alternative f =&gt; f a
+</span><span class="hs-identifier hs-var">empty</span></span><span>
+</span><span id="line-90"></span><span>    </span><span class="annot"><span class="hs-identifier hs-type">Just</span></span><span> </span><span id="local-6989586621681619561"><span class="annot"><span class="annottext">Uninterpreted
+</span><a href="#local-6989586621681619561"><span class="hs-identifier hs-var">v</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">IO (Maybe Uninterpreted) -&gt; Eff es (Maybe Uninterpreted)
+forall a. IO a -&gt; Eff es a
+forall (m :: * -&gt; *) a. MonadIO m =&gt; IO a -&gt; m a
+</span><span class="hs-identifier hs-var">liftIO</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">InputStream Uninterpreted -&gt; IO (Maybe Uninterpreted)
+forall a. InputStream a -&gt; IO (Maybe a)
+</span><span class="hs-identifier hs-var">read</span></span><span> </span><span class="annot"><span class="annottext">InputStream Uninterpreted
+</span><a href="#local-6989586621681619557"><span class="hs-identifier hs-var">i</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Eff es (Maybe Uninterpreted)
+-&gt; Uninterpreted -&gt; Eff es Uninterpreted
+forall (f :: * -&gt; *) a b. Functor f =&gt; f a -&gt; b -&gt; f b
+</span><span class="hs-operator hs-var">$&gt;</span></span><span> </span><span class="annot"><span class="annottext">Uninterpreted
+</span><a href="#local-6989586621681619561"><span class="hs-identifier hs-var">v</span></a></span><span>
+</span><span id="line-91"></span><span>
+</span><span id="line-92"></span><span id="local-6989586621681619317"><span class="annot"><a href="M.IO.Internal.EffectSocket.html#handleheara"><span class="hs-identifier hs-type">handleheara</span></a></span><span> </span><span class="hs-glyph">::</span><span>
+</span><span id="line-93"></span><span>  </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">IOE</span></span><span> </span><span class="annot"><span class="hs-operator hs-type">:&gt;</span></span><span> </span><span class="annot"><a href="#local-6989586621681619317"><span class="hs-identifier hs-type">es</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier hs-type">State</span></span><span> </span><span class="annot"><a href="M.IO.Internal.EffectTypes.html#ParserState"><span class="hs-identifier hs-type">ParserState</span></a></span><span> </span><span class="annot"><span class="hs-operator hs-type">:&gt;</span></span><span> </span><span class="annot"><a href="#local-6989586621681619317"><span class="hs-identifier hs-type">es</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=&gt;</span><span>
+</span><span id="line-94"></span><span>  </span><span class="annot"><span class="hs-identifier hs-type">InputStream</span></span><span> </span><span class="annot"><a href="M.IO.Internal.Datagram.html#Uninterpreted"><span class="hs-identifier hs-type">Uninterpreted</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Eff</span></span><span> </span><span class="annot"><a href="#local-6989586621681619317"><span class="hs-identifier hs-type">es</span></a></span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#SomeUnpack"><span class="hs-identifier hs-type">SomeUnpack</span></a></span></span><span>
+</span><span id="line-95"></span><span id="handleheara"><span class="annot"><span class="annottext">handleheara :: forall (es :: [Effect]).
+(IOE :&gt; es, State ParserState :&gt; es) =&gt;
+InputStream Uninterpreted -&gt; Eff es SomeUnpack
+</span><a href="M.IO.Internal.EffectSocket.html#handleheara"><span class="hs-identifier hs-var hs-var">handleheara</span></a></span></span><span> </span><span id="local-6989586621681619572"><span class="annot"><span class="annottext">InputStream Uninterpreted
+</span><a href="#local-6989586621681619572"><span class="hs-identifier hs-var">i</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-96"></span><span>  </span><span id="local-6989586621681619573"><span class="annot"><span class="annottext">Uninterpreted
+</span><a href="#local-6989586621681619573"><span class="hs-identifier hs-var">u</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">InputStream Uninterpreted -&gt; Eff es Uninterpreted
+forall (es :: [Effect]).
+(IOE :&gt; es) =&gt;
+InputStream Uninterpreted -&gt; Eff es Uninterpreted
+</span><a href="M.IO.Internal.EffectSocket.html#handlehearu"><span class="hs-identifier hs-var">handlehearu</span></a></span><span> </span><span class="annot"><span class="annottext">InputStream Uninterpreted
+</span><a href="#local-6989586621681619572"><span class="hs-identifier hs-var">i</span></a></span><span>
+</span><span id="line-97"></span><span>  </span><span class="annot"><a href="M.IO.Internal.EffectTypes.html#ParserState"><span class="hs-identifier hs-type">ParserState</span></a></span><span> </span><span id="local-6989586621681619574"><span class="annot"><span class="annottext">forall r. Op r -&gt; r
+</span><a href="#local-6989586621681619574"><span class="hs-identifier hs-var">p</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">Eff es ParserState
+forall s (es :: [Effect]).
+(HasCallStack, State s :&gt; es) =&gt;
+Eff es s
+</span><span class="hs-identifier hs-var">get</span></span><span>
+</span><span id="line-98"></span><span>  </span><span class="annot"><span class="annottext">SomeUnpack -&gt; Eff es SomeUnpack
+forall a. a -&gt; Eff es a
+forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><span class="hs-identifier hs-var">pure</span></span><span> </span><span class="annot"><span class="annottext">(SomeUnpack -&gt; Eff es SomeUnpack)
+-&gt; SomeUnpack -&gt; Eff es SomeUnpack
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">Op SomeUnpack -&gt; SomeUnpack
+forall r. Op r -&gt; r
+</span><a href="#local-6989586621681619574"><span class="hs-identifier hs-var">p</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Uninterpreted -&gt; Op SomeUnpack
+</span><a href="M.IO.Internal.EffectTypes.html#Parse"><span class="hs-identifier hs-var">Parse</span></a></span><span> </span><span class="annot"><span class="annottext">Uninterpreted
+</span><a href="#local-6989586621681619573"><span class="hs-identifier hs-var">u</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-99"></span><span>
+</span><span id="line-100"></span><span id="local-6989586621681619308"><span class="annot"><a href="M.IO.Internal.EffectSocket.html#handleheara_immediate"><span class="hs-identifier hs-type">handleheara_immediate</span></a></span><span> </span><span class="hs-glyph">::</span><span>
+</span><span id="line-101"></span><span>  </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">IOE</span></span><span> </span><span class="annot"><span class="hs-operator hs-type">:&gt;</span></span><span> </span><span class="annot"><a href="#local-6989586621681619308"><span class="hs-identifier hs-type">es</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier hs-type">State</span></span><span> </span><span class="annot"><a href="M.IO.Internal.EffectTypes.html#ParserState"><span class="hs-identifier hs-type">ParserState</span></a></span><span> </span><span class="annot"><span class="hs-operator hs-type">:&gt;</span></span><span> </span><span class="annot"><a href="#local-6989586621681619308"><span class="hs-identifier hs-type">es</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier hs-type">NonDet</span></span><span> </span><span class="annot"><span class="hs-operator hs-type">:&gt;</span></span><span> </span><span class="annot"><a href="#local-6989586621681619308"><span class="hs-identifier hs-type">es</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=&gt;</span><span>
+</span><span id="line-102"></span><span>  </span><span class="annot"><span class="hs-identifier hs-type">InputStream</span></span><span> </span><span class="annot"><a href="M.IO.Internal.Datagram.html#Uninterpreted"><span class="hs-identifier hs-type">Uninterpreted</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Eff</span></span><span> </span><span class="annot"><a href="#local-6989586621681619308"><span class="hs-identifier hs-type">es</span></a></span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#SomeUnpack"><span class="hs-identifier hs-type">SomeUnpack</span></a></span></span><span>
+</span><span id="line-103"></span><span id="handleheara_immediate"><span class="annot"><span class="annottext">handleheara_immediate :: forall (es :: [Effect]).
+(IOE :&gt; es, State ParserState :&gt; es, NonDet :&gt; es) =&gt;
+InputStream Uninterpreted -&gt; Eff es SomeUnpack
+</span><a href="M.IO.Internal.EffectSocket.html#handleheara_immediate"><span class="hs-identifier hs-var hs-var">handleheara_immediate</span></a></span></span><span> </span><span id="local-6989586621681619587"><span class="annot"><span class="annottext">InputStream Uninterpreted
+</span><a href="#local-6989586621681619587"><span class="hs-identifier hs-var">i</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-104"></span><span>  </span><span id="local-6989586621681619588"><span class="annot"><span class="annottext">Uninterpreted
+</span><a href="#local-6989586621681619588"><span class="hs-identifier hs-var">u</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">InputStream Uninterpreted -&gt; Eff es Uninterpreted
+forall (es :: [Effect]).
+(IOE :&gt; es, NonDet :&gt; es) =&gt;
+InputStream Uninterpreted -&gt; Eff es Uninterpreted
+</span><a href="M.IO.Internal.EffectSocket.html#handlehearu_immediate"><span class="hs-identifier hs-var">handlehearu_immediate</span></a></span><span> </span><span class="annot"><span class="annottext">InputStream Uninterpreted
+</span><a href="#local-6989586621681619587"><span class="hs-identifier hs-var">i</span></a></span><span>
+</span><span id="line-105"></span><span>  </span><span class="annot"><a href="M.IO.Internal.EffectTypes.html#ParserState"><span class="hs-identifier hs-type">ParserState</span></a></span><span> </span><span id="local-6989586621681619589"><span class="annot"><span class="annottext">forall r. Op r -&gt; r
+</span><a href="#local-6989586621681619589"><span class="hs-identifier hs-var">p</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">Eff es ParserState
+forall s (es :: [Effect]).
+(HasCallStack, State s :&gt; es) =&gt;
+Eff es s
+</span><span class="hs-identifier hs-var">get</span></span><span>
+</span><span id="line-106"></span><span>  </span><span class="annot"><span class="annottext">SomeUnpack -&gt; Eff es SomeUnpack
+forall a. a -&gt; Eff es a
+forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><span class="hs-identifier hs-var">pure</span></span><span> </span><span class="annot"><span class="annottext">(SomeUnpack -&gt; Eff es SomeUnpack)
+-&gt; SomeUnpack -&gt; Eff es SomeUnpack
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">Op SomeUnpack -&gt; SomeUnpack
+forall r. Op r -&gt; r
+</span><a href="#local-6989586621681619589"><span class="hs-identifier hs-var">p</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Uninterpreted -&gt; Op SomeUnpack
+</span><a href="M.IO.Internal.EffectTypes.html#Parse"><span class="hs-identifier hs-var">Parse</span></a></span><span> </span><span class="annot"><span class="annottext">Uninterpreted
+</span><a href="#local-6989586621681619588"><span class="hs-identifier hs-var">u</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-107"></span><span>
+</span><span id="line-108"></span><span class="annot"><span class="hs-comment">-- | run server accepting multiple connections</span></span><span>
+</span><span id="line-109"></span><span id="local-6989586621681619353"><span id="local-6989586621681619355"><span class="annot"><a href="M.IO.Internal.EffectSocket.html#withtalkingserver"><span class="hs-identifier hs-type">withtalkingserver</span></a></span><span> </span><span class="hs-glyph">::</span><span>
+</span><span id="line-110"></span><span>  </span><span class="hs-special">(</span><span> </span><span class="annot"><span class="hs-identifier hs-type">IOE</span></span><span> </span><span class="annot"><span class="hs-operator hs-type">:&gt;</span></span><span> </span><span class="annot"><a href="#local-6989586621681619353"><span class="hs-identifier hs-type">es</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-111"></span><span>    </span><span class="annot"><span class="hs-identifier hs-type">State</span></span><span> </span><span class="annot"><a href="M.IO.Internal.EffectTypes.html#ParserState"><span class="hs-identifier hs-type">ParserState</span></a></span><span> </span><span class="annot"><span class="hs-operator hs-type">:&gt;</span></span><span> </span><span class="annot"><a href="#local-6989586621681619353"><span class="hs-identifier hs-type">es</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-112"></span><span>    </span><span class="annot"><span class="hs-identifier hs-type">Concurrent</span></span><span> </span><span class="annot"><span class="hs-operator hs-type">:&gt;</span></span><span> </span><span class="annot"><a href="#local-6989586621681619353"><span class="hs-identifier hs-type">es</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-113"></span><span>    </span><span class="annot"><span class="hs-identifier hs-type">NonDet</span></span><span> </span><span class="annot"><span class="hs-operator hs-type">:&gt;</span></span><span> </span><span class="annot"><a href="#local-6989586621681619353"><span class="hs-identifier hs-type">es</span></a></span><span>
+</span><span id="line-114"></span><span>  </span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=&gt;</span><span>
+</span><span id="line-115"></span><span>  </span><span class="annot"><span class="hs-comment">-- | unlift strategy</span></span><span>
+</span><span id="line-116"></span><span>  </span><span class="annot"><span class="hs-identifier hs-type">UnliftStrategy</span></span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-117"></span><span>  </span><span class="annot"><span class="hs-comment">-- | host (Nothing = all interfaces)</span></span><span>
+</span><span id="line-118"></span><span>  </span><span class="annot"><span class="hs-identifier hs-type">Maybe</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">String</span></span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-119"></span><span>  </span><span class="annot"><span class="hs-comment">-- | port</span></span><span>
+</span><span id="line-120"></span><span>  </span><span class="annot"><span class="hs-identifier hs-type">String</span></span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-121"></span><span>  </span><span class="annot"><span class="hs-comment">-- | per-connection handler</span></span><span>
+</span><span id="line-122"></span><span>  </span><span class="annot"><span class="hs-identifier hs-type">Eff</span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="M.IO.Internal.EffectTypes.html#Talking"><span class="hs-identifier hs-type">Talking</span></a></span><span> </span><span class="annot"><span class="hs-glyph hs-type">:</span></span><span> </span><span class="annot"><a href="#local-6989586621681619353"><span class="hs-identifier hs-type">es</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><a href="#local-6989586621681619355"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-123"></span><span>  </span><span class="annot"><span class="hs-comment">-- | final result</span></span><span>
+</span><span id="line-124"></span><span>  </span><span class="annot"><span class="hs-identifier hs-type">Eff</span></span><span> </span><span class="annot"><a href="#local-6989586621681619353"><span class="hs-identifier hs-type">es</span></a></span><span> </span><span class="annot"><a href="#local-6989586621681619355"><span class="hs-identifier hs-type">a</span></a></span></span></span><span>
+</span><span id="line-125"></span><span id="withtalkingserver"><span class="annot"><span class="annottext">withtalkingserver :: forall (es :: [Effect]) a.
+(IOE :&gt; es, State ParserState :&gt; es, Concurrent :&gt; es,
+ NonDet :&gt; es) =&gt;
+UnliftStrategy
+-&gt; Maybe String -&gt; String -&gt; Eff (Talking : es) a -&gt; Eff es a
+</span><a href="M.IO.Internal.EffectSocket.html#withtalkingserver"><span class="hs-identifier hs-var hs-var">withtalkingserver</span></a></span></span><span> </span><span id="local-6989586621681619601"><span class="annot"><span class="annottext">UnliftStrategy
+</span><a href="#local-6989586621681619601"><span class="hs-identifier hs-var">u</span></a></span></span><span> </span><span id="local-6989586621681619602"><span class="annot"><span class="annottext">Maybe String
+</span><a href="#local-6989586621681619602"><span class="hs-identifier hs-var">host</span></a></span></span><span> </span><span id="local-6989586621681619603"><span class="annot"><span class="annottext">String
+</span><a href="#local-6989586621681619603"><span class="hs-identifier hs-var">port</span></a></span></span><span> </span><span id="local-6989586621681619604"><span class="annot"><span class="annottext">Eff (Talking : es) a
+</span><a href="#local-6989586621681619604"><span class="hs-identifier hs-var">handler</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">UnliftStrategy
+-&gt; ((forall r. Eff es r -&gt; IO r) -&gt; IO a) -&gt; Eff es a
+forall (es :: [Effect]) a.
+(HasCallStack, IOE :&gt; es) =&gt;
+UnliftStrategy
+-&gt; ((forall r. Eff es r -&gt; IO r) -&gt; IO a) -&gt; Eff es a
+</span><span class="hs-identifier hs-var">withEffToIO</span></span><span> </span><span class="annot"><span class="annottext">UnliftStrategy
+</span><a href="#local-6989586621681619601"><span class="hs-identifier hs-var">u</span></a></span><span> </span><span class="hs-glyph">\</span><span id="local-6989586621681619606"><span class="annot"><span class="annottext">forall r. Eff es r -&gt; IO r
+</span><a href="#local-6989586621681619606"><span class="hs-identifier hs-var">run</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-126"></span><span>  </span><span class="annot"><span class="annottext">Maybe String -&gt; String -&gt; (Socket -&gt; IO a) -&gt; IO a
+forall a. Maybe String -&gt; String -&gt; (Socket -&gt; IO a) -&gt; IO a
+</span><span class="hs-identifier hs-var">runTCPServer</span></span><span> </span><span class="annot"><span class="annottext">Maybe String
+</span><a href="#local-6989586621681619602"><span class="hs-identifier hs-var">host</span></a></span><span> </span><span class="annot"><span class="annottext">String
+</span><a href="#local-6989586621681619603"><span class="hs-identifier hs-var">port</span></a></span><span> </span><span class="hs-glyph">\</span><span id="local-6989586621681619607"><span class="annot"><span class="annottext">Socket
+</span><a href="#local-6989586621681619607"><span class="hs-identifier hs-var">sock</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-127"></span><span>    </span><span class="annot"><span class="annottext">Socket -&gt; (Connection -&gt; IO a) -&gt; IO a
+forall a. Socket -&gt; (Connection -&gt; IO a) -&gt; IO a
+</span><a href="M.IO.Internal.Socket.html#withcxfromsocket"><span class="hs-identifier hs-var">withcxfromsocket</span></a></span><span> </span><span class="annot"><span class="annottext">Socket
+</span><a href="#local-6989586621681619607"><span class="hs-identifier hs-var">sock</span></a></span><span> </span><span class="hs-glyph">\</span><span id="local-6989586621681619609"><span class="annot"><span class="annottext">Connection
+</span><a href="#local-6989586621681619609"><span class="hs-identifier hs-var">cx</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-128"></span><span>      </span><span class="annot"><span class="annottext">Eff es a -&gt; IO a
+forall r. Eff es r -&gt; IO r
+</span><a href="#local-6989586621681619606"><span class="hs-identifier hs-var">run</span></a></span><span> </span><span class="annot"><span class="annottext">(Eff es a -&gt; IO a) -&gt; Eff es a -&gt; IO a
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">Connection -&gt; Eff (Talking : es) a -&gt; Eff es a
+forall (es :: [Effect]) a.
+(IOE :&gt; es, NonDet :&gt; es, State ParserState :&gt; es,
+ Concurrent :&gt; es) =&gt;
+Connection -&gt; Eff (Talking : es) a -&gt; Eff es a
+</span><a href="M.IO.Internal.EffectSocket.html#runtalking0"><span class="hs-identifier hs-var">runtalking0</span></a></span><span> </span><span class="annot"><span class="annottext">Connection
+</span><a href="#local-6989586621681619609"><span class="hs-identifier hs-var">cx</span></a></span><span> </span><span class="annot"><span class="annottext">Eff (Talking : es) a
+</span><a href="#local-6989586621681619604"><span class="hs-identifier hs-var">handler</span></a></span><span>
+</span><span id="line-129"></span><span>
+</span><span id="line-130"></span><span class="annot"><span class="hs-comment">-- | run client with single connection</span></span><span>
+</span><span id="line-131"></span><span id="local-6989586621681619364"><span id="local-6989586621681619365"><span class="annot"><a href="M.IO.Internal.EffectSocket.html#withtalkingclient"><span class="hs-identifier hs-type">withtalkingclient</span></a></span><span> </span><span class="hs-glyph">::</span><span>
+</span><span id="line-132"></span><span>  </span><span class="hs-special">(</span><span> </span><span class="annot"><span class="hs-identifier hs-type">IOE</span></span><span> </span><span class="annot"><span class="hs-operator hs-type">:&gt;</span></span><span> </span><span class="annot"><a href="#local-6989586621681619364"><span class="hs-identifier hs-type">es</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-133"></span><span>    </span><span class="annot"><span class="hs-identifier hs-type">State</span></span><span> </span><span class="annot"><a href="M.IO.Internal.EffectTypes.html#ParserState"><span class="hs-identifier hs-type">ParserState</span></a></span><span> </span><span class="annot"><span class="hs-operator hs-type">:&gt;</span></span><span> </span><span class="annot"><a href="#local-6989586621681619364"><span class="hs-identifier hs-type">es</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-134"></span><span>    </span><span class="annot"><span class="hs-identifier hs-type">Concurrent</span></span><span> </span><span class="annot"><span class="hs-operator hs-type">:&gt;</span></span><span> </span><span class="annot"><a href="#local-6989586621681619364"><span class="hs-identifier hs-type">es</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-135"></span><span>    </span><span class="annot"><span class="hs-identifier hs-type">NonDet</span></span><span> </span><span class="annot"><span class="hs-operator hs-type">:&gt;</span></span><span> </span><span class="annot"><a href="#local-6989586621681619364"><span class="hs-identifier hs-type">es</span></a></span><span>
+</span><span id="line-136"></span><span>  </span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=&gt;</span><span>
+</span><span id="line-137"></span><span>  </span><span class="annot"><span class="hs-comment">-- | unlift strategy</span></span><span>
+</span><span id="line-138"></span><span>  </span><span class="annot"><span class="hs-identifier hs-type">UnliftStrategy</span></span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-139"></span><span>  </span><span class="annot"><span class="hs-comment">-- | host</span></span><span>
+</span><span id="line-140"></span><span>  </span><span class="annot"><span class="hs-identifier hs-type">String</span></span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-141"></span><span>  </span><span class="annot"><span class="hs-comment">-- | port</span></span><span>
+</span><span id="line-142"></span><span>  </span><span class="annot"><span class="hs-identifier hs-type">String</span></span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-143"></span><span>  </span><span class="annot"><span class="hs-comment">-- | handler</span></span><span>
+</span><span id="line-144"></span><span>  </span><span class="annot"><span class="hs-identifier hs-type">Eff</span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="M.IO.Internal.EffectTypes.html#Talking"><span class="hs-identifier hs-type">Talking</span></a></span><span> </span><span class="annot"><span class="hs-glyph hs-type">:</span></span><span> </span><span class="annot"><a href="#local-6989586621681619364"><span class="hs-identifier hs-type">es</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><a href="#local-6989586621681619365"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-145"></span><span>  </span><span class="annot"><span class="hs-comment">-- | result</span></span><span>
+</span><span id="line-146"></span><span>  </span><span class="annot"><span class="hs-identifier hs-type">Eff</span></span><span> </span><span class="annot"><a href="#local-6989586621681619364"><span class="hs-identifier hs-type">es</span></a></span><span> </span><span class="annot"><a href="#local-6989586621681619365"><span class="hs-identifier hs-type">a</span></a></span></span></span><span>
+</span><span id="line-147"></span><span id="withtalkingclient"><span class="annot"><span class="annottext">withtalkingclient :: forall (es :: [Effect]) a.
+(IOE :&gt; es, State ParserState :&gt; es, Concurrent :&gt; es,
+ NonDet :&gt; es) =&gt;
+UnliftStrategy
+-&gt; String -&gt; String -&gt; Eff (Talking : es) a -&gt; Eff es a
+</span><a href="M.IO.Internal.EffectSocket.html#withtalkingclient"><span class="hs-identifier hs-var hs-var">withtalkingclient</span></a></span></span><span> </span><span id="local-6989586621681619621"><span class="annot"><span class="annottext">UnliftStrategy
+</span><a href="#local-6989586621681619621"><span class="hs-identifier hs-var">u</span></a></span></span><span> </span><span id="local-6989586621681619622"><span class="annot"><span class="annottext">String
+</span><a href="#local-6989586621681619622"><span class="hs-identifier hs-var">host</span></a></span></span><span> </span><span id="local-6989586621681619623"><span class="annot"><span class="annottext">String
+</span><a href="#local-6989586621681619623"><span class="hs-identifier hs-var">port</span></a></span></span><span> </span><span id="local-6989586621681619624"><span class="annot"><span class="annottext">Eff (Talking : es) a
+</span><a href="#local-6989586621681619624"><span class="hs-identifier hs-var">handler</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">UnliftStrategy
+-&gt; ((forall r. Eff es r -&gt; IO r) -&gt; IO a) -&gt; Eff es a
+forall (es :: [Effect]) a.
+(HasCallStack, IOE :&gt; es) =&gt;
+UnliftStrategy
+-&gt; ((forall r. Eff es r -&gt; IO r) -&gt; IO a) -&gt; Eff es a
+</span><span class="hs-identifier hs-var">withEffToIO</span></span><span> </span><span class="annot"><span class="annottext">UnliftStrategy
+</span><a href="#local-6989586621681619621"><span class="hs-identifier hs-var">u</span></a></span><span> </span><span class="hs-glyph">\</span><span id="local-6989586621681619625"><span class="annot"><span class="annottext">forall r. Eff es r -&gt; IO r
+</span><a href="#local-6989586621681619625"><span class="hs-identifier hs-var">run</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-148"></span><span>  </span><span class="annot"><span class="annottext">String -&gt; String -&gt; (Socket -&gt; IO a) -&gt; IO a
+forall a. String -&gt; String -&gt; (Socket -&gt; IO a) -&gt; IO a
+</span><span class="hs-identifier hs-var">runTCPClient</span></span><span> </span><span class="annot"><span class="annottext">String
+</span><a href="#local-6989586621681619622"><span class="hs-identifier hs-var">host</span></a></span><span> </span><span class="annot"><span class="annottext">String
+</span><a href="#local-6989586621681619623"><span class="hs-identifier hs-var">port</span></a></span><span> </span><span class="hs-glyph">\</span><span id="local-6989586621681619626"><span class="annot"><span class="annottext">Socket
+</span><a href="#local-6989586621681619626"><span class="hs-identifier hs-var">sock</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-149"></span><span>    </span><span class="annot"><span class="annottext">Socket -&gt; (Connection -&gt; IO a) -&gt; IO a
+forall a. Socket -&gt; (Connection -&gt; IO a) -&gt; IO a
+</span><a href="M.IO.Internal.Socket.html#withcxfromsocket"><span class="hs-identifier hs-var">withcxfromsocket</span></a></span><span> </span><span class="annot"><span class="annottext">Socket
+</span><a href="#local-6989586621681619626"><span class="hs-identifier hs-var">sock</span></a></span><span> </span><span class="hs-glyph">\</span><span id="local-6989586621681619627"><span class="annot"><span class="annottext">Connection
+</span><a href="#local-6989586621681619627"><span class="hs-identifier hs-var">cx</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-150"></span><span>      </span><span class="annot"><span class="annottext">Eff es a -&gt; IO a
+forall r. Eff es r -&gt; IO r
+</span><a href="#local-6989586621681619625"><span class="hs-identifier hs-var">run</span></a></span><span> </span><span class="annot"><span class="annottext">(Eff es a -&gt; IO a) -&gt; Eff es a -&gt; IO a
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">Connection -&gt; Eff (Talking : es) a -&gt; Eff es a
+forall (es :: [Effect]) a.
+(IOE :&gt; es, NonDet :&gt; es, State ParserState :&gt; es,
+ Concurrent :&gt; es) =&gt;
+Connection -&gt; Eff (Talking : es) a -&gt; Eff es a
+</span><a href="M.IO.Internal.EffectSocket.html#runtalking0"><span class="hs-identifier hs-var">runtalking0</span></a></span><span> </span><span class="annot"><span class="annottext">Connection
+</span><a href="#local-6989586621681619627"><span class="hs-identifier hs-var">cx</span></a></span><span> </span><span class="annot"><span class="annottext">Eff (Talking : es) a
+</span><a href="#local-6989586621681619624"><span class="hs-identifier hs-var">handler</span></a></span><span>
+</span><span id="line-151"></span></pre></body></html>
