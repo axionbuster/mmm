@@ -14,6 +14,7 @@ import Control.Applicative.Combinators hiding (optional, (<|>))
 import Control.Monad
 import Data.ByteString qualified as B
 import Data.Char hiding (isDigit)
+import Data.Foldable
 import Data.Foldable1
 import Data.Function
 import Data.Functor
@@ -188,37 +189,12 @@ tester1 =
     \  deriving (B) based on (C, D,E @1 @i,F) shadow deriving ()\
     \}"
 
--- a variant of the shunting-yard algorithm
--- here the only operator (@) takes exactly two arguments
--- and associates to the left
-alwaysleft :: [String] -> [String]
-alwaysleft = go [] []
-  where
-    isop = (== "@")
-    islp = (== "(")
-    isrp = (== ")")
-    go ~out ~ops (t : ts)
-      | isop t =
-          let (sl, sr) = break islp ops
-           in go (reverse sl ++ out) (t : sr) ts
-    go ~out ~ops (t : ts) | islp t = go out (t : ops) ts
-    go ~out ~ops (t : ts) | isrp t =
-      case break islp ops of
-        (sl, srh : srt) | islp srh -> go (reverse sl ++ out) srt ts
-        _ -> error "ill-formed expression"
-    go ~out ~ops [] = reverse out ++ reverse ops
-    go ~out (op : ops) (t : ts)
-      | not (islp op) && not (isrp op) =
-          go (op : t : out) ops ts
-    go ~out ops (t : ts) = go (t : out) ops ts
-
--- uses eof for correctness. use 'isolate'.
 thhasktype :: P TH.Type
 thhasktype =
   -- only cover: ParensT, TupleT, AppT, AppKindT, ForallT,
   -- VarT, ConT, PromotedT, LitT, ListT.
   -- no functions or other infix operators.
-  ws *> choice @[] (map (<* eof) parsers)
+  ws *> choice @[] parsers
   where
     -- caution: if vart were attempted first then appkindt, forallt, etc.
     -- may be subsumed by it, by nature of the grammar. so attempt
@@ -246,13 +222,14 @@ thhasktype =
               i : [] -> TH.ParensT i
               _ -> foldl' TH.AppT (TH.TupleT (length items)) items
        in ws *> (prefix <|> regular) <* ws
-    appkindt =
-      TH.AppKindT <$> (fails atsymb *> self2 <* atsymb <* ws) <*> self3
-      where
-        self2 = choice @[] [appt, cont, vart, tuplet]
-        self3 =
-          choice @[]
-            [cont, vart, tuplet, promotedt, litt, listt]
+    appkindt = do
+      base <- choice @[] [cont, vart, tuplet]
+      foldr' ($) base <$> many do
+        let next = choice @[] [litt, listt, promotedt, tuplet, cont, vart]
+        choice @[]
+          [ (flip TH.AppKindT <$> (atsymb *> next)),
+            (flip TH.AppT <$> next)
+          ]
     forallt = do
       -- no KindedTV (that is, (a :: k) form) support yet
       ns <- $(string "forall") *> ws *> many vart0
@@ -270,12 +247,13 @@ thhasktype =
       between llist rlist $
         foldl' TH.AppT TH.ListT
           <$> flip sepBy comma do
-            choice @[] $ [litt, listt, promotedt, appkindt]
-              ++ [tuplet, forallt, appt, cont, vart]
+            choice @[] $
+              [litt, listt, promotedt, appkindt]
+                ++ [tuplet, forallt, appt, cont, vart]
     lpar = ws *> $(char '(') *> ws
     rpar = ws *> $(char ')') *> ws
     comma = ws *> $(char ',') *> ws
-    atsymb = $(char '@')
+    atsymb = ws *> $(char '@') <* ws
     quote = $(char '\'')
     dbquote = $(char '"')
     bksp = $(char '\\')
