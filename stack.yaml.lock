@@ -17,8 +17,7 @@ packages:
     git: https://github.com/axionbuster/th-serde.git
 snapshots:
 - completed:
-    sha256: dd89d2322cb5af74c6ab9d96c0c5f6c8e6653e0c991d619b4bb141a49cb98668
-    size: 679282
-    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/23/3.yaml
-  original:
-    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/23/3.yaml
+    sha256: 28105fd76386569f72c84978edbf017e006f5ee3957bb578f79bcd40db1376b9
+    size: 653612
+    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/nightly/2025/2/15.yaml
+  original: nightly-2025-02-15
