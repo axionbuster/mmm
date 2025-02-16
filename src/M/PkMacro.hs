@@ -11,12 +11,17 @@ module M.PkMacro
 where
 
 import Control.Applicative.Combinators hiding (optional, (<|>))
-import Control.Monad (guard)
+import Control.Monad
 import Data.ByteString qualified as B
 import Data.Char hiding (isDigit)
+import Data.Foldable1
 import Data.Function
+import Data.Functor
+import Data.List.NonEmpty qualified as NEL
 import FlatParse.Stateful hiding (Parser, Result)
+import Language.Haskell.TH qualified as TH
 import M.Pack
+import Debug.Trace
 
 -- data A {
 --  field1 :: Type via Type,
@@ -182,3 +187,97 @@ tester1 =
     \  field2 :: Type,\
     \  deriving (B) based on (C, D,E @1 @i,F) shadow deriving ()\
     \}"
+
+-- a variant of the shunting-yard algorithm
+-- here the only operator (@) takes exactly two arguments
+-- and associates to the left
+alwaysleft :: [String] -> [String]
+alwaysleft = go [] []
+  where
+    isop = (== "@")
+    islp = (== "(")
+    isrp = (== ")")
+    go ~out ~ops (t : ts)
+      | isop t =
+          let (sl, sr) = break islp ops
+           in go (reverse sl ++ out) (t : sr) ts
+    go ~out ~ops (t : ts) | islp t = go out (t : ops) ts
+    go ~out ~ops (t : ts) | isrp t =
+      case break islp ops of
+        (sl, srh : srt) | islp srh -> go (reverse sl ++ out) srt ts
+        _ -> error "ill-formed expression"
+    go ~out ~ops [] = reverse out ++ reverse ops
+    go ~out (op : ops) (t : ts)
+      | not (islp op) && not (isrp op) =
+          go (op : t : out) ops ts
+    go ~out ops (t : ts) = go (t : out) ops ts
+
+-- uses eof for correctness. use 'isolate'.
+thhasktype :: P TH.Type
+thhasktype =
+  -- only cover: ParensT, TupleT, AppT, AppKindT, ForallT,
+  -- VarT, ConT, PromotedT, LitT, ListT
+  ws *> selfeof
+  where
+    parsers =
+      [ cont,
+        forallt,
+        vart,
+        appt,
+        parenst,
+        tuplet,
+        appkindt,
+        promotedt,
+        litt,
+        listt
+      ]
+    selfeof = choice @[] $ map (<* eof) parsers
+    self = choice @[] parsers <* ws
+    vart0 = (TH.mkName <$> liftA2 (:) vahead (many chtail)) <* ws
+    cont0 = (TH.mkName <$> liftA2 (:) cohead (many chtail)) <* ws
+    cont = TH.ConT <$> (
+            do retval <- cont0
+               unsafeLiftIO (traceIO $ "c: \"" ++ show retval ++ "\"")
+               rest <- lookahead takeRest
+               unsafeLiftIO (traceIO $ "rest is " ++ show rest)
+               pure retval
+            )
+    vart = TH.VarT <$> (vart0 <* unsafeLiftIO (traceIO "v"))
+    appt = foldl1' TH.AppT . NEL.fromList <$> do
+      unsafeLiftIO $ traceIO "appt reached"
+      some self -- bad, infinite recursion
+    parenst = TH.ParensT <$> between lpar rpar self
+    tuplet = between lpar rpar (TH.TupleT . length <$> many comma)
+    appkindt =
+      TH.AppKindT <$> (fails atsymb *> self <* atsymb <* ws) <*> self
+    forallt = do
+      -- no KindedTV (that is, (a :: k) form) support yet
+      ns <- $(string "forall") *> ws *> many vart0
+      let vars = [TH.PlainTV name TH.SpecifiedSpec | name <- ns]
+      $(char '.') *> ws
+      ct <- between lpar rpar (sepBy1 self comma) <|>
+        (lookahead (fails $(string "<=")) *> fmap pure self)
+      when (not . null $ ct) do
+        ws <* $(string "=>") <* ws
+      TH.ForallT vars ct <$> self
+    promotedt = TH.PromotedT <$> (quote *> cont0) -- data con
+    litt = TH.LitT <$> choice @[] [numtylit, strtylit, chartylit]
+    listt = between llist rlist $ foldl' TH.AppT TH.ListT <$> some self
+    lpar = $(char '(')
+    rpar = $(char ')')
+    comma = $(char ',')
+    atsymb = $(char '@')
+    quote = $(char '\'')
+    dbquote = $(char '"')
+    bksp = $(char '\\')
+    llist = $(char '[')
+    rlist = $(char ']')
+    vahead = satisfy \c -> (isLetter c && isLower c) || c == '_'
+    cohead = satisfy \c -> (isLetter c && isUpper c) || c == '_'
+    chtail = satisfy \c -> isLetter c || c == '_' || c == '\'' || isDigit c
+    numtylit = TH.NumTyLit <$> anyAsciiDecimalInteger
+    strtylit = TH.StrTyLit <$> between dbquote dbquote (many escaped)
+    chartylit = TH.CharTyLit <$> between quote quote escaped'
+    escaped = approved <|> (bksp *> dbquote $> '"')
+    escaped' = approved <|> (bksp *> quote $> '\'')
+    approved = satisfy isPrint
