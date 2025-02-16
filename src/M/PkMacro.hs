@@ -11,15 +11,14 @@ module M.PkMacro
 where
 
 import Control.Applicative.Combinators hiding (optional, (<|>))
+import Control.Category ((>>>))
 import Control.Monad
 import Data.ByteString qualified as B
 import Data.Char hiding (isDigit)
-import Data.Foldable
 import Data.Foldable1
 import Data.Function
 import Data.Functor
 import Data.List.NonEmpty qualified as NEL
-import Debug.Trace
 import FlatParse.Stateful hiding (Parser, Result)
 import Language.Haskell.TH qualified as TH
 import M.Pack
@@ -90,15 +89,15 @@ multilinecomment =
 data DataDecl = DataDecl
   { dataname :: String,
     dataflds :: [Field],
-    dataderp :: [String], -- proper
-    dataders :: [String], -- shadow
-    dataderx :: [String] -- proxy
+    dataderp :: [TH.Type], -- proper
+    dataders :: [TH.Type], -- shadow
+    dataderx :: [TH.Type] -- proxy
   }
   deriving (Show)
 
 data FieldType = FieldType
-  { typename :: String,
-    typevia :: Maybe String
+  { typemain :: TH.Type,
+    typevia :: Maybe TH.Type
   }
   deriving (Show)
 
@@ -108,6 +107,7 @@ data Field = Field
   }
   deriving (Show)
 
+-- used in datadecl
 hasktype :: P String
 hasktype = ws *> (typeexpr <* ws)
   where
@@ -141,6 +141,7 @@ datadecl = do
       openb = ewrap $ cut $(char '{') "expecting '{'"
       closb = ewrap $ cut $(char '}') "expecting '}'"
       deriv = ewrap $ cut $(string "deriving") "expecting 'deriving'"
+      comma = ws *> $(char ',') <* ws
       based =
         ewrap $
           cut
@@ -159,17 +160,21 @@ datadecl = do
             le = 36
         err $ e `co` (ParseError $ ", the rest being " ++ show r')
       fieldident' = ewrap $ cut fieldident "expected a field identifier"
-  dataname <- ws *> data' *> ws *> typeident' <* ws <* openb
-  dataflds <-
-    ws
-      *> flip endBy $(char ',') do
-        ws *> fails $(string "deriving") *> do
-          fn <- fieldident' <* ws <* doubc <* ws
-          tn <- hasktype <* ws
-          vi <- optional ($(string "via") *> ws *> hasktype <* ws)
-          pure $ Field fn (FieldType tn vi)
+      parsety =
+        hasktype >>= do
+          strToUtf8 >>> parsepure0 (thhasktype <* eof) >>> \case
+            OK v _ _ -> pure v
+            Fail -> empty
+            Err e -> err e
+  dataname <- ws *> data' *> ws *> typeident' <* ws <* openb <* ws
+  dataflds <- flip endBy comma do
+    ws *> fails $(string "deriving") *> do
+      fn <- fieldident' <* ws <* doubc <* ws
+      ty <- parsety
+      vi <- optional ($(string "via") *> ws *> parsety <* ws)
+      pure $ Field fn (FieldType ty vi)
   let parsetypes =
-        let t = sepBy hasktype $(char ',')
+        let t = sepBy parsety comma
          in cut
               ((between $(char '(') $(char ')') t <|> t) <* ws)
               "expecting type; types"
@@ -224,7 +229,7 @@ thhasktype =
        in ws *> (prefix <|> regular) <* ws
     appkindt = do
       base <- choice @[] [cont, vart, tuplet]
-      foldr' ($) base <$> many do
+      foldl' (flip ($)) base <$> many do
         let next = choice @[] [litt, listt, promotedt, tuplet, cont, vart]
         choice @[]
           [ (flip TH.AppKindT <$> (atsymb *> next)),
