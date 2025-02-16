@@ -62,6 +62,7 @@ library
       M.Pack.Internal.Num
       M.Pack.Internal.TH
       M.Pack.Internal.Types
+      M.PkMacro
       M.Position
       M.Reg
       M.TODO
