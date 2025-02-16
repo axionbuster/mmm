@@ -18,10 +18,10 @@ import Data.Foldable1
 import Data.Function
 import Data.Functor
 import Data.List.NonEmpty qualified as NEL
+import Debug.Trace
 import FlatParse.Stateful hiding (Parser, Result)
 import Language.Haskell.TH qualified as TH
 import M.Pack
-import Debug.Trace
 
 -- data A {
 --  field1 :: Type via Type,
@@ -216,62 +216,71 @@ alwaysleft = go [] []
 thhasktype :: P TH.Type
 thhasktype =
   -- only cover: ParensT, TupleT, AppT, AppKindT, ForallT,
-  -- VarT, ConT, PromotedT, LitT, ListT
-  ws *> selfeof
+  -- VarT, ConT, PromotedT, LitT, ListT.
+  -- no functions or other infix operators.
+  ws *> choice @[] (map (<* eof) parsers)
   where
+    -- caution: if vart were attempted first then appkindt, forallt, etc.
+    -- may be subsumed by it, by nature of the grammar. so attempt
+    -- these more specific ones first. same for appt vs. contt and others.
     parsers =
-      [ cont,
-        forallt,
-        vart,
-        appt,
-        parenst,
-        tuplet,
-        appkindt,
-        promotedt,
-        litt,
-        listt
-      ]
-    selfeof = choice @[] $ map (<* eof) parsers
-    self = choice @[] parsers <* ws
+      [litt, listt, promotedt, appkindt]
+        ++ [tuplet, forallt, appt, cont, vart]
     vart0 = (TH.mkName <$> liftA2 (:) vahead (many chtail)) <* ws
     cont0 = (TH.mkName <$> liftA2 (:) cohead (many chtail)) <* ws
-    cont = TH.ConT <$> (
-            do retval <- cont0
-               unsafeLiftIO (traceIO $ "c: \"" ++ show retval ++ "\"")
-               rest <- lookahead takeRest
-               unsafeLiftIO (traceIO $ "rest is " ++ show rest)
-               pure retval
-            )
-    vart = TH.VarT <$> (vart0 <* unsafeLiftIO (traceIO "v"))
-    appt = foldl1' TH.AppT . NEL.fromList <$> do
-      unsafeLiftIO $ traceIO "appt reached"
-      some self -- bad, infinite recursion
-    parenst = TH.ParensT <$> between lpar rpar self
-    tuplet = between lpar rpar (TH.TupleT . length <$> many comma)
+    cont = TH.ConT <$> cont0
+    vart = TH.VarT <$> vart0
+    appt =
+      foldl1' TH.AppT . NEL.fromList
+        <$> do
+          some do
+            choice @[]
+              [cont, vart, tuplet, litt, listt, promotedt]
+        <* ws
+    tuplet =
+      let prefix = between lpar rpar (some comma) <&> (TH.TupleT . length)
+          regular = between lpar rpar do
+            items <- flip sepBy comma do
+              choice @[] parsers
+            pure case items of
+              i : [] -> TH.ParensT i
+              _ -> foldl' TH.AppT (TH.TupleT (length items)) items
+       in ws *> (prefix <|> regular) <* ws
     appkindt =
-      TH.AppKindT <$> (fails atsymb *> self <* atsymb <* ws) <*> self
+      TH.AppKindT <$> (fails atsymb *> self2 <* atsymb <* ws) <*> self3
+      where
+        self2 = choice @[] [appt, cont, vart, tuplet]
+        self3 =
+          choice @[]
+            [cont, vart, tuplet, promotedt, litt, listt]
     forallt = do
       -- no KindedTV (that is, (a :: k) form) support yet
       ns <- $(string "forall") *> ws *> many vart0
       let vars = [TH.PlainTV name TH.SpecifiedSpec | name <- ns]
       $(char '.') *> ws
-      ct <- between lpar rpar (sepBy1 self comma) <|>
-        (lookahead (fails $(string "<=")) *> fmap pure self)
-      when (not . null $ ct) do
+      ct <- option [] do
+        between lpar rpar (sepBy1 (choice @[] [appt, cont]) comma)
+      unless (null ct) do
         ws <* $(string "=>") <* ws
-      TH.ForallT vars ct <$> self
+      TH.ForallT vars ct <$> choice @[] do
+        [litt, listt, promotedt, appkindt, tuplet, appt, cont, vart]
     promotedt = TH.PromotedT <$> (quote *> cont0) -- data con
-    litt = TH.LitT <$> choice @[] [numtylit, strtylit, chartylit]
-    listt = between llist rlist $ foldl' TH.AppT TH.ListT <$> some self
-    lpar = $(char '(')
-    rpar = $(char ')')
-    comma = $(char ',')
+    litt = TH.LitT <$> (choice @[] [numtylit, strtylit, chartylit] <* ws)
+    listt =
+      between llist rlist $
+        foldl' TH.AppT TH.ListT
+          <$> flip sepBy comma do
+            choice @[] $ [litt, listt, promotedt, appkindt]
+              ++ [tuplet, forallt, appt, cont, vart]
+    lpar = ws *> $(char '(') *> ws
+    rpar = ws *> $(char ')') *> ws
+    comma = ws *> $(char ',') *> ws
     atsymb = $(char '@')
     quote = $(char '\'')
     dbquote = $(char '"')
     bksp = $(char '\\')
-    llist = $(char '[')
-    rlist = $(char ']')
+    llist = ws *> $(char '[') *> ws
+    rlist = ws *> $(char ']') *> ws
     vahead = satisfy \c -> (isLetter c && isLower c) || c == '_'
     cohead = satisfy \c -> (isLetter c && isUpper c) || c == '_'
     chtail = satisfy \c -> isLetter c || c == '_' || c == '\'' || isDigit c
