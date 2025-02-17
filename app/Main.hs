@@ -28,8 +28,8 @@ import M.V769.L qualified as L
 import M.V769.P qualified as P
 import M.V769.Reg
 import M.V769.S qualified as S
-import Text.Printf
 import Network.SocketA qualified as Network
+import Text.Printf
 
 reifybuilder :: Builder -> ByteString
 reifybuilder = B.toStrict . BB.toLazyByteString
@@ -81,9 +81,11 @@ main =
           . runFailIO
           . evalStateShared (forserver handshake)
           $ do
-            withtalkingserver
+            withUnliftStrategy
               do ConcUnlift Persistent Unlimited
-              do Just "127.0.0.1"
-              do "25565"
-              do greeting
+              ( withtalkingserver
+                  do Just "127.0.0.1"
+                  do "25565"
+                  do greeting
+              )
    in action >>= print

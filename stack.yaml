@@ -43,13 +43,15 @@ packages:
 #
 extra-deps:
 - git: https://github.com/axionbuster/winasyncsocket
-  commit: '2ca9cb243cae2bd1ff8f354ac87e657f7d1a6b6e'
+  commit: 'e36c7b8b8ed526596694502357f51a0be26a32bb'
 
 # Override default flag values for project packages and extra-deps
 flags:
   io-streams:
     network: false
     zlib: false
+
+allow-newer-deps: [winasyncsocket]
 
 # Extra package databases containing global packages
 # extra-package-dbs: []

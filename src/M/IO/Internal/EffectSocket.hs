@@ -9,11 +9,11 @@
 module M.IO.Internal.EffectSocket
   ( SocketTalkingError (..),
     withtalkingserver,
-    withtalkingclient,
   )
 where
 
 import Control.DeepSeq
+import Control.Monad
 import Data.ByteString qualified as B
 import Data.ByteString.Builder (Builder, toLazyByteString)
 import Data.Data
@@ -29,11 +29,21 @@ import Effectful.State.Dynamic
 import M.IO.Internal.Datagram
 import M.IO.Internal.EffectTypes
 import M.IO.Internal.Socket
-import M.IO.Internal.WinHack
 import M.Pack
-import Network.Run.TCP (runTCPClient, runTCPServer)
+import Network.SocketA hiding
+  ( accept,
+    bind,
+    close,
+    getaddrinfo,
+    listen,
+    socket,
+    withaddrlen,
+    withsocket,
+  )
+import Network.SocketA.Unlift
 import System.IO.Streams
 import Text.Printf
+import UnliftIO.Exception qualified as Unfe
 import Prelude hiding (read)
 
 -- https://hackage.haskell.org/package/effectful-core-2.5.1.0/docs/Effectful.html#g:13
@@ -128,11 +138,8 @@ withtalkingserver ::
   ( IOE :> es,
     State ParserState :> es,
     Concurrent :> es,
-    NonDet :> es,
-    NFData a
+    NonDet :> es
   ) =>
-  -- | unlift strategy
-  UnliftStrategy ->
   -- | host (Nothing = all interfaces)
   Maybe String ->
   -- | port
@@ -141,44 +148,37 @@ withtalkingserver ::
   Eff (Talking : es) a ->
   -- | final result
   Eff es a
-withtalkingserver u host port handler = do
+withtalkingserver host port handler = do
   liftIO $ traceIO "withtalkingserver: up"
-  withEffToIO u \run -> do
-    liftIO $ traceIO "withtalkingserver: inside withEffToIO"
-    -- 'network' package on Windows is broken. server gets stuck.
-    -- workaround: forcibly kill process on exception.
-    killonexc do
-      -- see M.IO.Internal.WinHack for docs on 'killonexc'
-      liftIO $ traceIO "withtalkingserver: inside killonexc"
-      runTCPServer host port \sock -> do
-        liftIO $ traceIO "withtalkingserver: inside runTCPServer"
-        withcxfromsocket sock \cx -> do
-          liftIO $ traceIO "withtalkingserver: inside withcxfromsocket"
-          run $ runtalking0 cx handler
-
--- TODO: from here we first make a small replacement...
--- - withcxfromsocket ... should now use the new Socket type, not the one from "network"
--- - generally all dependencies on "network" should get dropped.
--- - yeah this one too i will rewrite using "winasyncnetwork".
-
--- | run client with single connection
-withtalkingclient ::
-  ( IOE :> es,
-    State ParserState :> es,
-    Concurrent :> es,
-    NonDet :> es
-  ) =>
-  -- | unlift strategy
-  UnliftStrategy ->
-  -- | host
-  String ->
-  -- | port
-  String ->
-  -- | handler
-  Eff (Talking : es) a ->
-  -- | result
-  Eff es a
-withtalkingclient u host port handler = withEffToIO u \run -> do
-  runTCPClient host port \sock ->
-    withcxfromsocket sock \cx ->
+  -- affected by the ambient unlifting strategy.
+  -- set it somewhere else using withUnliftStrategy.
+  let host'
+        | Just h <- host = h
+        | otherwise = "0.0.0.0"
+  runTCPServer host' port \sock -> withRunInIO \run -> do
+    traceIO "withtalkingserver: inside runTCPServer"
+    withcxfromsocket sock \cx -> do
+      traceIO "withtalkingserver: inside withcxfromsocket"
       run $ runtalking0 cx handler
+
+-- compatibility with func of same name in "network" package; just unlifted
+runTCPServer ::
+  (MonadUnliftIO m) =>
+  String -> String -> (Socket -> m b) -> m a
+runTCPServer host port client = do
+  let hint =
+        addrinfo0
+          { ai_socktype = SOCK_STREAM,
+            ai_protocol = IPPROTO_TCP,
+            ai_family = AF_INET
+          }
+      mksocket = socket hint.ai_family hint.ai_socktype hint.ai_protocol
+  addr <- getaddrinfo host port (Just hint)
+  Unfe.bracket mksocket close \sock -> do
+    withaddrlen addr do bind sock
+    listen sock
+    forever do
+      Unfe.bracket
+        do accept sock -- wait happens here
+        do close -- close the socket!
+        do client -- gets passed the socket

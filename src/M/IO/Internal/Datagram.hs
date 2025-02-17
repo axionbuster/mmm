@@ -22,7 +22,6 @@ where
 import Codec.Compression.Zlib
 import Control.Concurrent.STM
 import Control.DeepSeq
-import Control.Exception
 import Control.Exception hiding (throw)
 import Control.Monad.IO.Class
 import Data.ByteString (ByteString)
@@ -41,7 +40,7 @@ import Language.Haskell.TH.Syntax (Lift)
 import M.IO.Internal.Read
 import M.IO.Internal.Zlib
 import M.Pack hiding (Parser)
-import System.IO.Streams hiding (compress)
+import System.IO.Streams
 import System.Timeout
 import Text.Printf
 import Prelude hiding (read)

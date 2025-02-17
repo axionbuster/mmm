@@ -5,15 +5,15 @@
 
 packages:
 - completed:
-    commit: 2ca9cb243cae2bd1ff8f354ac87e657f7d1a6b6e
+    commit: e36c7b8b8ed526596694502357f51a0be26a32bb
     git: https://github.com/axionbuster/winasyncsocket
     name: winasyncsocket
     pantry-tree:
-      sha256: 981edc2ea5852b60a2a7de2f23fa76e193811b913a71997d4c77205f1cc6e025
+      sha256: e125e075fe7c2713a634a47c5d4f01fb780199fdcd489e0b7594c2c5f2ac309b
       size: 1307
     version: 0.2.0.1
   original:
-    commit: 2ca9cb243cae2bd1ff8f354ac87e657f7d1a6b6e
+    commit: e36c7b8b8ed526596694502357f51a0be26a32bb
     git: https://github.com/axionbuster/winasyncsocket
 snapshots:
 - completed:

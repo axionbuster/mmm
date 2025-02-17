@@ -13,13 +13,13 @@ import Control.Concurrent.STM
 import Control.Exception
 import Control.Monad
 import Control.Monad.IO.Class
-import Data.ByteString
+import Data.ByteString (ByteString)
+import Data.ByteString qualified as B
 import Debug.Trace
 import M.Crypto
 import M.IO.Internal.Datagram
-import Network.Socket
-import System.IO.Streams (InputStream, OutputStream)
-import System.IO.Streams.Network (socketToStreams)
+import Network.SocketA
+import System.IO.Streams
 import Text.Printf
 
 -- | a connection to either a server or a client
@@ -82,3 +82,20 @@ withcxfromsocket sk cont = do
               cxinput = i2,
               cxoutput = o2
             }
+
+-- compatibility for socketToStreams from System.IO.Streams.Network
+-- that uses "network" for networking instead of "winasyncsocket"
+socketToStreams ::
+  Socket ->
+  IO (InputStream ByteString, OutputStream ByteString)
+socketToStreams sk = do
+  i <- makeInputStream do
+    c <- recv sk 2048
+    pure
+      if B.null c
+        then Nothing
+        else Just c
+  o <- makeOutputStream \case
+    Nothing -> pure () -- leave open; conventional in io-streams
+    Just x -> sendall sk x
+  pure (i, o)

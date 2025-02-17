@@ -12,7 +12,6 @@ module M.IO
     -- | define communication effects
     module M.IO.Internal.EffectTypes,
     withtalkingserver,
-    withtalkingclient,
     withcxfromsocket,
   )
 where
