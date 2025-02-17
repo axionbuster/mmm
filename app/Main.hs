@@ -8,12 +8,14 @@ import Data.ByteString.Builder (Builder)
 import Data.ByteString.Builder qualified as BB
 import Data.Int
 import Data.Semigroup
+import Data.Text (Text)
+import Data.Text qualified as T
 import Data.Vector.Unboxed qualified as VU
 import Data.Word
 import Debug.Trace
 import Effectful
 import Effectful.Concurrent
-import Effectful.Fail
+import Effectful.Error.Static
 import Effectful.NonDet
 import Effectful.State.Dynamic
 import M.Chunk.Code
@@ -56,7 +58,7 @@ chunk0 x y =
       ldata = LightData bszero bszero bszero bszero [] []
    in pack packet
 
-greeting :: (IOE :> es, Fail :> es, Talking' es) => Eff es ()
+greeting :: (IOE :> es, Error Text :> es, Talking' es) => Eff es ()
 greeting = do
   -- handshake
   liftIO $ traceIO "starting"
@@ -65,11 +67,16 @@ greeting = do
     liftIO $ traceIO $ printf "hs = %s" (show hs)
     unless (hs.protocolversion == 769) do
       liftIO $ traceIO "a!"
-      fail "unsupported protocol version"
+      throwError $ T.pack "unsupported protocol version"
     unless (hs.nextstate == 2 {- LOGIN -}) do
       liftIO $ traceIO "b!"
-      fail "state not LOGIN"
+      throwError $ T.pack "state not LOGIN"
   liftIO $ putStrLn "i'm here"
+
+server :: (IOE :> es, Error Text :> es, Talking' es) => Eff es ()
+server = catchError greeting \_ e -> do
+  liftIO $ traceIO $ T.unpack e
+  server
 
 main :: IO ()
 main =
@@ -78,7 +85,7 @@ main =
         runEff
           . runNonDet OnEmptyKeep
           . runConcurrent
-          . runFailIO
+          . runError @Text
           . evalStateShared (forserver handshake)
           $ do
             withUnliftStrategy
@@ -86,6 +93,6 @@ main =
               ( withtalkingserver
                   do Just "127.0.0.1"
                   do "25565"
-                  do greeting
+                  do server
               )
-   in action >>= print
+   in void action
