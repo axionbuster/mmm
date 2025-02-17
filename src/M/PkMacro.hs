@@ -443,7 +443,7 @@ pkmacrobody :: [DataDecl] -> TH.Q [TH.Dec]
 pkmacrobody decls = do
   pkinit
   pkstate <- pkget
-  join <$> do
+  concat <$> do
     forM decls \decl -> do
       let ders = pkstate.pkders ++ decl.dataders
           derp = pkstate.pkderp ++ decl.dataderp
@@ -535,7 +535,10 @@ pkmacrobody decls = do
                       [ TH.bindS (TH.varP other) (TH.varE 'unpack),
                         TH.letS
                           [ TH.valD
-                              (TH.conP (mkshadow decl.dataname) (TH.varP <$> names))
+                              ( TH.conP
+                                  (mkshadow decl.dataname)
+                                  (TH.varP <$> names)
+                              )
                               (TH.normalB (TH.varE other))
                               []
                           ],
