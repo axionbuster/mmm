@@ -41,7 +41,6 @@ library
       M.IO.Internal.EffectTypes
       M.IO.Internal.Read
       M.IO.Internal.Socket
-      M.IO.Internal.WinHack
       M.IO.Internal.Zlib
       M.IO.KeepAlive
       M.IO.Obs
