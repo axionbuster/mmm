@@ -154,7 +154,7 @@ ewrap = flip withError \e -> do
 
 datadecl :: P DataDecl
 datadecl = do
-  let data' = ewrap $ cut $(string "data") "expecting 'data'"
+  let data' = $(string "data")
       openb = ewrap $ cut $(char '{') "expecting '{'"
       closb = ewrap $ cut $(char '}') "expecting '}'"
       deriv = ewrap $ cut $(string "deriving") "expecting 'deriving'"
@@ -320,18 +320,19 @@ pkmacrobody decls =
             TH.Name (TH.OccName (n ++ "__")) nf
           shadowdecl =
             TH.dataD
-              (pure []) -- Cxt
+              (pure []) -- no Cxt
               (mkshadow decl.dataname)
               []
               Nothing
               [ TH.recC
                   (mkshadow decl.dataname)
-                  ( catMaybes
-                      [ fmap
-                          do \tv -> pure ((mkshadow f.fieldname), nobang, tv)
-                          do f.fieldtype.typevia
-                      | f <- decl.dataflds
-                      ]
+                  ( [ pure $
+                        maybe
+                          (n, nobang, f.fieldtype.typemain)
+                          (\v -> (n, nobang, v))
+                          f.fieldtype.typevia
+                    | f <- decl.dataflds, let n = mkshadow f.fieldname
+                    ]
                   )
               ]
               [ TH.derivClause

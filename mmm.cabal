@@ -63,6 +63,7 @@ library
       M.Pack.Internal.TH
       M.Pack.Internal.Types
       M.PkMacro
+      M.PkMacroTest
       M.Position
       M.Reg
       M.TODO
