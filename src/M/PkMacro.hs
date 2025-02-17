@@ -7,7 +7,7 @@
 -- Copyright: (c) axionbuster, 2025
 -- License: BSD-3-Clause
 --
--- This module provides Template Haskell functionality to generate data types with 
+-- This module provides Template Haskell functionality to generate data types with
 -- automatic 'Pack'\/'Unpack' instances. It uses a simple grammar to define data types
 -- and their field mappings.
 --
@@ -81,11 +81,11 @@
 -- * Type literals: @\"hello\"@, @123@
 -- * Parenthesized types: @(a, b)@, @('Either' a b)@
 --
--- See: 'Pack', 'Unpack', 'setdefaultderives', 'setproperderives', and 'setshadowderives'.
+-- See: 'Pack', 'Unpack', 'setdefaultderives', 'addproperderives', and 'addshadowderives'.
 module M.PkMacro
   ( setdefaultderives,
-    setproperderives,
-    setshadowderives,
+    addproperderives,
+    addshadowderives,
     pkmacro,
   )
 where
@@ -144,7 +144,7 @@ typeident = liftA2 (:) (goh chh) (got cht)
     goh = satisfyAscii
     got = many . satisfyAscii
     chh c = (isLetter c && isUpper c) || (c == '_')
-    cht c = isLetter c || isDigit c || c == '_' || c == '\''
+    cht c = isLetter c || isDigit c || c == '_' || c == '\'' || c == '.'
 typeident' = cut typeident "expected a type identifier"
 
 fieldident :: P String
@@ -357,7 +357,12 @@ thhasktype =
     rlist = ws *> $(char ']') *> ws
     vahead = satisfy \c -> (isLetter c && isLower c) || c == '_'
     cohead = satisfy \c -> (isLetter c && isUpper c) || c == '_'
-    chtail = satisfy \c -> isLetter c || c == '_' || c == '\'' || isDigit c
+    chtail = satisfy \c ->
+      isLetter c
+        || c == '_'
+        || c == '\''
+        || c == '.'
+        || isDigit c
     numtylit = TH.NumTyLit <$> anyAsciiDecimalInteger
     strtylit = TH.StrTyLit <$> between dbquote dbquote (many escaped)
     chartylit = TH.CharTyLit <$> between quote quote escaped'
@@ -385,32 +390,32 @@ data PkState = PkState
 setdefaultderives :: TH.Q [TH.Dec]
 setdefaultderives = do
   pkinit
-  void $ setproperderives [''Generic]
-  void $ setshadowderives [''Generic, ''Pack, ''Unpack]
+  pkmodify \b -> b {pkderp = TH.ConT <$> [''Generic]}
+  pkmodify \b -> b {pkders = TH.ConT <$> [''Generic, ''Pack, ''Unpack]}
   pure []
 
--- | Set the proper deriving clauses for subsequent data types.
+-- | Add proper deriving clauses for subsequent data types.
 -- These instances will be derived directly on the main data type.
 --
 -- @
--- setproperderives [''Generic, ''Show]  -- Derive Generic and Show
+-- 'addproperderives' [''Generic, ''Show]  -- Derive Generic and Show
 -- @
-setproperderives :: [TH.Name] -> TH.Q [TH.Dec]
-setproperderives a = do
+addproperderives :: [TH.Name] -> TH.Q [TH.Dec]
+addproperderives names = do
   pkinit
-  pkmodify \b -> b {pkderp = TH.ConT <$> a}
+  pkmodify \b -> b {pkderp = b.pkderp ++ map TH.ConT names}
   pure []
 
--- | Set the shadow deriving clauses for subsequent data types.
+-- | Add shadow deriving clauses for subsequent data types.
 -- These instances will be derived on the shadow data type used for serialization.
 --
 -- @
--- setshadowderives [''Generic, ''Pack]  -- Derive 'Generic' and 'Pack' on shadow type
+-- 'addshadowderives' [''Generic, ''Pack]  -- Derive 'Generic' and 'Pack' on shadow type
 -- @
-setshadowderives :: [TH.Name] -> TH.Q [TH.Dec]
-setshadowderives a = do
+addshadowderives :: [TH.Name] -> TH.Q [TH.Dec]
+addshadowderives names = do
   pkinit
-  pkmodify \b -> b {pkders = TH.ConT <$> a}
+  pkmodify \b -> b {pkders = b.pkders ++ map TH.ConT names}
   pure []
 
 pkinit :: TH.Q ()
