@@ -17,9 +17,6 @@ module M.Pack
     module M.Pack.Internal.Newtypes,
     -- | bit-fiddling: bitsets, bitflags, etc.
     module M.Pack.Internal.Bit,
-    -- | template Haskell utilities for use with "th-serde"
-    -- to help derive 'Pack' and 'Unpack' instances
-    module M.Pack.Internal.TH,
   )
 where
 
@@ -28,5 +25,4 @@ import M.Pack.Internal.Etc ()
 import M.Pack.Internal.Linear ()
 import M.Pack.Internal.Newtypes
 import M.Pack.Internal.Num
-import M.Pack.Internal.TH
 import M.Pack.Internal.Types

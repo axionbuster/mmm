@@ -12,11 +12,11 @@ import Control.DeepSeq
 import Data.Bits
 import Data.Data
 import Data.Hashable
-import Data.Serde.QQ
 import Data.Text (Text)
 import GHC.Generics
 import Language.Haskell.TH.Syntax (Lift)
 import M.Pack
+import M.PkMacro
 
 -- | flags for teleporting an entity
 --
@@ -44,24 +44,12 @@ data TeleportFlags = TeleportFlags
 -- use a type that is at least 16 bits wide
 instance (Bits i, Integral i, Pack i, Unpack i) => Bitreppable i TeleportFlags
 
--- TODO for th-serde:
---  support doc comments
+setdefaultderives
+addproperderives [''NFData, ''Typeable, ''Show, ''Eq]
 
-[serde|
-.derive
-  Show Read Lift Data Typeable
-
-data SoundEvent
-  soundname :: Text via Identifier
-  fixedrange :: Maybe Float
+[pkmacro|
+  data SoundEvent {
+    soundname :: Text via Identifier,
+    fixedrange :: Maybe Float,
+  }
   |]
-
-runusercoercion
-  borrowderivepackunpack
-  properderivepackunpack
-  [ ''Generic,
-    ''Hashable,
-    ''NFData,
-    ''Eq,
-    ''Ord
-  ]

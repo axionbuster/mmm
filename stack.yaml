@@ -43,12 +43,6 @@ packages:
 #
 # extra-deps: []
 
-extra-deps:
-  # th-serde: used to borrow traits by using shadow types
-  # (separates ser/de logic from the main code)
-  - git: https://github.com/axionbuster/th-serde.git
-    commit: '6d5e7aabb14120a3ae7d74a1dee954a237a3c421'
-
 # Override default flag values for project packages and extra-deps
 # flags: {}
 

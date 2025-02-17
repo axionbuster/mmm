@@ -3,18 +3,7 @@
 # For more information, please see the documentation at:
 #   https://docs.haskellstack.org/en/stable/topics/lock_files
 
-packages:
-- completed:
-    commit: 6d5e7aabb14120a3ae7d74a1dee954a237a3c421
-    git: https://github.com/axionbuster/th-serde.git
-    name: th-serde
-    pantry-tree:
-      sha256: 8dda827bc460dfac45e7624fb3f11800df6cdb7e3a57063e1a0c84abaa8a1323
-      size: 989
-    version: 0.1.3.0
-  original:
-    commit: 6d5e7aabb14120a3ae7d74a1dee954a237a3c421
-    git: https://github.com/axionbuster/th-serde.git
+packages: []
 snapshots:
 - completed:
     sha256: 28105fd76386569f72c84978edbf017e006f5ee3957bb578f79bcd40db1376b9

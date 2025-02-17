@@ -67,7 +67,6 @@ dependencies:
 - stm
 - template-haskell
 - text
-- th-serde
 - unliftio
 - unordered-containers
 - uuid-types

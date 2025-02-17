@@ -15,7 +15,6 @@ import Data.Data
 import Data.Functor
 import Data.Hashable
 import Data.Int
-import Data.Serde.QQ
 import Data.Vector qualified as V
 import Data.Word
 import GHC.Generics
@@ -24,6 +23,7 @@ import Linear
 import M.LEB
 import M.NBT
 import M.Pack
+import M.PkMacro
 
 -- only for internal use
 newtype PackedXZ = PackedXZ {getpackedxz :: V2 Word8}
@@ -46,36 +46,30 @@ instance Unpack PackedXZ where
   unpack = unpack @Word8 <&> \w -> PackedXZ (V2 (w .>>. 4) (w .&. 15))
   {-# INLINEABLE unpack #-}
 
-[serde|
-.derive
-  Show Read Data Typeable
+setdefaultderives
+addproperderives [''NFData, ''Typeable, ''Show, ''Eq]
 
-data BlockEntity
-  bexz :: V2 Word8 via PackedXZ
-  berelheight :: Int16
-  betype :: Int32 via VarInt
-  bedata :: Tg
+[pkmacro|
+data BlockEntity {
+  bexz :: V2 Word8 via PackedXZ,
+  berelheight :: Int16,
+  betype :: Int32 via VarInt,
+  bedata :: Tg,
+}
 
-data ChunkData
-  cdhmaps :: Tg
-  cddata :: ByteString
-  cdblockentities :: V.Vector BlockEntity
+data ChunkData {
+  cdhmaps :: Tg,
+  cddata :: ByteString,
+  cdblockentities :: V.Vector BlockEntity,
+}
 
-data LightData
-  ldskymask :: Bitset
-  ldblockmask :: Bitset
-  ld0skymask :: Bitset
-  ld0blockmask :: Bitset
+data LightData {
+  ldskymask :: Bitset,
+  ldblockmask :: Bitset,
+  ld0skymask :: Bitset,
+  ld0blockmask :: Bitset,
   -- inner ByteStrings are always 2048 bytes long by contract
-  ldskylights :: V.Vector ByteString
-  ldblocklights :: V.Vector ByteString
+  ldskylights :: V.Vector ByteString,
+  ldblocklights :: V.Vector ByteString,
+}
  |]
-
-runusercoercion
-  borrowderivepackunpack
-  properderivepackunpack
-  [ ''Generic,
-    ''NFData,
-    ''Eq,
-    ''Ord
-  ]

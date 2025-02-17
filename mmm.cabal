@@ -60,7 +60,6 @@ library
       M.Pack.Internal.Linear
       M.Pack.Internal.Newtypes
       M.Pack.Internal.Num
-      M.Pack.Internal.TH
       M.Pack.Internal.Types
       M.PkMacro
       M.Position
@@ -130,7 +129,6 @@ library
     , stm
     , template-haskell
     , text
-    , th-serde
     , unliftio
     , unordered-containers
     , uuid-types
@@ -194,7 +192,6 @@ executable mmm-run
     , stm
     , template-haskell
     , text
-    , th-serde
     , unliftio
     , unordered-containers
     , uuid-types
@@ -269,7 +266,6 @@ test-suite mmm-test
     , stm
     , template-haskell
     , text
-    , th-serde
     , unliftio
     , unordered-containers
     , uuid-types
