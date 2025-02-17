@@ -13,7 +13,6 @@ import Control.Concurrent.STM
 import Control.Exception
 import Control.Monad
 import Control.Monad.IO.Class
-import Data.ByteString (ByteString)
 import Data.ByteString qualified as B
 import Debug.Trace
 import M.Crypto

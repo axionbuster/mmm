@@ -196,6 +196,8 @@ executable mmm-run
     , winasyncsocket
     , zlib
   default-language: GHC2021
+  if os(windows)
+    ghc-options: -with-rtsopts=--io-manager=native
 
 test-suite mmm-test
   type: exitcode-stdio-1.0

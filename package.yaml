@@ -104,6 +104,10 @@ executables:
     - -threaded
     - -rtsopts
     - -with-rtsopts=-N
+    when:
+    - condition: os(windows)
+      ghc-options:
+      - -with-rtsopts=--io-manager=native
     dependencies:
     - mmm
     - optparse-applicative
