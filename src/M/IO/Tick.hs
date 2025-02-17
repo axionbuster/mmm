@@ -43,4 +43,4 @@ tick tr f = do
       t0 <- get
       t1 <- liftIO getMonotonicTime
       wa <- readTVarIO tr <&> \t -> max 0 (recip t - (t1 - t0))
-      threadDelay (ceiling (1e6 * wa)) -- 1e6 us = (1e6 us/s) * s = s
+      threadDelay (ceiling (1e6 * wa)) -- 1e6 us = s
