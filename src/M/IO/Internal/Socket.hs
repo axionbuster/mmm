@@ -8,18 +8,13 @@
 -- handling encryption and compression.
 module M.IO.Internal.Socket (Connection (..), withcxfromsocket) where
 
-import Control.Concurrent.Async
-import Control.Concurrent.STM
-import Control.Exception
-import Control.Monad
-import Control.Monad.IO.Class
 import Data.ByteString qualified as B
-import Debug.Trace
 import M.Crypto
 import M.IO.Internal.Datagram
+import M.IO.Obs
 import Network.SocketA
 import System.IO.Streams
-import Text.Printf
+import UnliftIO
 
 -- | a connection to either a server or a client
 data Connection = Connection
@@ -34,31 +29,28 @@ data Connection = Connection
   }
 
 -- | create a connection from a socket
-withcxfromsocket :: Socket -> (Connection -> IO a) -> IO a
+withcxfromsocket :: (MonadUnliftIO m) => Socket -> (Connection -> m a) -> m a
 withcxfromsocket sk cont = do
-  traceIO "withcxfromsocket begins"
   th <- newTVarIO (-1) -- compression off by default
-  (i0, o0) <- socketToStreams sk
+  (i0, o0) <- liftIO (socketToStreams sk)
   (ef, df) <- liftA2 (,) (newTVarIO pure) (newTVarIO pure)
-  -- (i1, o1) <- liftA2 (,) (makedecrypting df i0) (makeencrypting ef o0)
-  let (i1, o1) = (i0, o0)
-  (i2, o2) <- liftA2 (,) (makepacketstreami th i1) (makepacketstreamo th o1)
+  (i1, o1) <-
+    liftA2
+      (,)
+      (liftIO $ makedecrypting df i0)
+      (liftIO $ makeencrypting ef o0)
+  (i2, o2) <-
+    liftA2
+      (,)
+      (liftIO $ makepacketstreami th i1)
+      (liftIO $ makepacketstreamo th o1)
   k <- newTVarIO Nothing
-  traceIO "withcxfromsocket: past k"
-  -- need to go from the easy way to the hard way.
-  -- why? because Datagram.hs expects functions to be passed in
-  -- for crypto, so we need to convert encryption keys to
-  -- encryption functions
-  let watchk = do
-        kold <- newTVarIO Nothing
-        forever do
-          k' <- atomically do
-            kold' <- readTVar kold
-            knew <- readTVar k
-            when (knew == kold') retry
-            writeTVar kold knew
-            pure knew
-          case k' of
+  let watchk = liftIO $ obs
+        do k -- target
+        do const pure -- transform (accept new value)
+        do
+          const \case
+            -- what to do upon a change in 'k'
             Nothing -> atomically do
               writeTVar ef pure
               writeTVar df pure
@@ -70,9 +62,8 @@ withcxfromsocket sk cont = do
                 writeTVar df (aesupdate aesd)
   withAsync watchk \s -> do
     link s
-    traceIO "withcxfromsocket: about to call 'cont'"
     handle
-      do \(e :: SomeException) -> do liftIO $ traceIO $ printf "with..et caught: %s" (displayException e); throwIO e
+      do \(e :: SomeException) -> throwIO e
       do
         cont
           Connection

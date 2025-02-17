@@ -33,7 +33,6 @@ import Data.Data
 import Data.Hashable
 import Data.Maybe
 import Data.Word
-import Debug.Trace
 import FlatParse.Stateful
 import GHC.Generics
 import Language.Haskell.TH.Syntax (Lift)
@@ -74,7 +73,9 @@ makepacketstreami c s =
   where
     takepacket threshold b = do
       t <- parseio0 @ParseError b checkedlength
-      u <- catch (fmap fromJust $ timeout 5_000_000 $ readExactly t b) \(e :: SomeException) -> do traceIO ("takepacket: %s" ++ (displayException e)); throwIO e
+      u <- catch
+        (fmap fromJust $ timeout 5_000_000 $ readExactly t b)
+        \(e :: SomeException) -> throwIO e
       let p
             | threshold >= 0 = parsepostcomp
             | otherwise = parseprecomp

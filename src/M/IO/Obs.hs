@@ -13,8 +13,7 @@ module M.IO.Obs
 where
 
 import Control.Monad
-import Effectful
-import Effectful.Concurrent.STM
+import UnliftIO
 
 -- | A general observer that monitors changes in a shared variable and reacts to them.
 --
@@ -27,7 +26,7 @@ import Effectful.Concurrent.STM
 --     reacttochange          -- Action to execute when changes occur
 -- @
 obs ::
-  (Concurrent :> es, Eq a) =>
+  (MonadIO m, Eq a) =>
   -- | Target variable to observe for changes
   TVar a ->
   -- | Function to compare and transform old and new values in STM
@@ -37,8 +36,8 @@ obs ::
   -- | Action to execute when changes are detected, with old and new values
   --
   -- Old value is passed first
-  (a -> a -> Eff es ()) ->
-  Eff es b
+  (a -> a -> m ()) ->
+  m b
 obs a b c = do
   old <- readTVarIO a >>= newTVarIO
   forever do
