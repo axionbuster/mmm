@@ -51,8 +51,6 @@ flags:
     network: false
     zlib: false
 
-allow-newer-deps: [winasyncsocket]
-
 # Extra package databases containing global packages
 # extra-package-dbs: []
 
