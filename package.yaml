@@ -60,8 +60,6 @@ dependencies:
 - io-streams
 - lens
 - linear
-- network
-- network-run
 - parser-combinators
 - random
 - stm
@@ -71,6 +69,7 @@ dependencies:
 - unordered-containers
 - uuid-types
 - vector
+- winasyncsocket
 - zlib
 
 ghc-options:

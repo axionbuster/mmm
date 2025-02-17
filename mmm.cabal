@@ -122,8 +122,6 @@ library
     , io-streams
     , lens
     , linear
-    , network
-    , network-run
     , parser-combinators
     , random
     , stm
@@ -133,6 +131,7 @@ library
     , unordered-containers
     , uuid-types
     , vector
+    , winasyncsocket
     , zlib
   default-language: GHC2021
 
@@ -184,8 +183,6 @@ executable mmm-run
     , lens
     , linear
     , mmm
-    , network
-    , network-run
     , optparse-applicative
     , parser-combinators
     , random
@@ -196,6 +193,7 @@ executable mmm-run
     , unordered-containers
     , uuid-types
     , vector
+    , winasyncsocket
     , zlib
   default-language: GHC2021
 
@@ -259,8 +257,6 @@ test-suite mmm-test
     , lens
     , linear
     , mmm
-    , network
-    , network-run
     , parser-combinators
     , random
     , stm
@@ -270,5 +266,6 @@ test-suite mmm-test
     , unordered-containers
     , uuid-types
     , vector
+    , winasyncsocket
     , zlib
   default-language: GHC2021

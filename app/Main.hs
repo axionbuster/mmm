@@ -29,6 +29,7 @@ import M.V769.P qualified as P
 import M.V769.Reg
 import M.V769.S qualified as S
 import Text.Printf
+import Network.SocketA qualified as Network
 
 reifybuilder :: Builder -> ByteString
 reifybuilder = B.toStrict . BB.toLazyByteString
@@ -72,7 +73,8 @@ greeting = do
 
 main :: IO ()
 main =
-  let action =
+  let action = do
+        Network.startup
         runEff
           . runNonDet OnEmptyKeep
           . runConcurrent
