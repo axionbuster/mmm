@@ -63,15 +63,16 @@ library
       M.Pack.Internal.TH
       M.Pack.Internal.Types
       M.PkMacro
-      M.PkMacroTest
       M.Position
       M.Reg
       M.TODO
       M.V769.C
+      M.V769.C2
       M.V769.H
       M.V769.I
       M.V769.L
       M.V769.P
+      M.V769.P2
       M.V769.Reg
       M.V769.S
   other-modules:

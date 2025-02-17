@@ -99,6 +99,7 @@ import Data.Coerce
 import Data.Foldable1
 import Data.Function
 import Data.Functor
+import Data.List ((\\))
 import Data.List.NonEmpty qualified as NEL
 import Data.Maybe
 import Data.Typeable
@@ -447,6 +448,7 @@ pkmacrobody decls = do
       let ders = pkstate.pkders ++ decl.dataders
           derp = pkstate.pkderp ++ decl.dataderp
           nobang = TH.Bang TH.NoSourceUnpackedness TH.NoSourceStrictness
+          shadowed = any (isJust . typevia . fieldtype) decl.dataflds
           maindecl =
             TH.dataD
               (pure []) -- Cxt
@@ -459,10 +461,19 @@ pkmacrobody decls = do
                   | f <- decl.dataflds
                   ]
               ]
-              [ TH.derivClause
-                  Nothing
-                  (fmap pure derp)
-              ]
+              ( [ TH.derivClause
+                    Nothing
+                    (fmap pure derp)
+                ]
+                  ++ if shadowed
+                    then
+                      []
+                    else
+                      [ TH.derivClause
+                          Nothing
+                          (fmap pure (ders \\ derp))
+                      ]
+              )
           mkshadow (TH.Name (TH.OccName n) nf) =
             TH.Name (TH.OccName (n ++ "__")) nf
           shadowdecl =
@@ -496,14 +507,20 @@ pkmacrobody decls = do
                   'pack
                   [ [] & TH.clause [TH.varP self] do
                       TH.normalB do
-                        TH.appE (TH.varE 'pack) do
-                          TH.recConE
-                            (mkshadow decl.dataname)
-                            [ (mkshadow f.fieldname,)
-                                <$> TH.appE (TH.varE 'coerce) do
-                                  TH.appE (TH.varE f.fieldname) (TH.varE self)
-                            | f <- decl.dataflds
-                            ]
+                        names <- forM decl.dataflds (const (TH.newName "a"))
+                        TH.letE
+                          [ TH.valD
+                              (TH.conP decl.dataname (TH.varP <$> names))
+                              (TH.normalB (TH.varE self))
+                              [] -- no where-bindings
+                          ]
+                          ( TH.appE (TH.varE 'pack) do
+                              TH.appsE do
+                                TH.conE (mkshadow decl.dataname)
+                                  : [ TH.appE (TH.varE 'coerce) (TH.varE n)
+                                    | n <- names
+                                    ]
+                          )
                   ]
               ]
           bridgeunpack = do
@@ -513,23 +530,26 @@ pkmacrobody decls = do
               (TH.appT (TH.conT ''Unpack) (TH.conT decl.dataname))
               [ [] & TH.valD (TH.varP 'unpack) do
                   TH.normalB do
+                    names <- forM decl.dataflds (const (TH.newName "a"))
                     TH.doE
                       [ TH.bindS (TH.varP other) (TH.varE 'unpack),
+                        TH.letS
+                          [ TH.valD
+                              (TH.conP (mkshadow decl.dataname) (TH.varP <$> names))
+                              (TH.normalB (TH.varE other))
+                              []
+                          ],
                         TH.noBindS do
                           TH.appE (TH.varE 'pure) do
-                            TH.recConE
-                              decl.dataname
-                              [ (f.fieldname,)
-                                  <$> TH.appE (TH.varE 'coerce) do
-                                    TH.appE
-                                      (TH.varE (mkshadow f.fieldname))
-                                      (TH.varE other)
-                              | f <- decl.dataflds
-                              ]
+                            TH.appsE do
+                              TH.conE decl.dataname
+                                : [ TH.appE (TH.varE 'coerce) (TH.varE n)
+                                  | n <- names
+                                  ]
                       ]
               ]
       maindecl
-        # if any (isJust . typevia . fieldtype) decl.dataflds
+        # if shadowed
           then sequence [shadowdecl, bridgepack, bridgeunpack]
           else pure []
 
