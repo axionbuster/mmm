@@ -1,18 +1,92 @@
 {-# LANGUAGE NoMonomorphismRestriction #-}
 {-# LANGUAGE NoOverloadedLists #-}
 
+-- |
+-- Module: M.PkMacro
+-- Description: Template Haskell generator for data types with 'Pack'\/'Unpack' instances
+-- Copyright: (c) axionbuster, 2025
+-- License: BSD-3-Clause
+--
+-- This module provides Template Haskell functionality to generate data types with 
+-- automatic 'Pack'\/'Unpack' instances. It uses a simple grammar to define data types
+-- and their field mappings.
+--
+-- == Usage
+--
+-- Define data types using the 'pkmacro' quasi-quoter. The syntax is indentation-insensitive:
+--
+-- @
+-- -- First, set up default instances
+-- 'setdefaultderives'  -- Sets up 'Generic', 'Pack', and 'Unpack' derives
+--
+-- -- Define a newtype wrapper with 'Pack'\/'Unpack' instances
+-- newtype AAA = AAA 'Data.Int.Int32'
+--   deriving stock ('Generic')
+--   deriving newtype ('Pack', 'Unpack')
+--
+-- [pkmacro|
+-- -- Regular data type with two fields
+-- data A {
+--   f1 :: Int32,                -- Regular field
+--   f2 :: Int32 via AAA,       -- Field with custom serialization
+-- }
+--
+-- -- Data type with one field and explicit deriving
+-- data B {
+--   f3 :: Int32,
+--   deriving ('Generic', 'Show')
+-- }
+--
+-- -- Empty data type (creates constructor with no fields)
+-- data C {}
+-- |]
+-- @
+--
+-- The grammar supports:
+--
+-- * Empty data types (no fields)
+-- * Custom serialization via @via@ clause
+-- * Multiple data types in one block
+-- * Indentation-insensitive syntax
+-- * Comments (both @--@ and @{- -}@ style)
+--
+-- == Syntax
+--
+-- The full syntax for data type definitions is:
+--
+-- @
+-- data TypeName {
+--   field1 :: Type1 [via Type2],     -- Field with optional via clause
+--   field2 :: Type3,                 -- Regular field
+--   [deriving (Class1, Class2)]      -- Optional proper deriving clause
+--   [and shadow deriving ('Pack', 'Unpack') with (Class3, Class4)] -- Optional shadow deriving
+-- }
+-- @
+--
+-- Elements in square brackets are optional.
+--
+-- * The @via@ clause specifies a different type to use for serialization
+-- * @deriving@ adds instances to the main data type
+-- * @shadow deriving@ adds instances to the generated shadow type used for serialization
+-- * Multiple data types can be defined in a single quasi-quoter block
+--
+-- === Type Syntax
+--
+-- Types can include:
+--
+-- * Simple types: @'Data.Int.Int32'@, @'Data.Text.Text'@, etc.
+-- * Parameterized types: @'Maybe' a@, @['Int']@
+-- * Type applications: @a \@k@
+-- * Promoted types: @\'True@, @\'Just@
+-- * Type literals: @\"hello\"@, @123@
+-- * Parenthesized types: @(a, b)@, @('Either' a b)@
+--
+-- See: 'Pack', 'Unpack', 'setdefaultderives', 'setproperderives', and 'setshadowderives'.
 module M.PkMacro
-  ( DataDecl (..), -- debug
-    FieldType (..), -- debug
-    Field (..), -- debug
-    P, -- debug
-    hasktype, -- debug
-    datadecl, -- debug
-    pkmacrobody, -- debug
-    pkmacro, -- real
-    setdefaultderives, -- real
-    setproperderives, -- real
-    setshadowderives, -- real
+  ( setdefaultderives,
+    setproperderives,
+    setshadowderives,
+    pkmacro,
   )
 where
 
@@ -304,6 +378,10 @@ data PkState = PkState
 
 -- user-facing
 
+-- | Set up default derives for subsequent data types.
+-- This sets 'Generic' for proper derives and 'Generic' + 'Pack' + 'Unpack' for shadow derives.
+--
+-- Use this at the start of your module to automatically derive the most common instances.
 setdefaultderives :: TH.Q [TH.Dec]
 setdefaultderives = do
   pkinit
@@ -311,12 +389,24 @@ setdefaultderives = do
   void $ setshadowderives [''Generic, ''Pack, ''Unpack]
   pure []
 
+-- | Set the proper deriving clauses for subsequent data types.
+-- These instances will be derived directly on the main data type.
+--
+-- @
+-- setproperderives [''Generic, ''Show]  -- Derive Generic and Show
+-- @
 setproperderives :: [TH.Name] -> TH.Q [TH.Dec]
 setproperderives a = do
   pkinit
   pkmodify \b -> b {pkderp = TH.ConT <$> a}
   pure []
 
+-- | Set the shadow deriving clauses for subsequent data types.
+-- These instances will be derived on the shadow data type used for serialization.
+--
+-- @
+-- setshadowderives [''Generic, ''Pack]  -- Derive 'Generic' and 'Pack' on shadow type
+-- @
 setshadowderives :: [TH.Name] -> TH.Q [TH.Dec]
 setshadowderives a = do
   pkinit
@@ -443,6 +533,7 @@ punwrap (OK v _ _) = v
 punwrap Fail = error "unexpected uninformative failure"
 punwrap (Err e) = error ("parsing error: " ++ showparseerror e)
 
+-- | See module docs ("M.PkMacro") for information.
 pkmacro :: TH.QuasiQuoter
 pkmacro =
   TH.QuasiQuoter
