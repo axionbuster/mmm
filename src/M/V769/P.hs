@@ -1,7 +1,7 @@
 {-# OPTIONS_GHC -Wno-missing-export-lists #-}
 
 -- |
--- Module: M.V769.P2
+-- Module: M.V769.P
 -- Description: Protocol play state packets (AI-generated)
 -- Copyright: (c) axionbuster, 2025
 -- License: BSD-3-Clause

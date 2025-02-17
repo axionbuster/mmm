@@ -14,31 +14,19 @@ module M.V769.H where
 import Control.DeepSeq
 import Data.Data
 import Data.Int
-import Data.Serde.QQ
 import Data.Text (Text)
 import Data.Word
-import GHC.Generics
 import M.LEB
-import M.Pack
+import M.PkMacro
 
-[serde|
-.derive
-  Show Read Data Typeable
+setdefaultderives
+addproperderives [''NFData, ''Typeable, ''Show, ''Eq]
 
--- Handshaking
-data HandshakePacket
-  protocolversion :: Int32 via VarInt
-  serveraddress :: Text 
-  serverport :: Word16
-  nextstate :: Int32 via VarInt
- |]
-
-runusercoercion
-  borrowderivepackunpack
-  properderivepackunpack
-  -- preparations for shadow types
-  [ ''Generic,
-    ''NFData,
-    ''Eq,
-    ''Ord
-  ]
+[pkmacro|
+data HandshakePacket {
+  protocolversion :: Int32 via VarInt,
+  serveraddress :: Text,
+  serverport :: Word16,
+  nextstate :: Int32 via VarInt,
+}
+  |]

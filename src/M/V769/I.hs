@@ -18,11 +18,11 @@ import Data.Data
 import Data.Fixed
 import Data.Hashable
 import Data.Int
-import Data.Serde.QQ
 import Data.Text (Text)
 import GHC.Generics
 import Language.Haskell.TH.Syntax (Lift)
 import M.Pack
+import M.PkMacro
 
 -- | given in 1/8000 resolution
 data SetEntityVelocityRes
@@ -83,32 +83,21 @@ newtype Ping = Ping
   deriving newtype (Show, Read, NFData, Eq, Ord, Pack, Unpack)
   deriving stock (Data, Typeable, Generic)
 
-[serde|
-.derive
-  Show Read Data Typeable
+-- Set up default instances for all data types
+setdefaultderives
+addproperderives [''NFData, ''Typeable, ''Show, ''Eq]
 
--- Common/Shared types first
-data DisplayedSkinParts
-  cape :: Bool
-  jacket :: Bool
-  leftsleeve :: Bool
-  rightsleeve :: Bool
-  leftpants :: Bool
-  rightpants :: Bool
-  hat :: Bool
+[pkmacro|
+data DisplayedSkinParts {
+  cape :: Bool,
+  jacket :: Bool,
+  leftsleeve :: Bool,
+  rightsleeve :: Bool,
+  leftpants :: Bool,
+  rightpants :: Bool,
+  hat :: Bool,
+}
 |]
-
--- provided by "th-serde": Data.Serde.QQ
-runusercoercion
-  -- provided by M.Pack
-  borrowderivepackunpack
-  properderivepackunpack
-  -- preparations for shadow types
-  [ ''Generic,
-    ''NFData,
-    ''Eq,
-    ''Ord
-  ]
 
 instance
   (Bits i, Integral i, Pack i, Unpack i) =>
