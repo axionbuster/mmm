@@ -12,7 +12,6 @@ module M.IO.Internal.EffectSocket
   )
 where
 
-import Control.DeepSeq
 import Control.Monad
 import Data.ByteString qualified as B
 import Data.ByteString.Builder (Builder, toLazyByteString)
