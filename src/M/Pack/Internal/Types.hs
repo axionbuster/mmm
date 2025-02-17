@@ -42,7 +42,7 @@ type Result = F.Result ParseError
 
 -- | our parser error type
 newtype ParseError = ParseError {showparseerror :: String} -- generic message
-  deriving newtype (Eq, Ord, Show, IsString)
+  deriving newtype (Eq, Ord, Show, IsString, Semigroup, Monoid)
   deriving stock (Typeable, Data, Generic, Lift)
   deriving anyclass (Exception)
 

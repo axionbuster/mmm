@@ -1,12 +1,15 @@
 {-# LANGUAGE NoMonomorphismRestriction #-}
+{-# LANGUAGE NoOverloadedLists #-}
 
 module M.PkMacro
-  ( DataDecl (..),
-    FieldType (..),
-    Field (..),
+  ( DataDecl (..), -- debug
+    FieldType (..), -- debug
+    Field (..), -- debug
     P, -- debug
     hasktype, -- debug
-    datadecl,
+    datadecl, -- debug
+    pkmacrobody, -- debug
+    pkmacro, -- real
   )
 where
 
@@ -15,20 +18,24 @@ import Control.Category ((>>>))
 import Control.Monad
 import Data.ByteString qualified as B
 import Data.Char hiding (isDigit)
+import Data.Coerce
 import Data.Foldable1
 import Data.Function
 import Data.Functor
 import Data.List.NonEmpty qualified as NEL
+import Data.Maybe
 import FlatParse.Stateful hiding (Parser, Result)
 import Language.Haskell.TH qualified as TH
+import Language.Haskell.TH.Quote qualified as TH
+import Language.Haskell.TH.Syntax qualified as TH
 import M.Pack
 
 -- data A {
 --  field1 :: Type via Type,
 --  field2 :: Type,
---  deriving (Classes3)
---    based on (Classes 1)
---    shadow deriving (Classes 2)
+--  deriving (Classes 1)
+--    and shadow deriving (Pack, Unpack)
+--    with (Classes 2)
 -- }
 
 type P a = forall st r. Parser st r a
@@ -87,11 +94,17 @@ multilinecomment =
        )
 
 data DataDecl = DataDecl
-  { dataname :: String,
+  { dataname :: TH.Name,
     dataflds :: [Field],
     dataderp :: [TH.Type], -- proper
     dataders :: [TH.Type], -- shadow
-    dataderx :: [TH.Type] -- proxy
+    datashwg :: Bool -- shadowing Pack and Unpack?
+  }
+  deriving (Show)
+
+data Field = Field
+  { fieldname :: TH.Name,
+    fieldtype :: FieldType
   }
   deriving (Show)
 
@@ -101,11 +114,8 @@ data FieldType = FieldType
   }
   deriving (Show)
 
-data Field = Field
-  { fieldname :: String,
-    fieldtype :: FieldType
-  }
-  deriving (Show)
+data ShadowDir = ViaShadow | ViaMain
+  deriving (Show, Eq)
 
 -- used in datadecl
 hasktype :: P String
@@ -142,16 +152,11 @@ datadecl = do
       closb = ewrap $ cut $(char '}') "expecting '}'"
       deriv = ewrap $ cut $(string "deriving") "expecting 'deriving'"
       comma = ws *> $(char ',') <* ws
-      based =
-        ewrap $
-          cut
-            ($(string "based") *> ws *> $(string "on"))
-            "expecting 'based on'"
-      shado =
-        ewrap $
-          cut
-            ($(string "shadow") *> ws *> $(string "deriving"))
-            "expecting 'shadow deriving'"
+      shado = do
+        do $(string "and") *> ws *> $(string "shadow") *> ws
+        do $(string "deriving") *> ws *> $(char '(') *> ws *> $(string "Pack")
+        do comma *> $(string "Unpack") *> ws *> $(char ')') *> ws
+        do $(string "with")
       doubc = ewrap $ cut $(string "::") "expecting '::'"
       ewrap = flip withError \e -> do
         r <- lookahead takeRest
@@ -166,10 +171,12 @@ datadecl = do
             OK v _ _ -> pure v
             Fail -> empty
             Err e -> err e
-  dataname <- ws *> data' *> ws *> typeident' <* ws <* openb <* ws
+  dataname <-
+    TH.mkName <$> do
+      ws *> data' *> ws *> typeident' <* ws <* openb <* ws
   dataflds <- flip endBy comma do
     ws *> fails $(string "deriving") *> do
-      fn <- fieldident' <* ws <* doubc <* ws
+      fn <- TH.mkName <$> (fieldident' <* ws <* doubc <* ws)
       ty <- parsety
       vi <- optional ($(string "via") *> ws *> parsety <* ws)
       pure $ Field fn (FieldType ty vi)
@@ -179,10 +186,11 @@ datadecl = do
               ((between $(char '(') $(char ')') t <|> t) <* ws)
               "expecting type; types"
   ws
-  dataderx <- deriv *> ws *> parsetypes
-  dataderp <- based *> ws *> parsetypes
-  dataders <- shado *> ws *> parsetypes
-  DataDecl {..} <$ closb <* ws
+  dataderp <- deriv *> ws *> parsetypes
+  ders <- optional do shado *> ws *> parsetypes
+  case ders of
+    Just dataders -> DataDecl {datashwg = True, ..} <$ closb <* ws
+    Nothing -> DataDecl {datashwg = False, dataders = [], ..} <$ closb <* ws
 
 tester1 :: Result DataDecl
 tester1 =
@@ -191,7 +199,16 @@ tester1 =
     "data A {\
     \  field1 :: Type via Type @A @i @223 a b (C @i),\
     \  field2 :: Type,\
-    \  deriving (B) based on (C, D,E @1 @i,F) shadow deriving ()\
+    \  deriving (B) and shadow deriving (Pack, Unpack) with (D, E)\
+    \}"
+
+tester2 :: Result DataDecl
+tester2 =
+  parsepure0
+    datadecl
+    "data B {\
+    \ field1 :: Type,\
+    \ deriving (C)\
     \}"
 
 thhasktype :: P TH.Type
@@ -199,11 +216,11 @@ thhasktype =
   -- only cover: ParensT, TupleT, AppT, AppKindT, ForallT,
   -- VarT, ConT, PromotedT, LitT, ListT.
   -- no functions or other infix operators.
-  ws *> choice @[] parsers
+  ws *> choice parsers
   where
     -- caution: if vart were attempted first then appkindt, forallt, etc.
     -- may be subsumed by it, by nature of the grammar. so attempt
-    -- these more specific ones first. same for appt vs. contt and others.
+    -- these more specific ones first. same for appt vs. cont and others.
     parsers =
       [litt, listt, promotedt, appkindt]
         ++ [tuplet, forallt, appt, cont, vart]
@@ -213,25 +230,23 @@ thhasktype =
     vart = TH.VarT <$> vart0
     appt =
       foldl1' TH.AppT . NEL.fromList
-        <$> do
-          some do
-            choice @[]
-              [cont, vart, tuplet, litt, listt, promotedt]
+        <$> some do
+          choice @[]
+            [cont, vart, tuplet, litt, listt, promotedt]
         <* ws
     tuplet =
       let prefix = between lpar rpar (some comma) <&> (TH.TupleT . length)
           regular = between lpar rpar do
-            items <- flip sepBy comma do
-              choice @[] parsers
+            items <- flip sepBy comma do choice parsers
             pure case items of
               i : [] -> TH.ParensT i
               _ -> foldl' TH.AppT (TH.TupleT (length items)) items
        in ws *> (prefix <|> regular) <* ws
     appkindt = do
-      base <- choice @[] [cont, vart, tuplet]
+      base <- choice [cont, vart, tuplet]
       foldl' (flip ($)) base <$> many do
-        let next = choice @[] [litt, listt, promotedt, tuplet, cont, vart]
-        choice @[]
+        let next = choice [litt, listt, promotedt, tuplet, cont, vart]
+        choice
           [ (flip TH.AppKindT <$> (atsymb *> next)),
             (flip TH.AppT <$> next)
           ]
@@ -241,18 +256,18 @@ thhasktype =
       let vars = [TH.PlainTV name TH.SpecifiedSpec | name <- ns]
       $(char '.') *> ws
       ct <- option [] do
-        between lpar rpar (sepBy1 (choice @[] [appt, cont]) comma)
+        between lpar rpar (sepBy1 (choice [appt, cont]) comma)
       unless (null ct) do
         ws <* $(string "=>") <* ws
-      TH.ForallT vars ct <$> choice @[] do
+      TH.ForallT vars ct <$> choice do
         [litt, listt, promotedt, appkindt, tuplet, appt, cont, vart]
     promotedt = TH.PromotedT <$> (quote *> cont0) -- data con
-    litt = TH.LitT <$> (choice @[] [numtylit, strtylit, chartylit] <* ws)
+    litt = TH.LitT <$> (choice [numtylit, strtylit, chartylit] <* ws)
     listt =
       between llist rlist $
         foldl' TH.AppT TH.ListT
           <$> flip sepBy comma do
-            choice @[] $
+            choice $
               [litt, listt, promotedt, appkindt]
                 ++ [tuplet, forallt, appt, cont, vart]
     lpar = ws *> $(char '(') *> ws
@@ -273,3 +288,111 @@ thhasktype =
     escaped = approved <|> (bksp *> dbquote $> '"')
     escaped' = approved <|> (bksp *> quote $> '\'')
     approved = satisfy isPrint
+
+infixr 3 #
+
+(#) :: TH.Q a -> TH.Q [a] -> TH.Q [a]
+(#) = liftA2 (:)
+
+pkmacrobody :: [DataDecl] -> TH.Q [TH.Dec]
+pkmacrobody decls =
+  join <$> do
+    forM decls \(decl :: DataDecl) -> do
+      let nobang = TH.Bang TH.NoSourceUnpackedness TH.NoSourceStrictness
+          maindecl =
+            TH.dataD
+              (pure []) -- Cxt
+              decl.dataname
+              [] -- no type variables
+              Nothing -- no exotic kind
+              [ TH.recC
+                  decl.dataname
+                  [ pure (f.fieldname, nobang, f.fieldtype.typemain)
+                  | f <- decl.dataflds
+                  ]
+              ]
+              [ TH.derivClause
+                  Nothing
+                  (fmap pure decl.dataderp)
+              ]
+          mkshadow (TH.Name (TH.OccName n) nf) =
+            TH.Name (TH.OccName (n ++ "__")) nf
+          shadowdecl =
+            TH.dataD
+              (pure []) -- Cxt
+              (mkshadow decl.dataname)
+              []
+              Nothing
+              [ TH.recC
+                  (mkshadow decl.dataname)
+                  ( catMaybes
+                      [ fmap
+                          do \tv -> pure ((mkshadow f.fieldname), nobang, tv)
+                          do f.fieldtype.typevia
+                      | f <- decl.dataflds
+                      ]
+                  )
+              ]
+              [ TH.derivClause
+                  Nothing
+                  (fmap pure decl.dataders)
+              ]
+          bridgepack = do
+            self <- TH.newName "self"
+            TH.instanceD
+              (pure []) -- no Cxt
+              (TH.appT (TH.conT ''Pack) (TH.conT decl.dataname))
+              [ TH.funD
+                  'pack
+                  [ [] & TH.clause [TH.varP self] do
+                      TH.normalB do
+                        TH.appE (TH.varE 'pack) do
+                          TH.recConE
+                            (mkshadow decl.dataname)
+                            [ (mkshadow f.fieldname,)
+                                <$> TH.appE (TH.varE 'coerce) do
+                                  TH.appE (TH.varE f.fieldname) (TH.varE self)
+                            | f <- decl.dataflds
+                            ]
+                  ]
+              ]
+          bridgeunpack = do
+            other <- TH.newName "other"
+            TH.instanceD
+              (pure []) -- no Cxt
+              (TH.appT (TH.conT ''Unpack) (TH.conT decl.dataname))
+              [ [] & TH.valD (TH.varP 'unpack) do
+                  TH.normalB do
+                    TH.doE
+                      [ TH.bindS (TH.varP other) (TH.varE 'unpack),
+                        TH.noBindS do
+                          TH.appE (TH.varE 'pure) do
+                            TH.recConE
+                              decl.dataname
+                              [ (f.fieldname,)
+                                  <$> TH.appE (TH.varE 'coerce) do
+                                    TH.appE
+                                      (TH.varE (mkshadow f.fieldname))
+                                      (TH.varE other)
+                              | f <- decl.dataflds
+                              ]
+                      ]
+              ]
+      maindecl
+        # if decl.datashwg
+          then sequence [shadowdecl, bridgepack, bridgeunpack]
+          else pure []
+
+punwrap :: Result a -> a
+punwrap (OK v _ _) = v
+punwrap Fail = error "unexpected uninformative failure"
+punwrap (Err e) = error ("parsing error: " ++ showparseerror e)
+
+pkmacro :: TH.QuasiQuoter
+pkmacro =
+  TH.QuasiQuoter
+    { quoteExp = error "pkmacro is not an expression quoter",
+      quotePat = error "pkmacro is not a pattern quoter",
+      quoteType = error "pkmacro is not a type quoter",
+      quoteDec = pkmacrobody . punwrap . parsepure0 (many datadecl) . strToUtf8
+    }
