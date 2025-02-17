@@ -145,6 +145,13 @@ hasktype = ws *> (typeexpr <* ws)
           <|> bracketed $(char '(') $(char ')') '(' ')' typeexpr
           <|> bracketed $(char '[') $(char ']') '[' ']' typeexpr
 
+ewrap :: Parser st r a -> Parser st r a
+ewrap = flip withError \e -> do
+  r <- lookahead takeRest
+  let r' = if B.length r > le then B.append (B.take le r) "..." else r
+      le = 36
+  err $ e <> (ParseError $ ", the rest being " ++ show r')
+
 datadecl :: P DataDecl
 datadecl = do
   let data' = ewrap $ cut $(string "data") "expecting 'data'"
@@ -158,12 +165,6 @@ datadecl = do
         do comma *> $(string "Unpack") *> ws *> $(char ')') *> ws
         do $(string "with")
       doubc = ewrap $ cut $(string "::") "expecting '::'"
-      ewrap = flip withError \e -> do
-        r <- lookahead takeRest
-        let r' = if B.length r > le then B.append (B.take le r) "..." else r
-            co (ParseError e1) (ParseError e2) = ParseError (e1 ++ e2)
-            le = 36
-        err $ e `co` (ParseError $ ", the rest being " ++ show r')
       fieldident' = ewrap $ cut fieldident "expected a field identifier"
       parsety =
         hasktype >>= do
@@ -192,8 +193,8 @@ datadecl = do
     Just dataders -> DataDecl {datashwg = True, ..} <$ closb <* ws
     Nothing -> DataDecl {datashwg = False, dataders = [], ..} <$ closb <* ws
 
-tester1 :: Result DataDecl
-tester1 =
+_tester1 :: Result DataDecl
+_tester1 =
   parsepure0
     datadecl
     "data A {\
@@ -202,8 +203,8 @@ tester1 =
     \  deriving (B) and shadow deriving (Pack, Unpack) with (D, E)\
     \}"
 
-tester2 :: Result DataDecl
-tester2 =
+_tester2 :: Result DataDecl
+_tester2 =
   parsepure0
     datadecl
     "data B {\
@@ -394,5 +395,9 @@ pkmacro =
     { quoteExp = error "pkmacro is not an expression quoter",
       quotePat = error "pkmacro is not a pattern quoter",
       quoteType = error "pkmacro is not a type quoter",
-      quoteDec = pkmacrobody . punwrap . parsepure0 (many datadecl) . strToUtf8
+      quoteDec =
+        pkmacrobody
+          . punwrap
+          . parsepure0 (ewrap (cut (many datadecl <* eof) "pkmacro parse"))
+          . strToUtf8
     }
