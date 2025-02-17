@@ -156,6 +156,11 @@ withtalkingserver u host port handler = do
           liftIO $ traceIO "withtalkingserver: inside withcxfromsocket"
           run $ runtalking0 cx handler
 
+-- TODO: from here we first make a small replacement...
+-- - withcxfromsocket ... should now use the new Socket type, not the one from "network"
+-- - generally all dependencies on "network" should get dropped.
+-- - yeah this one too i will rewrite using "winasyncnetwork".
+
 -- | run client with single connection
 withtalkingclient ::
   ( IOE :> es,
