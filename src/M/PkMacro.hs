@@ -10,6 +10,9 @@ module M.PkMacro
     datadecl, -- debug
     pkmacrobody, -- debug
     pkmacro, -- real
+    setdefaultderives, -- real
+    setproperderives, -- real
+    setshadowderives, -- real
   )
 where
 
@@ -24,7 +27,9 @@ import Data.Function
 import Data.Functor
 import Data.List.NonEmpty qualified as NEL
 import Data.Maybe
+import Data.Typeable
 import FlatParse.Stateful hiding (Parser, Result)
+import GHC.Generics
 import Language.Haskell.TH qualified as TH
 import Language.Haskell.TH.Quote qualified as TH
 import Language.Haskell.TH.Syntax qualified as TH
@@ -97,8 +102,7 @@ data DataDecl = DataDecl
   { dataname :: TH.Name,
     dataflds :: [Field],
     dataderp :: [TH.Type], -- proper
-    dataders :: [TH.Type], -- shadow
-    datashwg :: Bool -- shadowing Pack and Unpack?
+    dataders :: [TH.Type] -- shadow
   }
   deriving (Show)
 
@@ -157,7 +161,7 @@ datadecl = do
   let data' = $(string "data")
       openb = ewrap $ cut $(char '{') "expecting '{'"
       closb = ewrap $ cut $(char '}') "expecting '}'"
-      deriv = ewrap $ cut $(string "deriving") "expecting 'deriving'"
+      deriv = $(string "deriving")
       comma = ws *> $(char ',') <* ws
       shado = do
         do $(string "and") *> ws *> $(string "shadow") *> ws
@@ -165,7 +169,6 @@ datadecl = do
         do comma *> $(string "Unpack") *> ws *> $(char ')') *> ws
         do $(string "with")
       doubc = ewrap $ cut $(string "::") "expecting '::'"
-      fieldident' = ewrap $ cut fieldident "expected a field identifier"
       parsety =
         hasktype >>= do
           strToUtf8 >>> parsepure0 (thhasktype <* eof) >>> \case
@@ -177,7 +180,7 @@ datadecl = do
       ws *> data' *> ws *> typeident' <* ws <* openb <* ws
   dataflds <- flip endBy comma do
     ws *> fails $(string "deriving") *> do
-      fn <- TH.mkName <$> (fieldident' <* ws <* doubc <* ws)
+      fn <- TH.mkName <$> (fieldident <* ws <* doubc <* ws)
       ty <- parsety
       vi <- optional ($(string "via") *> ws *> parsety <* ws)
       pure $ Field fn (FieldType ty vi)
@@ -187,11 +190,9 @@ datadecl = do
               ((between $(char '(') $(char ')') t <|> t) <* ws)
               "expecting type; types"
   ws
-  dataderp <- deriv *> ws *> parsetypes
-  ders <- optional do shado *> ws *> parsetypes
-  case ders of
-    Just dataders -> DataDecl {datashwg = True, ..} <$ closb <* ws
-    Nothing -> DataDecl {datashwg = False, dataders = [], ..} <$ closb <* ws
+  dataderp <- option [] do deriv *> ws *> parsetypes
+  dataders <- option [] do shado *> ws *> parsetypes
+  DataDecl {..} <$ closb <* ws
 
 _tester1 :: Result DataDecl
 _tester1 =
@@ -295,11 +296,62 @@ infixr 3 #
 (#) :: TH.Q a -> TH.Q [a] -> TH.Q [a]
 (#) = liftA2 (:)
 
+data PkState = PkState
+  { pkderp :: [TH.Type],
+    pkders :: [TH.Type]
+  }
+  deriving (Show, Typeable)
+
+-- user-facing
+
+setdefaultderives :: TH.Q [TH.Dec]
+setdefaultderives = do
+  pkinit
+  void $ setproperderives [''Generic]
+  void $ setshadowderives [''Generic, ''Pack, ''Unpack]
+  pure []
+
+setproperderives :: [TH.Name] -> TH.Q [TH.Dec]
+setproperderives a = do
+  pkinit
+  pkmodify \b -> b {pkderp = TH.ConT <$> a}
+  pure []
+
+setshadowderives :: [TH.Name] -> TH.Q [TH.Dec]
+setshadowderives a = do
+  pkinit
+  pkmodify \b -> b {pkders = TH.ConT <$> a}
+  pure []
+
+pkinit :: TH.Q ()
+pkinit =
+  TH.getQ >>= \case
+    Just (_ :: PkState) -> noop
+    Nothing -> pkput $ PkState [] []
+
+pkput :: PkState -> TH.Q ()
+pkput = TH.putQ
+
+pkget :: TH.Q PkState
+pkget =
+  TH.getQ <&> \case
+    Just s -> s
+    Nothing -> error "pkget failed"
+
+pkmodify :: (PkState -> PkState) -> TH.Q ()
+pkmodify f = do
+  a <- pkget
+  pkput (f a)
+
 pkmacrobody :: [DataDecl] -> TH.Q [TH.Dec]
-pkmacrobody decls =
+pkmacrobody decls = do
+  pkinit
+  pkstate <- pkget
   join <$> do
-    forM decls \(decl :: DataDecl) -> do
-      let nobang = TH.Bang TH.NoSourceUnpackedness TH.NoSourceStrictness
+    forM decls \decl -> do
+      let ders = pkstate.pkders ++ decl.dataders
+          derp = pkstate.pkderp ++ decl.dataderp
+          nobang = TH.Bang TH.NoSourceUnpackedness TH.NoSourceStrictness
           maindecl =
             TH.dataD
               (pure []) -- Cxt
@@ -314,7 +366,7 @@ pkmacrobody decls =
               ]
               [ TH.derivClause
                   Nothing
-                  (fmap pure decl.dataderp)
+                  (fmap pure derp)
               ]
           mkshadow (TH.Name (TH.OccName n) nf) =
             TH.Name (TH.OccName (n ++ "__")) nf
@@ -331,13 +383,14 @@ pkmacrobody decls =
                           (n, nobang, f.fieldtype.typemain)
                           (\v -> (n, nobang, v))
                           f.fieldtype.typevia
-                    | f <- decl.dataflds, let n = mkshadow f.fieldname
+                    | f <- decl.dataflds,
+                      let n = mkshadow f.fieldname
                     ]
                   )
               ]
               [ TH.derivClause
                   Nothing
-                  (fmap pure decl.dataders)
+                  (fmap pure ders)
               ]
           bridgepack = do
             self <- TH.newName "self"
@@ -381,7 +434,7 @@ pkmacrobody decls =
                       ]
               ]
       maindecl
-        # if decl.datashwg
+        # if any (isJust . typevia . fieldtype) decl.dataflds
           then sequence [shadowdecl, bridgepack, bridgeunpack]
           else pure []
 
