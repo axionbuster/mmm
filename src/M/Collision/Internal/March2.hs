@@ -1,10 +1,46 @@
-module M.Collision.Internal.March2 (march) where
+-- |
+-- Module: M.Collision.Internal.March2
+-- Description: Grid-based ray marching implementation using digital differential analyzer
+-- Copyright: (c) axionbuster, 2025
+-- License: BSD-3-Clause
+--
+-- Alternative implementation of ray marching algorithm focused on performance.
+module M.Collision.Internal.March2
+  ( VHit (..),
+    isnotahit,
+    isahit,
+    march,
+  )
+where
 
 import Control.Lens
 import Data.Int
 import Debug.Trace
 import Linear
 import Text.Printf
+
+-- | voxel hit data structure. may encode hit or no hit.
+data VHit i a = VHit
+  { -- | finite nonnegative float on hit; otherwise
+    -- will be positive infinity and there will be
+    -- no hit (and the other fields will be
+    -- defined, but meaningless and unspecified)
+    vhittim :: !a,
+    -- | integer coordinate location of where it hit
+    vhitloc :: !(V3 i),
+    -- | the normal vectors (signum; opposite to
+    -- the displacement)
+    vhitnor :: !(V3 i)
+  }
+  deriving (Eq, Show)
+
+-- | decide if something is not a hit
+isnotahit :: (RealFloat a) => VHit i a -> Bool
+isnotahit = isInfinite . vhittim
+
+-- | decide if something is a hit
+isahit :: (RealFloat a) => VHit i a -> Bool
+isahit = not . isnotahit
 
 -- | march along an integer grid using a digital differential
 -- analyzer (DDA)-based algorithm
@@ -18,9 +54,9 @@ march ::
   V3 a ->
   -- | number of iterations (maximum)
   Int ->
-  -- | number of iterations left or -1 for failure
-  m Int
-march test ray pos0 = go dis0 (floor <$> pos0)
+  -- | hit information (success or failure)
+  m (VHit i a)
+march test ray pos0 = go dis0 (floor <$> pos0) 0 0
   where
     -- prevent NaNs. for the comparison in finding 'closest'
     -- NaNs need to have no influence and therefore actually
@@ -67,11 +103,11 @@ march test ray pos0 = go dis0 (floor <$> pos0)
           )
     rcp = recip ray
     sgn = floor <$> signum ray
-    go dis pos iter
+    go dis pos closest0 time0 iter
       | iter >= 0 = do
           t <- test pos
           if t
-            then pure iter
+            then pure $ VHit time0 pos (-sgn * closest0)
             else
               -- for each of x, y, and z coordinates,
               -- decide if it's the "closest" one among
@@ -89,5 +125,18 @@ march test ray pos0 = go dis0 (floor <$> pos0)
                in go
                     (dis + fclosest `mul1` rcp)
                     (pos + closest * sgn)
+                    closest
+                    (time0 + minimum dis)
                     (iter - 1)
-      | otherwise = pure (-1)
+      | otherwise = pure $ VHit (1 / 0) 0 0
+
+-- debug
+
+_march2tester :: V3 Int -> IO Bool
+_march2tester v = False <$ traceIO (printf "v = %s" (show v))
+
+_march2tester_distance :: V3 Int -> Double -> V3 Int -> IO Bool
+_march2tester_distance home dst v =
+  let h = fromIntegral <$> home
+      w = fromIntegral <$> v
+   in pure (distance h w >= dst)

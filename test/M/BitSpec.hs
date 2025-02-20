@@ -1,3 +1,5 @@
+{-# LANGUAGE NoMonadComprehensions #-}
+
 module M.BitSpec (spec) where
 
 import Data.ByteString qualified as B
