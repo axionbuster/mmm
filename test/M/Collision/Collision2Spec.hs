@@ -5,7 +5,7 @@ import Data.Map.Lazy qualified as M
 import Effectful
 import Linear
 import M.Collision.BlockModel1
-import M.Collision.Effectful
+import M.Collision.Effectful2
 import M.Collision.Internal.Face
 import M.Collision.Pure
 import Test.Hspec
@@ -91,7 +91,7 @@ layline n p d f =
 
 spec :: Spec
 spec = do
-  describe "Collision" do
+  describe "Collision2" do
     describe "hitting" do
       it "lets zombie slide on top of block" do
         let zombie = genericzombie (V3 0 0.5 0)

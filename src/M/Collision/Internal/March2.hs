@@ -105,9 +105,10 @@ march test ray pos0 = go dis0 (floor <$> pos0) 0 0
     sgn = floor <$> signum ray
     go dis pos closest0 time0 iter
       | iter >= 0 = do
+          let time1 = time0 + minimum dis
           t <- test pos
           if t
-            then pure $ VHit time0 pos (-sgn * closest0)
+            then pure $ VHit time1 pos (-sgn * closest0)
             else
               -- for each of x, y, and z coordinates,
               -- decide if it's the "closest" one among
@@ -126,7 +127,7 @@ march test ray pos0 = go dis0 (floor <$> pos0) 0 0
                     (dis + fclosest `mul1` rcp)
                     (pos + closest * sgn)
                     closest
-                    (time0 + minimum dis)
+                    time1
                     (iter - 1)
       | otherwise = pure $ VHit (1 / 0) 0 0
 

@@ -32,9 +32,11 @@ import GHC.Generics
 import Linear
 import M.Collision.Internal.Effects
 import M.Collision.Internal.Face
-import M.Collision.Internal.March
+import M.Collision.Internal.March2
 import M.Collision.Pure
 import Prelude hiding (break)
+import Debug.Trace
+import Text.Printf
 
 -- internal control-flow exception because i don't think i can use call/cc
 newtype EarlyExit a = EarlyExit (Resolve a)
@@ -47,6 +49,7 @@ instance Show (EarlyExit a) where
 -- | detect and resolve collision
 resolve ::
   ( Shape s,
+    Show n,
     RealFloat n,
     Epsilon n,
     Typeable n,
@@ -78,6 +81,7 @@ resolve myself disp =
 resolve' ::
   forall s n ef.
   ( Shape s,
+    Show n,
     RealFloat n,
     Epsilon n,
     Typeable n,
@@ -162,6 +166,7 @@ resolve' =
 slowcore ::
   forall s n ef.
   ( Shape s,
+    Show n,
     Epsilon n,
     RealFloat n,
     GetBlock s n :> ef,
@@ -170,7 +175,7 @@ slowcore ::
   Resolve n -> s n -> Eff ef (Min (Hit' n))
 slowcore res myself =
   ask @[V3 n] >>= \fps ->
-    mconcat <$> for fps \fp ->
+    mconcat <$> for fps \fp -> do
       -- ray marching algorithm:
       --   1. shoot ray from each face point (fp)
       --   2. track ray's path through grid cubes
@@ -187,26 +192,31 @@ slowcore res myself =
       -- note: behavior unspecified when ray travels exactly
       -- along grid edge or plane, but will return something
       -- for sake of completeness
-      (March 0 undefined [floor <$> fp] : march fp (resdis res))
-        & fix \contrm ->
-          \case
-            -- some improper displacements can cause termination
-            -- of ray marching (which should normally be infinite)
-            [] -> pure mempty
-            -- no hit
-            March t _ _ : _ | t > 1 -> pure mempty
-            -- entering (a) grid cube(s), are there any blocks in them?
-            March _ _ cubes : rm ->
-              cubes & fix \contcb -> \case
-                -- ran out of grid cubes, so, no;
-                -- need to go one step further along the ray
-                [] -> contrm rm
-                -- let's check the block at the grid cube
-                cb : cb' ->
-                  chkcol
-                    (hitting (resdis res) myself)
-                    (contcb cb')
-                    cb
+      let fi = fromIntegral
+          dis = resdis res
+      hitinfo <-
+        march
+          ( \c -> do
+              z <- 
+                chkcol (hitting dis myself) (pure mempty) c
+                  >>= \x -> if x == mempty then pure False else pure True
+              traceM (printf "checking c = %s ... result = %s"
+                (show c)
+                (show z)
+                ) *> pure z
+          )
+          dis
+          fp
+          3 -- reasonable max iteration count
+      pure $
+        Min $
+          Hit' $
+            traceShowId
+              Hit
+                { hittime = vhittim hitinfo,
+                  hitwhere = fp + vhittim hitinfo *^ dis,
+                  hitnorm = fi <$> vhitnor hitinfo
+                }
 
 -- fast collision detection for small movements (length <= 1 or
 -- diagonal |x|=|z|=1)
