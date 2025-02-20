@@ -33,6 +33,7 @@ library
       M.Collision.Effectful
       M.Collision.Internal.Face
       M.Collision.Internal.March
+      M.Collision.Internal.March2
       M.Collision.Pure
       M.Crypto
       M.IO
@@ -88,10 +89,12 @@ library
       DuplicateRecordFields
       LambdaCase
       LinearTypes
+      MonadComprehensions
       MultiWayIf
       OverloadedStrings
       OverloadedLists
       OverloadedRecordDot
+      ParallelListComp
       PatternSynonyms
       QuasiQuotes
       RecordWildCards
@@ -153,10 +156,12 @@ executable mmm-run
       DuplicateRecordFields
       LambdaCase
       LinearTypes
+      MonadComprehensions
       MultiWayIf
       OverloadedStrings
       OverloadedLists
       OverloadedRecordDot
+      ParallelListComp
       PatternSynonyms
       QuasiQuotes
       RecordWildCards
@@ -227,10 +232,12 @@ test-suite mmm-test
       DuplicateRecordFields
       LambdaCase
       LinearTypes
+      MonadComprehensions
       MultiWayIf
       OverloadedStrings
       OverloadedLists
       OverloadedRecordDot
+      ParallelListComp
       PatternSynonyms
       QuasiQuotes
       RecordWildCards

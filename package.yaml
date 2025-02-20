@@ -19,10 +19,12 @@ default-extensions:
 - DuplicateRecordFields
 - LambdaCase
 - LinearTypes
+- MonadComprehensions
 - MultiWayIf
 - OverloadedStrings
 - OverloadedLists
 - OverloadedRecordDot
+- ParallelListComp
 - PatternSynonyms
 - QuasiQuotes
 - RecordWildCards
