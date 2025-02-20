@@ -1,0 +1,207 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span class="hs-comment">-- |</span><span>
+</span><span id="line-2"></span><span class="hs-comment">-- Module: M.IO.Internal.Read</span><span>
+</span><span id="line-3"></span><span class="hs-comment">-- Description: Stream parsing utilities</span><span>
+</span><span id="line-4"></span><span class="hs-comment">-- License: BSD-3-Clause</span><span>
+</span><span id="line-5"></span><span class="hs-comment">--</span><span>
+</span><span id="line-6"></span><span class="hs-comment">-- This module provides parsing utilities for reading structured data from streams.</span><span>
+</span><span id="line-7"></span><span class="hs-keyword">module</span><span> </span><span class="annot"><a href="M.IO.Internal.Read.html"><span class="hs-identifier">M.IO.Internal.Read</span></a></span><span>
+</span><span id="line-8"></span><span>  </span><span class="hs-special">(</span><span> </span><span class="annot"><span class="hs-comment">-- * Basic parsing</span></span><span>
+</span><span id="line-9"></span><span>    </span><span class="annot"><a href="M.IO.Internal.Read.html#parseio"><span class="hs-identifier">parseio</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-10"></span><span>    </span><span class="annot"><a href="M.IO.Internal.Read.html#parseio0"><span class="hs-identifier">parseio0</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-11"></span><span>
+</span><span id="line-12"></span><span>    </span><span class="annot"><span class="hs-comment">-- * Lifted versions</span></span><span>
+</span><span id="line-13"></span><span>    </span><span class="annot"><a href="M.IO.Internal.Read.html#parseiolift"><span class="hs-identifier">parseiolift</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-14"></span><span>    </span><span class="annot"><a href="M.IO.Internal.Read.html#parseio0lift"><span class="hs-identifier">parseio0lift</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-15"></span><span>  </span><span class="hs-special">)</span><span>
+</span><span id="line-16"></span><span class="hs-keyword">where</span><span>
+</span><span id="line-17"></span><span>
+</span><span id="line-18"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Control.Exception</span></span><span>
+</span><span id="line-19"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Control.Monad.IO.Class</span></span><span>
+</span><span id="line-20"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.ByteString</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">ByteString</span></span><span class="hs-special">)</span><span>
+</span><span id="line-21"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Functor</span></span><span>
+</span><span id="line-22"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">FlatParse.Stateful</span></span><span>
+</span><span id="line-23"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">System.IO.Streams</span></span><span>
+</span><span id="line-24"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Prelude</span></span><span> </span><span class="hs-keyword">hiding</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">read</span></span><span class="hs-special">)</span><span>
+</span><span id="line-25"></span><span>
+</span><span id="line-26"></span><span class="hs-comment">-- | parse from a stream (with no state and int value of 0). see also:</span><span>
+</span><span id="line-27"></span><span class="hs-comment">-- 'parseio'</span><span>
+</span><span id="line-28"></span><span id="local-6989586621680373329"><span id="local-6989586621680373333"><span class="annot"><a href="M.IO.Internal.Read.html#parseio0"><span class="hs-identifier hs-type">parseio0</span></a></span><span> </span><span class="hs-glyph">::</span><span>
+</span><span id="line-29"></span><span>  </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">Exception</span></span><span> </span><span class="annot"><a href="#local-6989586621680373329"><span class="hs-identifier hs-type">e</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=&gt;</span><span>
+</span><span id="line-30"></span><span>  </span><span class="annot"><span class="hs-comment">-- | input stream</span></span><span>
+</span><span id="line-31"></span><span>  </span><span class="annot"><span class="hs-identifier hs-type">InputStream</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">ByteString</span></span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-32"></span><span>  </span><span class="annot"><span class="hs-comment">-- | parser</span></span><span>
+</span><span id="line-33"></span><span>  </span><span class="annot"><span class="hs-identifier hs-type">ParserIO</span></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span> </span><span class="annot"><a href="#local-6989586621680373329"><span class="hs-identifier hs-type">e</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680373333"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-34"></span><span>  </span><span class="annot"><span class="hs-comment">-- | result</span></span><span>
+</span><span id="line-35"></span><span>  </span><span class="annot"><span class="hs-identifier hs-type">IO</span></span><span> </span><span class="annot"><a href="#local-6989586621680373333"><span class="hs-identifier hs-type">a</span></a></span></span></span><span>
+</span><span id="line-36"></span><span id="parseio0"><span class="annot"><span class="annottext">parseio0 :: forall e a.
+Exception e =&gt;
+InputStream ByteString -&gt; ParserIO () e a -&gt; IO a
+</span><a href="M.IO.Internal.Read.html#parseio0"><span class="hs-identifier hs-var hs-var">parseio0</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">() -&gt; Int -&gt; InputStream ByteString -&gt; ParserIO () e a -&gt; IO a
+forall e r a.
+Exception e =&gt;
+r -&gt; Int -&gt; InputStream ByteString -&gt; ParserIO r e a -&gt; IO a
+</span><a href="M.IO.Internal.Read.html#parseio"><span class="hs-identifier hs-var">parseio</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">0</span></span><span>
+</span><span id="line-37"></span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="M.IO.Internal.Read.html#parseio0"><span class="hs-pragma hs-type">parseio0</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-38"></span><span>
+</span><span id="line-39"></span><span class="annot"><span class="hs-comment">-- | lifted version of 'parseio0'</span></span><span>
+</span><span id="line-40"></span><span id="local-6989586621680373340"><span id="local-6989586621680373342"><span id="local-6989586621680373343"><span class="annot"><a href="M.IO.Internal.Read.html#parseio0lift"><span class="hs-identifier hs-type">parseio0lift</span></a></span><span> </span><span class="hs-glyph">::</span><span>
+</span><span id="line-41"></span><span>  </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">MonadIO</span></span><span> </span><span class="annot"><a href="#local-6989586621680373340"><span class="hs-identifier hs-type">m</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Exception</span></span><span> </span><span class="annot"><a href="#local-6989586621680373342"><span class="hs-identifier hs-type">e</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=&gt;</span><span>
+</span><span id="line-42"></span><span>  </span><span class="annot"><span class="hs-comment">-- | input stream</span></span><span>
+</span><span id="line-43"></span><span>  </span><span class="annot"><span class="hs-identifier hs-type">InputStream</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">ByteString</span></span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-44"></span><span>  </span><span class="annot"><span class="hs-comment">-- | parser</span></span><span>
+</span><span id="line-45"></span><span>  </span><span class="annot"><span class="hs-identifier hs-type">ParserIO</span></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span> </span><span class="annot"><a href="#local-6989586621680373342"><span class="hs-identifier hs-type">e</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680373343"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-46"></span><span>  </span><span class="annot"><span class="hs-comment">-- | result</span></span><span>
+</span><span id="line-47"></span><span>  </span><span class="annot"><a href="#local-6989586621680373340"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680373343"><span class="hs-identifier hs-type">a</span></a></span></span></span></span><span>
+</span><span id="line-48"></span><span id="parseio0lift"><span class="annot"><span class="annottext">parseio0lift :: forall (m :: * -&gt; *) e a.
+(MonadIO m, Exception e) =&gt;
+InputStream ByteString -&gt; ParserIO () e a -&gt; m a
+</span><a href="M.IO.Internal.Read.html#parseio0lift"><span class="hs-identifier hs-var hs-var">parseio0lift</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">() -&gt; Int -&gt; InputStream ByteString -&gt; ParserIO () e a -&gt; m a
+forall (m :: * -&gt; *) e r a.
+(MonadIO m, Exception e) =&gt;
+r -&gt; Int -&gt; InputStream ByteString -&gt; ParserIO r e a -&gt; m a
+</span><a href="M.IO.Internal.Read.html#parseiolift"><span class="hs-identifier hs-var">parseiolift</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">0</span></span><span>
+</span><span id="line-49"></span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="M.IO.Internal.Read.html#parseio0lift"><span class="hs-pragma hs-type">parseio0lift</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-50"></span><span>
+</span><span id="line-51"></span><span class="hs-comment">-- | Parse from a stream. Automatically handles chunked input by</span><span>
+</span><span id="line-52"></span><span class="hs-comment">-- concatenating chunks until a complete parse succeeds.</span><span>
+</span><span id="line-53"></span><span class="hs-comment">--</span><span>
+</span><span id="line-54"></span><span class="hs-comment">-- May throw:</span><span>
+</span><span id="line-55"></span><span class="hs-comment">-- * The parser's error type @e@</span><span>
+</span><span id="line-56"></span><span class="hs-comment">-- * IOError &quot;parseio: unexpected end of input&quot;</span><span>
+</span><span id="line-57"></span><span id="local-6989586621680373337"><span id="local-6989586621680373338"><span id="local-6989586621680373339"><span class="annot"><a href="M.IO.Internal.Read.html#parseio"><span class="hs-identifier hs-type">parseio</span></a></span><span> </span><span class="hs-glyph">::</span><span>
+</span><span id="line-58"></span><span>  </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">Exception</span></span><span> </span><span class="annot"><a href="#local-6989586621680373337"><span class="hs-identifier hs-type">e</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=&gt;</span><span>
+</span><span id="line-59"></span><span>  </span><span class="annot"><span class="hs-comment">-- | state</span></span><span>
+</span><span id="line-60"></span><span>  </span><span class="annot"><a href="#local-6989586621680373338"><span class="hs-identifier hs-type">r</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-61"></span><span>  </span><span class="annot"><span class="hs-comment">-- | int value</span></span><span>
+</span><span id="line-62"></span><span>  </span><span class="annot"><span class="hs-identifier hs-type">Int</span></span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-63"></span><span>  </span><span class="annot"><span class="hs-comment">-- | input stream</span></span><span>
+</span><span id="line-64"></span><span>  </span><span class="annot"><span class="hs-identifier hs-type">InputStream</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">ByteString</span></span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-65"></span><span>  </span><span class="annot"><span class="hs-comment">-- | parser</span></span><span>
+</span><span id="line-66"></span><span>  </span><span class="annot"><span class="hs-identifier hs-type">ParserIO</span></span><span> </span><span class="annot"><a href="#local-6989586621680373338"><span class="hs-identifier hs-type">r</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680373337"><span class="hs-identifier hs-type">e</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680373339"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-67"></span><span>  </span><span class="annot"><span class="hs-comment">-- | result</span></span><span>
+</span><span id="line-68"></span><span>  </span><span class="annot"><span class="hs-identifier hs-type">IO</span></span><span> </span><span class="annot"><a href="#local-6989586621680373339"><span class="hs-identifier hs-type">a</span></a></span></span></span></span><span>
+</span><span id="line-69"></span><span id="parseio"><span class="annot"><span class="annottext">parseio :: forall e r a.
+Exception e =&gt;
+r -&gt; Int -&gt; InputStream ByteString -&gt; ParserIO r e a -&gt; IO a
+</span><a href="M.IO.Internal.Read.html#parseio"><span class="hs-identifier hs-var hs-var">parseio</span></a></span></span><span> </span><span id="local-6989586621680373408"><span class="annot"><span class="annottext">r
+</span><a href="#local-6989586621680373408"><span class="hs-identifier hs-var">v</span></a></span></span><span> </span><span id="local-6989586621680373409"><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621680373409"><span class="hs-identifier hs-var">i</span></a></span></span><span> </span><span id="local-6989586621680373410"><span class="annot"><span class="annottext">InputStream ByteString
+</span><a href="#local-6989586621680373410"><span class="hs-identifier hs-var">s</span></a></span></span><span> </span><span id="local-6989586621680373411"><span class="annot"><span class="annottext">ParserIO r e a
+</span><a href="#local-6989586621680373411"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">ByteString -&gt; IO a
+</span><a href="#local-6989586621680373412"><span class="hs-identifier hs-var">parse</span></a></span><span> </span><span class="annot"><span class="annottext">ByteString
+forall a. Monoid a =&gt; a
+</span><span class="hs-identifier hs-var">mempty</span></span><span>
+</span><span id="line-70"></span><span>  </span><span class="hs-keyword">where</span><span>
+</span><span id="line-71"></span><span>    </span><span class="hs-comment">-- controlled by a two-state machine</span><span>
+</span><span id="line-72"></span><span>    </span><span id="local-6989586621680373412"><span class="annot"><span class="annottext">parse :: ByteString -&gt; IO a
+</span><a href="#local-6989586621680373412"><span class="hs-identifier hs-var hs-var">parse</span></a></span></span><span> </span><span id="local-6989586621680373413"><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621680373413"><span class="hs-identifier hs-var">b</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">ParserIO r e a -&gt; r -&gt; Int -&gt; ByteString -&gt; IO (Result e a)
+forall r e a.
+ParserIO r e a -&gt; r -&gt; Int -&gt; ByteString -&gt; IO (Result e a)
+</span><span class="hs-identifier hs-var">runParserIO</span></span><span> </span><span class="annot"><span class="annottext">ParserIO r e a
+</span><a href="#local-6989586621680373411"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="annot"><span class="annottext">r
+</span><a href="#local-6989586621680373408"><span class="hs-identifier hs-var">v</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621680373409"><span class="hs-identifier hs-var">i</span></a></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621680373413"><span class="hs-identifier hs-var">b</span></a></span><span> </span><span class="annot"><span class="annottext">IO (Result e a) -&gt; (Result e a -&gt; IO a) -&gt; IO a
+forall a b. IO a -&gt; (a -&gt; IO b) -&gt; IO b
+forall (m :: * -&gt; *) a b. Monad m =&gt; m a -&gt; (a -&gt; m b) -&gt; m b
+</span><span class="hs-operator hs-var">&gt;&gt;=</span></span><span> </span><span class="annot"><span class="annottext">ByteString -&gt; Result e a -&gt; IO a
+</span><a href="#local-6989586621680373415"><span class="hs-identifier hs-var">check</span></a></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621680373413"><span class="hs-identifier hs-var">b</span></a></span><span>
+</span><span id="line-73"></span><span>    </span><span id="local-6989586621680373415"><span class="annot"><span class="annottext">check :: ByteString -&gt; Result e a -&gt; IO a
+</span><a href="#local-6989586621680373415"><span class="hs-identifier hs-var hs-var">check</span></a></span></span><span> </span><span id="local-6989586621680373416"><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621680373416"><span class="hs-identifier hs-var">b</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-glyph">\</span><span class="hs-glyph">case</span><span>
+</span><span id="line-74"></span><span>      </span><span class="annot"><span class="hs-identifier hs-type">OK</span></span><span> </span><span id="local-6989586621680373418"><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621680373418"><span class="hs-identifier hs-var">a</span></a></span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-identifier">_</span></span><span> </span><span id="local-6989586621680373419"><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621680373419"><span class="hs-identifier hs-var">r</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">ByteString -&gt; InputStream ByteString -&gt; IO ()
+forall a. a -&gt; InputStream a -&gt; IO ()
+</span><span class="hs-identifier hs-var">unRead</span></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621680373419"><span class="hs-identifier hs-var">r</span></a></span><span> </span><span class="annot"><span class="annottext">InputStream ByteString
+</span><a href="#local-6989586621680373410"><span class="hs-identifier hs-var">s</span></a></span><span> </span><span class="annot"><span class="annottext">IO () -&gt; a -&gt; IO a
+forall (f :: * -&gt; *) a b. Functor f =&gt; f a -&gt; b -&gt; f b
+</span><span class="hs-operator hs-var">$&gt;</span></span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621680373418"><span class="hs-identifier hs-var">a</span></a></span><span>
+</span><span id="line-75"></span><span>      </span><span class="annot"><span class="annottext">Result e a
+</span><span class="hs-identifier hs-var">Fail</span></span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-76"></span><span>        </span><span class="annot"><span class="annottext">InputStream ByteString -&gt; IO (Maybe ByteString)
+forall a. InputStream a -&gt; IO (Maybe a)
+</span><span class="hs-identifier hs-var">read</span></span><span> </span><span class="annot"><span class="annottext">InputStream ByteString
+</span><a href="#local-6989586621680373410"><span class="hs-identifier hs-var">s</span></a></span><span> </span><span class="annot"><span class="annottext">IO (Maybe ByteString) -&gt; (Maybe ByteString -&gt; IO a) -&gt; IO a
+forall a b. IO a -&gt; (a -&gt; IO b) -&gt; IO b
+forall (m :: * -&gt; *) a b. Monad m =&gt; m a -&gt; (a -&gt; m b) -&gt; m b
+</span><span class="hs-operator hs-var">&gt;&gt;=</span></span><span> </span><span class="hs-glyph">\</span><span class="hs-glyph">case</span><span>
+</span><span id="line-77"></span><span>          </span><span class="hs-comment">-- note: FlatParse is not a resumable parser.</span><span>
+</span><span id="line-78"></span><span>          </span><span class="hs-comment">-- so, we must start over from the beginning</span><span>
+</span><span id="line-79"></span><span>          </span><span class="annot"><span class="hs-identifier hs-type">Just</span></span><span> </span><span id="local-6989586621680373424"><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621680373424"><span class="hs-identifier hs-var">t</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">ByteString -&gt; IO a
+</span><a href="#local-6989586621680373412"><span class="hs-identifier hs-var">parse</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621680373416"><span class="hs-identifier hs-var">b</span></a></span><span> </span><span class="annot"><span class="annottext">ByteString -&gt; ByteString -&gt; ByteString
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">&lt;&gt;</span></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621680373424"><span class="hs-identifier hs-var">t</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-comment">-- concatenate and start over</span><span>
+</span><span id="line-80"></span><span>          </span><span class="annot"><span class="annottext">Maybe ByteString
+</span><span class="hs-identifier hs-var">Nothing</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">String -&gt; IO a
+forall a. String -&gt; IO a
+forall (m :: * -&gt; *) a. MonadFail m =&gt; String -&gt; m a
+</span><span class="hs-identifier hs-var">fail</span></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;parseio: unexpected end of input&quot;</span></span><span>
+</span><span id="line-81"></span><span>      </span><span class="annot"><span class="hs-identifier hs-type">Err</span></span><span> </span><span id="local-6989586621680373426"><span class="annot"><span class="annottext">e
+</span><a href="#local-6989586621680373426"><span class="hs-identifier hs-var">e</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">e -&gt; IO a
+forall e a. (HasCallStack, Exception e) =&gt; e -&gt; IO a
+</span><span class="hs-identifier hs-var">throwIO</span></span><span> </span><span class="annot"><span class="annottext">e
+</span><a href="#local-6989586621680373426"><span class="hs-identifier hs-var">e</span></a></span><span>
+</span><span id="line-82"></span><span>
+</span><span id="line-83"></span><span class="annot"><span class="hs-comment">-- | lifted version of 'parseio'</span></span><span>
+</span><span id="line-84"></span><span id="local-6989586621680373347"><span id="local-6989586621680373348"><span id="local-6989586621680373349"><span id="local-6989586621680373350"><span class="annot"><a href="M.IO.Internal.Read.html#parseiolift"><span class="hs-identifier hs-type">parseiolift</span></a></span><span> </span><span class="hs-glyph">::</span><span>
+</span><span id="line-85"></span><span>  </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">MonadIO</span></span><span> </span><span class="annot"><a href="#local-6989586621680373347"><span class="hs-identifier hs-type">m</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Exception</span></span><span> </span><span class="annot"><a href="#local-6989586621680373348"><span class="hs-identifier hs-type">e</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=&gt;</span><span>
+</span><span id="line-86"></span><span>  </span><span class="annot"><span class="hs-comment">-- | state</span></span><span>
+</span><span id="line-87"></span><span>  </span><span class="annot"><a href="#local-6989586621680373349"><span class="hs-identifier hs-type">r</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-88"></span><span>  </span><span class="annot"><span class="hs-comment">-- | int value</span></span><span>
+</span><span id="line-89"></span><span>  </span><span class="annot"><span class="hs-identifier hs-type">Int</span></span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-90"></span><span>  </span><span class="annot"><span class="hs-comment">-- | input stream</span></span><span>
+</span><span id="line-91"></span><span>  </span><span class="annot"><span class="hs-identifier hs-type">InputStream</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">ByteString</span></span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-92"></span><span>  </span><span class="annot"><span class="hs-comment">-- | parser</span></span><span>
+</span><span id="line-93"></span><span>  </span><span class="annot"><span class="hs-identifier hs-type">ParserIO</span></span><span> </span><span class="annot"><a href="#local-6989586621680373349"><span class="hs-identifier hs-type">r</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680373348"><span class="hs-identifier hs-type">e</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680373350"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-94"></span><span>  </span><span class="annot"><span class="hs-comment">-- | result</span></span><span>
+</span><span id="line-95"></span><span>  </span><span class="annot"><a href="#local-6989586621680373347"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680373350"><span class="hs-identifier hs-type">a</span></a></span></span></span></span></span><span>
+</span><span id="line-96"></span><span id="parseiolift"><span class="annot"><span class="annottext">parseiolift :: forall (m :: * -&gt; *) e r a.
+(MonadIO m, Exception e) =&gt;
+r -&gt; Int -&gt; InputStream ByteString -&gt; ParserIO r e a -&gt; m a
+</span><a href="M.IO.Internal.Read.html#parseiolift"><span class="hs-identifier hs-var hs-var">parseiolift</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-special">(</span><span class="hs-special">(</span><span class="hs-special">(</span><span class="annot"><span class="annottext">IO a -&gt; m a
+forall a. IO a -&gt; m a
+forall (m :: * -&gt; *) a. MonadIO m =&gt; IO a -&gt; m a
+</span><span class="hs-identifier hs-var">liftIO</span></span><span> </span><span class="annot"><span class="annottext">(IO a -&gt; m a) -&gt; (ParserIO r e a -&gt; IO a) -&gt; ParserIO r e a -&gt; m a
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">((ParserIO r e a -&gt; IO a) -&gt; ParserIO r e a -&gt; m a)
+-&gt; (InputStream ByteString -&gt; ParserIO r e a -&gt; IO a)
+-&gt; InputStream ByteString
+-&gt; ParserIO r e a
+-&gt; m a
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">((InputStream ByteString -&gt; ParserIO r e a -&gt; IO a)
+ -&gt; InputStream ByteString -&gt; ParserIO r e a -&gt; m a)
+-&gt; (Int -&gt; InputStream ByteString -&gt; ParserIO r e a -&gt; IO a)
+-&gt; Int
+-&gt; InputStream ByteString
+-&gt; ParserIO r e a
+-&gt; m a
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">((Int -&gt; InputStream ByteString -&gt; ParserIO r e a -&gt; IO a)
+ -&gt; Int -&gt; InputStream ByteString -&gt; ParserIO r e a -&gt; m a)
+-&gt; (r -&gt; Int -&gt; InputStream ByteString -&gt; ParserIO r e a -&gt; IO a)
+-&gt; r
+-&gt; Int
+-&gt; InputStream ByteString
+-&gt; ParserIO r e a
+-&gt; m a
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">r -&gt; Int -&gt; InputStream ByteString -&gt; ParserIO r e a -&gt; IO a
+forall e r a.
+Exception e =&gt;
+r -&gt; Int -&gt; InputStream ByteString -&gt; ParserIO r e a -&gt; IO a
+</span><a href="M.IO.Internal.Read.html#parseio"><span class="hs-identifier hs-var">parseio</span></a></span><span>
+</span><span id="line-97"></span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="M.IO.Internal.Read.html#parseiolift"><span class="hs-pragma hs-type">parseiolift</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-98"></span></pre></body></html>

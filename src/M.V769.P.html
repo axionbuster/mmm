@@ -1,0 +1,1026 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span class="hs-pragma">{-# OPTIONS_GHC -Wno-missing-export-lists #-}</span><span>
+</span><span id="line-2"></span><span>
+</span><span id="line-3"></span><span class="hs-comment">-- |</span><span>
+</span><span id="line-4"></span><span class="hs-comment">-- Module: M.V769.P</span><span>
+</span><span id="line-5"></span><span class="hs-comment">-- Description: Protocol play state packets (AI-generated)</span><span>
+</span><span id="line-6"></span><span class="hs-comment">-- Copyright: (c) axionbuster, 2025</span><span>
+</span><span id="line-7"></span><span class="hs-comment">-- License: BSD-3-Clause</span><span>
+</span><span id="line-8"></span><span class="hs-comment">--</span><span>
+</span><span id="line-9"></span><span class="hs-comment">-- Implements the extensive set of packet structures for the play state</span><span>
+</span><span id="line-10"></span><span class="hs-comment">-- of protocol version 769, including entity management, world interaction,</span><span>
+</span><span id="line-11"></span><span class="hs-comment">-- inventory handling, and all other gameplay-related communication.</span><span>
+</span><span id="line-12"></span><span class="hs-keyword">module</span><span> </span><span class="annot"><a href="M.V769.P.html"><span class="hs-identifier">M.V769.P</span></a></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-13"></span><span>
+</span><span id="line-14"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Control.DeepSeq</span></span><span>
+</span><span id="line-15"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.ByteString</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">ByteString</span></span><span class="hs-special">)</span><span>
+</span><span id="line-16"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Data</span></span><span>
+</span><span id="line-17"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Int</span></span><span>
+</span><span id="line-18"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Text</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">Text</span></span><span class="hs-special">)</span><span>
+</span><span id="line-19"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.UUID.Types</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">UUID</span></span><span class="hs-special">)</span><span>
+</span><span id="line-20"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Vector</span></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">V</span></span><span>
+</span><span id="line-21"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Word</span></span><span>
+</span><span id="line-22"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Linear</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">V2</span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier">V3</span></span><span class="hs-special">)</span><span>
+</span><span id="line-23"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="M.Chunk.Net.html"><span class="hs-identifier">M.Chunk.Net</span></a></span><span>
+</span><span id="line-24"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="M.LEB.html"><span class="hs-identifier">M.LEB</span></a></span><span>
+</span><span id="line-25"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="M.NBT.html"><span class="hs-identifier">M.NBT</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="M.NBT.Internal.Types.html#Tg"><span class="hs-identifier">Tg</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-26"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="M.Pack.html"><span class="hs-identifier">M.Pack</span></a></span><span>
+</span><span id="line-27"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="M.PkMacro.html"><span class="hs-identifier">M.PkMacro</span></a></span><span>
+</span><span id="line-28"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="M.Position.html"><span class="hs-identifier">M.Position</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="M.Position.html#Position"><span class="hs-identifier">Position</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-29"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="M.TODO.html"><span class="hs-identifier">M.TODO</span></a></span><span>
+</span><span id="line-30"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="M.V769.I.html"><span class="hs-identifier">M.V769.I</span></a></span><span>
+</span><span id="line-31"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Prelude</span></span><span> </span><span class="hs-keyword">hiding</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">id</span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier">length</span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier">sequence</span></span><span class="hs-special">)</span><span>
+</span><span id="line-32"></span><span>
+</span><span id="line-33"></span><span class="hs-comment">-- Set up default instances for all data types</span><span>
+</span><span id="line-34"></span><span class="hs-identifier">setdefaultderives</span><span>
+</span><span id="line-35"></span><span class="hs-identifier">addproperderives</span><span> </span><span class="hs-special">[</span><span class="hs-special">''</span><span class="hs-identifier">NFData</span><span class="hs-special">,</span><span> </span><span class="hs-special">''</span><span class="hs-identifier">Typeable</span><span class="hs-special">,</span><span> </span><span class="hs-special">''</span><span class="hs-identifier">Show</span><span class="hs-special">,</span><span> </span><span class="hs-special">''</span><span class="hs-identifier">Eq</span><span class="hs-special">]</span><span>
+</span><span id="line-36"></span><span>
+</span><span id="line-37"></span><span id="UseItem"><span id="UseItemOn"><span id="TeleportToEntity"><span id="SwingArm"><span id="UpdateSign"><span id="ProgramStructureBlock"><span id="ProgramJigsawBlock"><span id="SetCreativeModeSlot"><span id="ProgramCommandBlockMinecart"><span id="ProgramCommandBlock"><span id="SetHeldItemServerbound"><span id="SetBeaconEffect"><span id="SelectTrade"><span id="SeenAdvancements"><span id="ResourcePackResponsePlay"><span id="RenameItem"><span id="SetSeenRecipe"><span id="ChangeRecipeBookSettings"><span id="PongPlay"><span id="PlayerLoaded"><span id="PlayerInput"><span id="PlayerCommand"><span id="PlayerAction"><span id="ServerboundPlayerAbilities"><span id="PlaceRecipe"><span id="PingRequestPlay"><span id="PickItemFromEntity"><span id="PickItemFromBlock"><span id="PaddleBoat"><span id="MoveVehicleServerbound"><span id="SetPlayerMovementFlags"><span id="SetPlayerRotation"><span id="SetPlayerPositionAndRotation"><span id="SetPlayerPosition"><span id="LockDifficulty"><span id="JigsawGenerate"><span id="Interact"><span id="QueryEntityTag"><span id="EditBook"><span id="DebugSampleSubscription"><span id="CookieResponsePlay"><span id="ChangeContainerSlotState"><span id="CloseContainerServerbound"><span id="ClickContainer"><span id="ClickContainerButton"><span id="AcknowledgeConfiguration"><span id="CommandSuggestionsRequest"><span id="ClientInformationPlay"><span id="ClientTickEnd"><span id="ClientStatus"><span id="ChunkBatchReceived"><span id="PlayerSession"><span id="ChatMessage"><span id="SignedChatCommand"><span id="ServerboundChatCommand"><span id="AcknowledgeMessage"><span id="ServerboundChangeDifficulty"><span id="BundleItemSelected"><span id="QueryBlockEntityTag"><span id="ConfirmTeleportation"><span id="SetTabListHeaderAndFooter"><span id="StoreCookie"><span id="StopSound"><span id="StartConfiguration"><span id="SoundEffect"><span id="EntitySoundEffect"><span id="SetTitleAnimationTimes"><span id="SetTitleText"><span id="UpdateTime"><span id="SetSubtitleText"><span id="SetSimulationDistance"><span id="UpdateScore"><span id="UpdateTeams"><span id="SetPlayerInventorySlot"><span id="SetPassengers"><span id="UpdateObjectives"><span id="SetHeldItem"><span id="SetHealth"><span id="SetExperience"><span id="SetEquipment"><span id="SetEntityVelocity"><span id="LinkEntities"><span id="SetEntityMetadata"><span id="DisplayObjective"><span id="SetDefaultSpawnPosition"><span id="SetCursorItem"><span id="SetRenderDistance"><span id="SetCenterChunk"><span id="SetCamera"><span id="SetBorderWarningDistance"><span id="SetBorderWarningDelay"><span id="SetBorderSize"><span id="SetBorderLerpSize"><span id="SetBorderCenter"><span id="SetActionBarText"><span id="ServerData"><span id="SelectAdvancementsTab"><span id="UpdateSectionBlocks"><span id="SetHeadRotation"><span id="Respawn"><span id="AddResourcePack"><span id="RemoveResourcePack"><span id="ResetScore"><span id="RemoveEntityEffect"><span id="RemoveEntities"><span id="RecipeBookSettings"><span id="RecipeBookRemove"><span id="RecipeBookAdd"><span id="PlayerRotation"><span id="SynchronizePlayerPosition"><span id="LookAt"><span id="PlayerInfoUpdate"><span id="PlayerInfoRemove"><span id="CombatDeath"><span id="EnterCombat"><span id="EndCombat"><span id="PlayerChatMessage"><span id="ClientboundPlayerAbilities"><span id="PlaceGhostRecipe"><span id="PlayPingResponse"><span id="PlayPing"><span id="OpenSignEditor"><span id="OpenScreen"><span id="OpenBook"><span id="MoveVehicle"><span id="UpdateEntityRotation"><span id="MoveMinecartAlongTrack"><span id="UpdateEntityPositionAndRotation"><span id="UpdateEntityPosition"><span id="MerchantOffers"><span id="MapData"><span id="Login"><span id="UpdateLight"><span id="ParticleEffect"><span id="WorldEvent"><span id="ChunkDataAndUpdateLight"><span id="InitializeWorldBorder"><span id="HurtAnimation"><span id="OpenHorseScreen"><span id="GameEvent"><span id="UnloadChunk"><span id="Explosion"><span id="TeleportEntity"><span id="EntityEvent"><span id="DisguisedChatMessage"><span id="Disconnect"><span id="DeleteMessage"><span id="DebugSample"><span id="DamageEvent"><span id="ChatSuggestions"><span id="SetCooldown"><span id="CookieRequest"><span id="SetContainerSlot"><span id="SetContainerProperty"><span id="SetContainerContent"><span id="CloseContainer"><span id="Commands"><span id="CommandMatch"><span id="CommandSuggestionsResponse"><span id="ClearTitles"><span id="ChunkBiomes"><span id="ChunkBatchStarted"><span id="ChunkBatchFinished"><span id="ChangeDifficulty"><span id="BossBar"><span id="BlockUpdate"><span id="BlockAction"><span id="BlockEntityData"><span id="SetBlockDestroyStage"><span id="AcknowledgeBlockChange"><span id="AwardStatistics_Entry"><span id="AwardStatistics"><span id="EntityAnimation"><span id="SpawnExperienceOrb"><span id="SpawnEntity"><span id="BundleDelimiter"><span id="UseItem__"><span id="UseItemOn__"><span id="TeleportToEntity__"><span id="SwingArm__"><span id="ProgramStructureBlock__"><span id="ProgramCommandBlockMinecart__"><span id="ProgramCommandBlock__"><span id="SetBeaconEffect__"><span id="SelectTrade__"><span id="SeenAdvancements__"><span id="ResourcePackResponsePlay__"><span id="ChangeRecipeBookSettings__"><span id="PlayerCommand__"><span id="PlayerAction__"><span id="PickItemFromEntity__"><span id="SetPlayerPositionAndRotation__"><span id="SetPlayerPosition__"><span id="JigsawGenerate__"><span id="Interact__"><span id="QueryEntityTag__"><span id="EditBook__"><span id="DebugSampleSubscription__"><span id="ClickContainer__"><span id="CommandSuggestionsRequest__"><span id="ClientInformationPlay__"><span id="ClientStatus__"><span id="BundleItemSelected__"><span id="QueryBlockEntityTag__"><span id="ConfirmTeleportation__"><span id="StopSound__"><span id="SoundEffect__"><span id="EntitySoundEffect__"><span id="SetSimulationDistance__"><span id="UpdateScore__"><span id="UpdateTeams__"><span id="SetPassengers__"><span id="UpdateObjectives__"><span id="SetHealth__"><span id="SetExperience__"><span id="SetEquipment__"><span id="SetEntityVelocity__"><span id="LinkEntities__"><span id="SetEntityMetadata__"><span id="SetRenderDistance__"><span id="SetCenterChunk__"><span id="SetCamera__"><span id="SetBorderWarningDistance__"><span id="SetBorderWarningDelay__"><span id="SetBorderLerpSize__"><span id="UpdateSectionBlocks__"><span id="SetHeadRotation__"><span id="RemoveEntityEffect__"><span id="RemoveEntities__"><span id="RecipeBookSettings__"><span id="SynchronizePlayerPosition__"><span id="LookAt__"><span id="PlayerInfoUpdate__"><span id="CombatDeath__"><span id="EndCombat__"><span id="OpenScreen__"><span id="OpenBook__"><span id="UpdateEntityRotation__"><span id="MoveMinecartAlongTrack__"><span id="UpdateEntityPositionAndRotation__"><span id="UpdateEntityPosition__"><span id="MerchantOffers__"><span id="MapData__"><span id="Login__"><span id="UpdateLight__"><span id="ParticleEffect__"><span id="InitializeWorldBorder__"><span id="HurtAnimation__"><span id="OpenHorseScreen__"><span id="GameEvent__"><span id="TeleportEntity__"><span id="EntityEvent__"><span id="DisguisedChatMessage__"><span id="DebugSample__"><span id="DamageEvent__"><span id="ChatSuggestions__"><span id="SetCooldown__"><span id="SetContainerSlot__"><span id="SetContainerProperty__"><span id="SetContainerContent__"><span id="CloseContainer__"><span id="Commands__"><span id="CommandSuggestionsResponse__"><span id="ChunkBatchFinished__"><span id="BlockUpdate__"><span id="BlockAction__"><span id="BlockEntityData__"><span id="SetBlockDestroyStage__"><span id="AcknowledgeBlockChange__"><span id="AwardStatistics_Entry__"><span id="EntityAnimation__"><span id="SpawnExperienceOrb__"><span id="SpawnEntity__"><span id="local-6989586621680400560"><span id="local-6989586621680400562"><span id="local-6989586621680400564"><span id="local-6989586621680400572"><span id="local-6989586621680400579"><span id="local-6989586621680400581"><span id="local-6989586621680400583"><span id="local-6989586621680400591"><span id="local-6989586621680400598"><span id="local-6989586621680400602"><span id="local-6989586621680400605"><span id="local-6989586621680400610"><span id="local-6989586621680400614"><span id="local-6989586621680400616"><span id="local-6989586621680400618"><span id="local-6989586621680400626"><span id="local-6989586621680400633"><span id="local-6989586621680400635"><span id="local-6989586621680400637"><span id="local-6989586621680400645"><span id="local-6989586621680400657"><span id="local-6989586621680400661"><span id="local-6989586621680400664"><span id="local-6989586621680400675"><span id="local-6989586621680400679"><span id="local-6989586621680400681"><span id="local-6989586621680400683"><span id="local-6989586621680400691"><span id="local-6989586621680400698"><span id="local-6989586621680400700"><span id="local-6989586621680400702"><span id="local-6989586621680400710"><span id="local-6989586621680400714"><span id="local-6989586621680400718"><span id="local-6989586621680400721"><span id="local-6989586621680400724"><span id="local-6989586621680400728"><span id="local-6989586621680400730"><span id="local-6989586621680400732"><span id="local-6989586621680400740"><span id="local-6989586621680400747"><span id="local-6989586621680400749"><span id="local-6989586621680400751"><span id="local-6989586621680400759"><span id="local-6989586621680400763"><span id="local-6989586621680400767"><span id="local-6989586621680400770"><span id="local-6989586621680400773"><span id="local-6989586621680400777"><span id="local-6989586621680400779"><span id="local-6989586621680400781"><span id="local-6989586621680400789"><span id="local-6989586621680400797"><span id="local-6989586621680400801"><span id="local-6989586621680400804"><span id="local-6989586621680400811"><span id="local-6989586621680400815"><span id="local-6989586621680400822"><span id="local-6989586621680400829"><span id="local-6989586621680400831"><span id="local-6989586621680400833"><span id="local-6989586621680400841"><span id="local-6989586621680400848"><span id="local-6989586621680400850"><span id="local-6989586621680400852"><span id="local-6989586621680400860"><span id="local-6989586621680400880"><span id="local-6989586621680400884"><span id="local-6989586621680400887"><span id="local-6989586621680400906"><span id="local-6989586621680400910"><span id="local-6989586621680400912"><span id="local-6989586621680400914"><span id="local-6989586621680400922"><span id="local-6989586621680400931"><span id="local-6989586621680400935"><span id="local-6989586621680400938"><span id="local-6989586621680400946"><span id="local-6989586621680400950"><span id="local-6989586621680400957"><span id="local-6989586621680400964"><span id="local-6989586621680400966"><span id="local-6989586621680400968"><span id="local-6989586621680400976"><span id="local-6989586621680400983"><span id="local-6989586621680400987"><span id="local-6989586621680400990"><span id="local-6989586621680400996"><span id="local-6989586621680401000"><span id="local-6989586621680401007"><span id="local-6989586621680401014"><span id="local-6989586621680401016"><span id="local-6989586621680401018"><span id="local-6989586621680401026"><span id="local-6989586621680401033"><span id="local-6989586621680401035"><span id="local-6989586621680401037"><span id="local-6989586621680401045"><span id="local-6989586621680401051"><span id="local-6989586621680401055"><span id="local-6989586621680401058"><span id="local-6989586621680401063"><span id="local-6989586621680401067"><span id="local-6989586621680401069"><span id="local-6989586621680401071"><span id="local-6989586621680401079"><span id="local-6989586621680401086"><span id="local-6989586621680401088"><span id="local-6989586621680401090"><span id="local-6989586621680401098"><span id="local-6989586621680401105"><span id="local-6989586621680401109"><span id="local-6989586621680401112"><span id="local-6989586621680401118"><span id="local-6989586621680401122"><span id="local-6989586621680401124"><span id="local-6989586621680401126"><span id="local-6989586621680401134"><span id="local-6989586621680401138"><span id="local-6989586621680401142"><span id="local-6989586621680401145"><span id="local-6989586621680401148"><span id="local-6989586621680401152"><span id="local-6989586621680401159"><span id="local-6989586621680401166"><span id="local-6989586621680401168"><span id="local-6989586621680401170"><span id="local-6989586621680401178"><span id="local-6989586621680401185"><span id="local-6989586621680401187"><span id="local-6989586621680401189"><span id="local-6989586621680401197"><span id="local-6989586621680401202"><span id="local-6989586621680401206"><span id="local-6989586621680401209"><span id="local-6989586621680401213"><span id="local-6989586621680401217"><span id="local-6989586621680401219"><span id="local-6989586621680401221"><span id="local-6989586621680401229"><span id="local-6989586621680401236"><span id="local-6989586621680401238"><span id="local-6989586621680401240"><span id="local-6989586621680401248"><span id="local-6989586621680401252"><span id="local-6989586621680401256"><span id="local-6989586621680401259"><span id="local-6989586621680401262"><span id="local-6989586621680401266"><span id="local-6989586621680401268"><span id="local-6989586621680401270"><span id="local-6989586621680401278"><span id="local-6989586621680401285"><span id="local-6989586621680401287"><span id="local-6989586621680401289"><span id="local-6989586621680401297"><span id="local-6989586621680401302"><span id="local-6989586621680401306"><span id="local-6989586621680401309"><span id="local-6989586621680401313"><span id="local-6989586621680401317"><span id="local-6989586621680401319"><span id="local-6989586621680401321"><span id="local-6989586621680401329"><span id="local-6989586621680401336"><span id="local-6989586621680401338"><span id="local-6989586621680401340"><span id="local-6989586621680401348"><span id="local-6989586621680401352"><span id="local-6989586621680401356"><span id="local-6989586621680401359"><span id="local-6989586621680401362"><span id="local-6989586621680401366"><span id="local-6989586621680401368"><span id="local-6989586621680401370"><span id="local-6989586621680401378"><span id="local-6989586621680401382"><span id="local-6989586621680401386"><span id="local-6989586621680401389"><span id="local-6989586621680401392"><span id="local-6989586621680401396"><span id="local-6989586621680401403"><span id="local-6989586621680401410"><span id="local-6989586621680401412"><span id="local-6989586621680401414"><span id="local-6989586621680401422"><span id="local-6989586621680401426"><span id="local-6989586621680401430"><span id="local-6989586621680401433"><span id="local-6989586621680401436"><span id="local-6989586621680401440"><span id="local-6989586621680401447"><span id="local-6989586621680401454"><span id="local-6989586621680401456"><span id="local-6989586621680401458"><span id="local-6989586621680401466"><span id="local-6989586621680401473"><span id="local-6989586621680401475"><span id="local-6989586621680401477"><span id="local-6989586621680401485"><span id="local-6989586621680401491"><span id="local-6989586621680401495"><span id="local-6989586621680401498"><span id="local-6989586621680401503"><span id="local-6989586621680401507"><span id="local-6989586621680401509"><span id="local-6989586621680401511"><span id="local-6989586621680401519"><span id="local-6989586621680401523"><span id="local-6989586621680401527"><span id="local-6989586621680401530"><span id="local-6989586621680401533"><span id="local-6989586621680401537"><span id="local-6989586621680401544"><span id="local-6989586621680401551"><span id="local-6989586621680401553"><span id="local-6989586621680401555"><span id="local-6989586621680401563"><span id="local-6989586621680401565"><span id="local-6989586621680401569"><span id="local-6989586621680401572"><span id="local-6989586621680401574"><span id="local-6989586621680401578"><span id="local-6989586621680401585"><span id="local-6989586621680401592"><span id="local-6989586621680401594"><span id="local-6989586621680401596"><span id="local-6989586621680401604"><span id="local-6989586621680401610"><span id="local-6989586621680401614"><span id="local-6989586621680401617"><span id="local-6989586621680401622"><span id="local-6989586621680401626"><span id="local-6989586621680401633"><span id="local-6989586621680401640"><span id="local-6989586621680401642"><span id="local-6989586621680401644"><span id="local-6989586621680401652"><span id="local-6989586621680401659"><span id="local-6989586621680401661"><span id="local-6989586621680401663"><span id="local-6989586621680401671"><span id="local-6989586621680401677"><span id="local-6989586621680401681"><span id="local-6989586621680401684"><span id="local-6989586621680401689"><span id="local-6989586621680401693"><span id="local-6989586621680401695"><span id="local-6989586621680401697"><span id="local-6989586621680401705"><span id="local-6989586621680401712"><span id="local-6989586621680401714"><span id="local-6989586621680401716"><span id="local-6989586621680401724"><span id="local-6989586621680401732"><span id="local-6989586621680401736"><span id="local-6989586621680401739"><span id="local-6989586621680401746"><span id="local-6989586621680401750"><span id="local-6989586621680401752"><span id="local-6989586621680401754"><span id="local-6989586621680401762"><span id="local-6989586621680401766"><span id="local-6989586621680401770"><span id="local-6989586621680401773"><span id="local-6989586621680401776"><span id="local-6989586621680401780"><span id="local-6989586621680401787"><span id="local-6989586621680401794"><span id="local-6989586621680401796"><span id="local-6989586621680401798"><span id="local-6989586621680401806"><span id="local-6989586621680401812"><span id="local-6989586621680401816"><span id="local-6989586621680401819"><span id="local-6989586621680401824"><span id="local-6989586621680401828"><span id="local-6989586621680401835"><span id="local-6989586621680401842"><span id="local-6989586621680401844"><span id="local-6989586621680401846"><span id="local-6989586621680401854"><span id="local-6989586621680401858"><span id="local-6989586621680401862"><span id="local-6989586621680401865"><span id="local-6989586621680401868"><span id="local-6989586621680401872"><span id="local-6989586621680401879"><span id="local-6989586621680401886"><span id="local-6989586621680401888"><span id="local-6989586621680401890"><span id="local-6989586621680401898"><span id="local-6989586621680401905"><span id="local-6989586621680401907"><span id="local-6989586621680401909"><span id="local-6989586621680401917"><span id="local-6989586621680401921"><span id="local-6989586621680401925"><span id="local-6989586621680401928"><span id="local-6989586621680401931"><span id="local-6989586621680401935"><span id="local-6989586621680401937"><span id="local-6989586621680401939"><span id="local-6989586621680401947"><span id="local-6989586621680401951"><span id="local-6989586621680401955"><span id="local-6989586621680401958"><span id="local-6989586621680401961"><span id="local-6989586621680401965"><span id="local-6989586621680401972"><span id="local-6989586621680401979"><span id="local-6989586621680401981"><span id="local-6989586621680401983"><span id="local-6989586621680401991"><span id="local-6989586621680401996"><span id="local-6989586621680402000"><span id="local-6989586621680402003"><span id="local-6989586621680402007"><span id="local-6989586621680402011"><span id="local-6989586621680402018"><span id="local-6989586621680402025"><span id="local-6989586621680402027"><span id="local-6989586621680402029"><span id="local-6989586621680402037"><span id="local-6989586621680402045"><span id="local-6989586621680402049"><span id="local-6989586621680402052"><span id="local-6989586621680402059"><span id="local-6989586621680402063"><span id="local-6989586621680402070"><span id="local-6989586621680402077"><span id="local-6989586621680402079"><span id="local-6989586621680402081"><span id="local-6989586621680402089"><span id="local-6989586621680402093"><span id="local-6989586621680402097"><span id="local-6989586621680402100"><span id="local-6989586621680402103"><span id="local-6989586621680402107"><span id="local-6989586621680402114"><span id="local-6989586621680402121"><span id="local-6989586621680402123"><span id="local-6989586621680402125"><span id="local-6989586621680402133"><span id="local-6989586621680402139"><span id="local-6989586621680402143"><span id="local-6989586621680402146"><span id="local-6989586621680402151"><span id="local-6989586621680402155"><span id="local-6989586621680402162"><span id="local-6989586621680402169"><span id="local-6989586621680402171"><span id="local-6989586621680402173"><span id="local-6989586621680402181"><span id="local-6989586621680402188"><span id="local-6989586621680402190"><span id="local-6989586621680402192"><span id="local-6989586621680402200"><span id="local-6989586621680402209"><span id="local-6989586621680402213"><span id="local-6989586621680402216"><span id="local-6989586621680402224"><span id="local-6989586621680402228"><span id="local-6989586621680402230"><span id="local-6989586621680402232"><span id="local-6989586621680402240"><span id="local-6989586621680402247"><span id="local-6989586621680402249"><span id="local-6989586621680402251"><span id="local-6989586621680402259"><span id="local-6989586621680402268"><span id="local-6989586621680402272"><span id="local-6989586621680402275"><span id="local-6989586621680402283"><span id="local-6989586621680402287"><span id="local-6989586621680402289"><span id="local-6989586621680402291"><span id="local-6989586621680402299"><span id="local-6989586621680402303"><span id="local-6989586621680402307"><span id="local-6989586621680402310"><span id="local-6989586621680402313"><span id="local-6989586621680402317"><span id="local-6989586621680402324"><span id="local-6989586621680402331"><span id="local-6989586621680402333"><span id="local-6989586621680402335"><span id="local-6989586621680402343"><span id="local-6989586621680402350"><span id="local-6989586621680402352"><span id="local-6989586621680402354"><span id="local-6989586621680402362"><span id="local-6989586621680402368"><span id="local-6989586621680402372"><span id="local-6989586621680402375"><span id="local-6989586621680402380"><span id="local-6989586621680402384"><span id="local-6989586621680402386"><span id="local-6989586621680402388"><span id="local-6989586621680402396"><span id="local-6989586621680402403"><span id="local-6989586621680402405"><span id="local-6989586621680402407"><span id="local-6989586621680402415"><span id="local-6989586621680402424"><span id="local-6989586621680402428"><span id="local-6989586621680402431"><span id="local-6989586621680402439"><span id="local-6989586621680402443"><span id="local-6989586621680402445"><span id="local-6989586621680402447"><span id="local-6989586621680402455"><span id="local-6989586621680402462"><span id="local-6989586621680402464"><span id="local-6989586621680402466"><span id="local-6989586621680402474"><span id="local-6989586621680402479"><span id="local-6989586621680402483"><span id="local-6989586621680402486"><span id="local-6989586621680402490"><span id="local-6989586621680402494"><span id="local-6989586621680402496"><span id="local-6989586621680402498"><span id="local-6989586621680402506"><span id="local-6989586621680402513"><span id="local-6989586621680402515"><span id="local-6989586621680402517"><span id="local-6989586621680402525"><span id="local-6989586621680402532"><span id="local-6989586621680402536"><span id="local-6989586621680402539"><span id="local-6989586621680402545"><span id="local-6989586621680402549"><span id="local-6989586621680402551"><span id="local-6989586621680402553"><span id="local-6989586621680402561"><span id="local-6989586621680402568"><span id="local-6989586621680402570"><span id="local-6989586621680402572"><span id="local-6989586621680402580"><span id="local-6989586621680402585"><span id="local-6989586621680402589"><span id="local-6989586621680402592"><span id="local-6989586621680402596"><span id="local-6989586621680402600"><span id="local-6989586621680402602"><span id="local-6989586621680402604"><span id="local-6989586621680402612"><span id="local-6989586621680402617"><span id="local-6989586621680402621"><span id="local-6989586621680402624"><span id="local-6989586621680402628"><span id="local-6989586621680402632"><span id="local-6989586621680402639"><span id="local-6989586621680402646"><span id="local-6989586621680402648"><span id="local-6989586621680402650"><span id="local-6989586621680402658"><span id="local-6989586621680402664"><span id="local-6989586621680402668"><span id="local-6989586621680402671"><span id="local-6989586621680402676"><span id="local-6989586621680402680"><span id="local-6989586621680402687"><span id="local-6989586621680402694"><span id="local-6989586621680402696"><span id="local-6989586621680402698"><span id="local-6989586621680402706"><span id="local-6989586621680402710"><span id="local-6989586621680402714"><span id="local-6989586621680402717"><span id="local-6989586621680402720"><span id="local-6989586621680402724"><span id="local-6989586621680402731"><span id="local-6989586621680402738"><span id="local-6989586621680402740"><span id="local-6989586621680402742"><span id="local-6989586621680402750"><span id="local-6989586621680402757"><span id="local-6989586621680402759"><span id="local-6989586621680402761"><span id="local-6989586621680402769"><span id="local-6989586621680402779"><span id="local-6989586621680402783"><span id="local-6989586621680402786"><span id="local-6989586621680402795"><span id="local-6989586621680402799"><span id="local-6989586621680402801"><span id="local-6989586621680402803"><span id="local-6989586621680402811"><span id="local-6989586621680402816"><span id="local-6989586621680402820"><span id="local-6989586621680402823"><span id="local-6989586621680402827"><span id="local-6989586621680402831"><span id="local-6989586621680402838"><span id="local-6989586621680402845"><span id="local-6989586621680402847"><span id="local-6989586621680402849"><span id="local-6989586621680402857"><span id="local-6989586621680402859"><span id="local-6989586621680402863"><span id="local-6989586621680402866"><span id="local-6989586621680402868"><span id="local-6989586621680402872"><span id="local-6989586621680402879"><span id="local-6989586621680402886"><span id="local-6989586621680402888"><span id="local-6989586621680402890"><span id="local-6989586621680402898"><span id="local-6989586621680402905"><span id="local-6989586621680402907"><span id="local-6989586621680402909"><span id="local-6989586621680402917"><span id="local-6989586621680402922"><span id="local-6989586621680402926"><span id="local-6989586621680402929"><span id="local-6989586621680402933"><span id="local-6989586621680402937"><span id="local-6989586621680402939"><span id="local-6989586621680402941"><span id="local-6989586621680402949"><span id="local-6989586621680402956"><span id="local-6989586621680402958"><span id="local-6989586621680402960"><span id="local-6989586621680402968"><span id="local-6989586621680402979"><span id="local-6989586621680402983"><span id="local-6989586621680402986"><span id="local-6989586621680402996"><span id="local-6989586621680403000"><span id="local-6989586621680403002"><span id="local-6989586621680403004"><span id="local-6989586621680403012"><span id="local-6989586621680403014"><span id="local-6989586621680403018"><span id="local-6989586621680403021"><span id="local-6989586621680403023"><span id="local-6989586621680403027"><span id="local-6989586621680403034"><span id="local-6989586621680403041"><span id="local-6989586621680403043"><span id="local-6989586621680403045"><span id="local-6989586621680403053"><span id="local-6989586621680403060"><span id="local-6989586621680403062"><span id="local-6989586621680403064"><span id="local-6989586621680403072"><span id="local-6989586621680403076"><span id="local-6989586621680403080"><span id="local-6989586621680403083"><span id="local-6989586621680403086"><span id="local-6989586621680403090"><span id="local-6989586621680403092"><span id="local-6989586621680403094"><span id="local-6989586621680403102"><span id="local-6989586621680403104"><span id="local-6989586621680403108"><span id="local-6989586621680403111"><span id="local-6989586621680403113"><span id="local-6989586621680403117"><span id="local-6989586621680403124"><span id="local-6989586621680403131"><span id="local-6989586621680403133"><span id="local-6989586621680403135"><span id="local-6989586621680403143"><span id="local-6989586621680403150"><span id="local-6989586621680403154"><span id="local-6989586621680403157"><span id="local-6989586621680403163"><span id="local-6989586621680403167"><span id="local-6989586621680403174"><span id="local-6989586621680403181"><span id="local-6989586621680403183"><span id="local-6989586621680403185"><span id="local-6989586621680403193"><span id="local-6989586621680403203"><span id="local-6989586621680403207"><span id="local-6989586621680403210"><span id="local-6989586621680403219"><span id="local-6989586621680403223"><span id="local-6989586621680403230"><span id="local-6989586621680403237"><span id="local-6989586621680403239"><span id="local-6989586621680403241"><span id="local-6989586621680403249"><span id="local-6989586621680403259"><span id="local-6989586621680403263"><span id="local-6989586621680403266"><span id="local-6989586621680403275"><span id="local-6989586621680403279"><span id="local-6989586621680403286"><span id="local-6989586621680403293"><span id="local-6989586621680403295"><span id="local-6989586621680403297"><span id="local-6989586621680403305"><span id="local-6989586621680403315"><span id="local-6989586621680403319"><span id="local-6989586621680403322"><span id="local-6989586621680403331"><span id="local-6989586621680403335"><span id="local-6989586621680403342"><span id="local-6989586621680403349"><span id="local-6989586621680403351"><span id="local-6989586621680403353"><span id="local-6989586621680403361"><span id="local-6989586621680403365"><span id="local-6989586621680403369"><span id="local-6989586621680403372"><span id="local-6989586621680403375"><span id="local-6989586621680403379"><span id="local-6989586621680403386"><span id="local-6989586621680403393"><span id="local-6989586621680403395"><span id="local-6989586621680403397"><span id="local-6989586621680403405"><span id="local-6989586621680403409"><span id="local-6989586621680403413"><span id="local-6989586621680403416"><span id="local-6989586621680403419"><span id="local-6989586621680403423"><span id="local-6989586621680403430"><span id="local-6989586621680403437"><span id="local-6989586621680403439"><span id="local-6989586621680403441"><span id="local-6989586621680403449"><span id="local-6989586621680403456"><span id="local-6989586621680403458"><span id="local-6989586621680403460"><span id="local-6989586621680403468"><span id="local-6989586621680403472"><span id="local-6989586621680403476"><span id="local-6989586621680403479"><span id="local-6989586621680403482"><span id="local-6989586621680403486"><span id="local-6989586621680403488"><span id="local-6989586621680403490"><span id="local-6989586621680403498"><span id="local-6989586621680403505"><span id="local-6989586621680403507"><span id="local-6989586621680403509"><span id="local-6989586621680403517"><span id="local-6989586621680403522"><span id="local-6989586621680403526"><span id="local-6989586621680403529"><span id="local-6989586621680403533"><span id="local-6989586621680403537"><span id="local-6989586621680403539"><span id="local-6989586621680403541"><span id="local-6989586621680403549"><span id="local-6989586621680403556"><span id="local-6989586621680403558"><span id="local-6989586621680403560"><span id="local-6989586621680403568"><span id="local-6989586621680403572"><span id="local-6989586621680403576"><span id="local-6989586621680403579"><span id="local-6989586621680403582"><span id="local-6989586621680403586"><span id="local-6989586621680403588"><span id="local-6989586621680403590"><span id="local-6989586621680403598"><span id="local-6989586621680403604"><span id="local-6989586621680403608"><span id="local-6989586621680403611"><span id="local-6989586621680403616"><span id="local-6989586621680403620"><span id="local-6989586621680403627"><span id="local-6989586621680403634"><span id="local-6989586621680403636"><span id="local-6989586621680403638"><span id="local-6989586621680403646"><span id="local-6989586621680403651"><span id="local-6989586621680403655"><span id="local-6989586621680403658"><span id="local-6989586621680403662"><span id="local-6989586621680403666"><span id="local-6989586621680403673"><span id="local-6989586621680403680"><span id="local-6989586621680403682"><span id="local-6989586621680403684"><span id="local-6989586621680403692"><span id="local-6989586621680403699"><span id="local-6989586621680403701"><span id="local-6989586621680403703"><span id="local-6989586621680403711"><span id="local-6989586621680403717"><span id="local-6989586621680403721"><span id="local-6989586621680403724"><span id="local-6989586621680403729"><span id="local-6989586621680403733"><span id="local-6989586621680403735"><span id="local-6989586621680403737"><span id="local-6989586621680403745"><span id="local-6989586621680403747"><span id="local-6989586621680403751"><span id="local-6989586621680403754"><span id="local-6989586621680403756"><span id="local-6989586621680403760"><span id="local-6989586621680403767"><span id="local-6989586621680403774"><span id="local-6989586621680403776"><span id="local-6989586621680403778"><span id="local-6989586621680403786"><span id="local-6989586621680403793"><span id="local-6989586621680403795"><span id="local-6989586621680403797"><span id="local-6989586621680403805"><span id="local-6989586621680403813"><span id="local-6989586621680403817"><span id="local-6989586621680403820"><span id="local-6989586621680403827"><span id="local-6989586621680403831"><span id="local-6989586621680403833"><span id="local-6989586621680403835"><span id="local-6989586621680403843"><span id="local-6989586621680403850"><span id="local-6989586621680403852"><span id="local-6989586621680403854"><span id="local-6989586621680403862"><span id="local-6989586621680403870"><span id="local-6989586621680403874"><span id="local-6989586621680403877"><span id="local-6989586621680403884"><span id="local-6989586621680403888"><span id="local-6989586621680403890"><span id="local-6989586621680403892"><span id="local-6989586621680403900"><span id="local-6989586621680403906"><span id="local-6989586621680403910"><span id="local-6989586621680403913"><span id="local-6989586621680403918"><span id="local-6989586621680403922"><span id="local-6989586621680403929"><span id="local-6989586621680403936"><span id="local-6989586621680403938"><span id="local-6989586621680403940"><span id="local-6989586621680403948"><span id="local-6989586621680403952"><span id="local-6989586621680403956"><span id="local-6989586621680403959"><span id="local-6989586621680403962"><span id="local-6989586621680403966"><span id="local-6989586621680403973"><span id="local-6989586621680403980"><span id="local-6989586621680403982"><span id="local-6989586621680403984"><span id="local-6989586621680403992"><span id="local-6989586621680403997"><span id="local-6989586621680404001"><span id="local-6989586621680404004"><span id="local-6989586621680404008"><span id="local-6989586621680404012"><span id="local-6989586621680404019"><span id="local-6989586621680404026"><span id="local-6989586621680404028"><span id="local-6989586621680404030"><span id="local-6989586621680404038"><span id="local-6989586621680404042"><span id="local-6989586621680404046"><span id="local-6989586621680404049"><span id="local-6989586621680404052"><span id="local-6989586621680404056"><span id="local-6989586621680404063"><span id="local-6989586621680404070"><span id="local-6989586621680404072"><span id="local-6989586621680404074"><span id="local-6989586621680404082"><span id="local-6989586621680404089"><span id="local-6989586621680404091"><span id="local-6989586621680404093"><span id="local-6989586621680404101"><span id="local-6989586621680404105"><span id="local-6989586621680404109"><span id="local-6989586621680404112"><span id="local-6989586621680404115"><span id="local-6989586621680404119"><span id="local-6989586621680404121"><span id="local-6989586621680404123"><span id="local-6989586621680404131"><span id="local-6989586621680404138"><span id="local-6989586621680404140"><span id="local-6989586621680404142"><span id="local-6989586621680404150"><span id="local-6989586621680404157"><span id="local-6989586621680404161"><span id="local-6989586621680404164"><span id="local-6989586621680404170"><span id="local-6989586621680404174"><span id="local-6989586621680404176"><span id="local-6989586621680404178"><span id="local-6989586621680404186"><span id="local-6989586621680404193"><span id="local-6989586621680404195"><span id="local-6989586621680404197"><span id="local-6989586621680404205"><span id="local-6989586621680404218"><span id="local-6989586621680404222"><span id="local-6989586621680404225"><span id="local-6989586621680404237"><span id="local-6989586621680404241"><span id="local-6989586621680404243"><span id="local-6989586621680404245"><span id="local-6989586621680404253"><span id="local-6989586621680404258"><span id="local-6989586621680404262"><span id="local-6989586621680404265"><span id="local-6989586621680404269"><span id="local-6989586621680404273"><span id="local-6989586621680404280"><span id="local-6989586621680404287"><span id="local-6989586621680404289"><span id="local-6989586621680404291"><span id="local-6989586621680404299"><span id="local-6989586621680404306"><span id="local-6989586621680404308"><span id="local-6989586621680404310"><span id="local-6989586621680404318"><span id="local-6989586621680404323"><span id="local-6989586621680404327"><span id="local-6989586621680404330"><span id="local-6989586621680404334"><span id="local-6989586621680404338"><span id="local-6989586621680404340"><span id="local-6989586621680404342"><span id="local-6989586621680404350"><span id="local-6989586621680404357"><span id="local-6989586621680404359"><span id="local-6989586621680404361"><span id="local-6989586621680404369"><span id="local-6989586621680404376"><span id="local-6989586621680404380"><span id="local-6989586621680404383"><span id="local-6989586621680404389"><span id="local-6989586621680404393"><span id="local-6989586621680404395"><span id="local-6989586621680404397"><span id="local-6989586621680404405"><span id="local-6989586621680404409"><span id="local-6989586621680404413"><span id="local-6989586621680404416"><span id="local-6989586621680404419"><span id="local-6989586621680404423"><span id="local-6989586621680404430"><span id="local-6989586621680404437"><span id="local-6989586621680404439"><span id="local-6989586621680404441"><span id="local-6989586621680404449"><span id="local-6989586621680404456"><span id="local-6989586621680404458"><span id="local-6989586621680404460"><span id="local-6989586621680404468"><span id="local-6989586621680404474"><span id="local-6989586621680404478"><span id="local-6989586621680404481"><span id="local-6989586621680404486"><span id="local-6989586621680404490"><span id="local-6989586621680404492"><span id="local-6989586621680404494"><span id="local-6989586621680404502"><span id="local-6989586621680404509"><span id="local-6989586621680404511"><span id="local-6989586621680404513"><span id="local-6989586621680404521"><span id="local-6989586621680404527"><span id="local-6989586621680404531"><span id="local-6989586621680404534"><span id="local-6989586621680404539"><span id="local-6989586621680404543"><span id="local-6989586621680404545"><span id="local-6989586621680404547"><span id="local-6989586621680404555"><span id="local-6989586621680404562"><span id="local-6989586621680404564"><span id="local-6989586621680404566"><span id="local-6989586621680404574"><span id="local-6989586621680404580"><span id="local-6989586621680404584"><span id="local-6989586621680404587"><span id="local-6989586621680404592"><span id="local-6989586621680404596"><span id="local-6989586621680404598"><span id="local-6989586621680404600"><span id="local-6989586621680404608"><span id="local-6989586621680404615"><span id="local-6989586621680404617"><span id="local-6989586621680404619"><span id="local-6989586621680404627"><span id="local-6989586621680404633"><span id="local-6989586621680404637"><span id="local-6989586621680404640"><span id="local-6989586621680404645"><span id="local-6989586621680404649"><span id="local-6989586621680404651"><span id="local-6989586621680404653"><span id="local-6989586621680404661"><span id="local-6989586621680404668"><span id="local-6989586621680404670"><span id="local-6989586621680404672"><span id="local-6989586621680404680"><span id="local-6989586621680404685"><span id="local-6989586621680404689"><span id="local-6989586621680404692"><span id="local-6989586621680404696"><span id="local-6989586621680404700"><span id="local-6989586621680404702"><span id="local-6989586621680404704"><span id="local-6989586621680404712"><span id="local-6989586621680404719"><span id="local-6989586621680404721"><span id="local-6989586621680404723"><span id="local-6989586621680404731"><span id="local-6989586621680404736"><span id="local-6989586621680404740"><span id="local-6989586621680404743"><span id="local-6989586621680404747"><span id="local-6989586621680404751"><span id="local-6989586621680404753"><span id="local-6989586621680404755"><span id="local-6989586621680404763"><span id="local-6989586621680404768"><span id="local-6989586621680404772"><span id="local-6989586621680404775"><span id="local-6989586621680404779"><span id="local-6989586621680404783"><span id="local-6989586621680404790"><span id="local-6989586621680404797"><span id="local-6989586621680404799"><span id="local-6989586621680404801"><span id="local-6989586621680404809"><span id="local-6989586621680404814"><span id="local-6989586621680404818"><span id="local-6989586621680404821"><span id="local-6989586621680404825"><span id="local-6989586621680404829"><span id="local-6989586621680404836"><span id="local-6989586621680404843"><span id="local-6989586621680404845"><span id="local-6989586621680404847"><span id="local-6989586621680404855"><span id="local-6989586621680404859"><span id="local-6989586621680404863"><span id="local-6989586621680404866"><span id="local-6989586621680404869"><span id="local-6989586621680404873"><span id="local-6989586621680404880"><span id="local-6989586621680404887"><span id="local-6989586621680404889"><span id="local-6989586621680404891"><span id="local-6989586621680404899"><span id="local-6989586621680404906"><span id="local-6989586621680404908"><span id="local-6989586621680404910"><span id="local-6989586621680404918"><span id="local-6989586621680404922"><span id="local-6989586621680404926"><span id="local-6989586621680404929"><span id="local-6989586621680404932"><span id="local-6989586621680404936"><span id="local-6989586621680404938"><span id="local-6989586621680404940"><span id="local-6989586621680404948"><span id="local-6989586621680404955"><span id="local-6989586621680404957"><span id="local-6989586621680404959"><span id="local-6989586621680404967"><span id="local-6989586621680404972"><span id="local-6989586621680404976"><span id="local-6989586621680404979"><span id="local-6989586621680404983"><span id="local-6989586621680404987"><span id="local-6989586621680404989"><span id="local-6989586621680404991"><span id="local-6989586621680404999"><span id="local-6989586621680405006"><span id="local-6989586621680405008"><span id="local-6989586621680405010"><span id="local-6989586621680405018"><span id="local-6989586621680405022"><span id="local-6989586621680405026"><span id="local-6989586621680405029"><span id="local-6989586621680405032"><span id="local-6989586621680405036"><span id="local-6989586621680405038"><span id="local-6989586621680405040"><span id="local-6989586621680405048"><span id="local-6989586621680405055"><span id="local-6989586621680405057"><span id="local-6989586621680405059"><span id="local-6989586621680405067"><span id="local-6989586621680405071"><span id="local-6989586621680405075"><span id="local-6989586621680405078"><span id="local-6989586621680405081"><span id="local-6989586621680405085"><span id="local-6989586621680405087"><span id="local-6989586621680405089"><span id="local-6989586621680405097"><span id="local-6989586621680405104"><span id="local-6989586621680405106"><span id="local-6989586621680405108"><span id="local-6989586621680405116"><span id="local-6989586621680405120"><span id="local-6989586621680405124"><span id="local-6989586621680405127"><span id="local-6989586621680405130"><span id="local-6989586621680405134"><span id="local-6989586621680405136"><span id="local-6989586621680405138"><span id="local-6989586621680405146"><span id="local-6989586621680405151"><span id="local-6989586621680405155"><span id="local-6989586621680405158"><span id="local-6989586621680405162"><span id="local-6989586621680405166"><span id="local-6989586621680405173"><span id="local-6989586621680405180"><span id="local-6989586621680405182"><span id="local-6989586621680405184"><span id="local-6989586621680405192"><span id="local-6989586621680405199"><span id="local-6989586621680405201"><span id="local-6989586621680405203"><span id="local-6989586621680405211"><span id="local-6989586621680405217"><span id="local-6989586621680405221"><span id="local-6989586621680405224"><span id="local-6989586621680405229"><span id="local-6989586621680405233"><span id="local-6989586621680405235"><span id="local-6989586621680405237"><span id="local-6989586621680405245"><span id="local-6989586621680405250"><span id="local-6989586621680405254"><span id="local-6989586621680405257"><span id="local-6989586621680405261"><span id="local-6989586621680405265"><span id="local-6989586621680405272"><span id="local-6989586621680405279"><span id="local-6989586621680405281"><span id="local-6989586621680405283"><span id="local-6989586621680405291"><span id="local-6989586621680405295"><span id="local-6989586621680405299"><span id="local-6989586621680405302"><span id="local-6989586621680405305"><span id="local-6989586621680405309"><span id="local-6989586621680405316"><span id="local-6989586621680405323"><span id="local-6989586621680405325"><span id="local-6989586621680405327"><span id="local-6989586621680405335"><span id="local-6989586621680405341"><span id="local-6989586621680405345"><span id="local-6989586621680405348"><span id="local-6989586621680405353"><span id="local-6989586621680405357"><span id="local-6989586621680405364"><span id="local-6989586621680405371"><span id="local-6989586621680405373"><span id="local-6989586621680405375"><span id="local-6989586621680405383"><span id="local-6989586621680405387"><span id="local-6989586621680405391"><span id="local-6989586621680405394"><span id="local-6989586621680405397"><span id="local-6989586621680405401"><span id="local-6989586621680405408"><span id="local-6989586621680405415"><span id="local-6989586621680405417"><span id="local-6989586621680405419"><span id="local-6989586621680405427"><span id="local-6989586621680405434"><span id="local-6989586621680405436"><span id="local-6989586621680405438"><span id="local-6989586621680405446"><span id="local-6989586621680405452"><span id="local-6989586621680405456"><span id="local-6989586621680405459"><span id="local-6989586621680405464"><span id="local-6989586621680405468"><span id="local-6989586621680405470"><span id="local-6989586621680405472"><span id="local-6989586621680405480"><span id="local-6989586621680405487"><span id="local-6989586621680405489"><span id="local-6989586621680405491"><span id="local-6989586621680405499"><span id="local-6989586621680405504"><span id="local-6989586621680405508"><span id="local-6989586621680405511"><span id="local-6989586621680405515"><span id="local-6989586621680405519"><span id="local-6989586621680405521"><span id="local-6989586621680405523"><span id="local-6989586621680405531"><span id="local-6989586621680405543"><span id="local-6989586621680405547"><span id="local-6989586621680405550"><span id="local-6989586621680405561"><span id="local-6989586621680405565"><span id="local-6989586621680405572"><span id="local-6989586621680405579"><span id="local-6989586621680405581"><span id="local-6989586621680405583"><span id="local-6989586621680405591"><span id="local-6989586621680405596"><span id="local-6989586621680405600"><span id="local-6989586621680405603"><span id="local-6989586621680405607"><span id="local-6989586621680405611"><span id="local-6989586621680405618"><span id="local-6989586621680405625"><span id="local-6989586621680405627"><span id="local-6989586621680405629"><span id="local-6989586621680405637"><span id="local-6989586621680405639"><span id="local-6989586621680405643"><span id="local-6989586621680405646"><span id="local-6989586621680405648"><span id="local-6989586621680405652"><span id="local-6989586621680405659"><span id="local-6989586621680405666"><span id="local-6989586621680405668"><span id="local-6989586621680405670"><span id="local-6989586621680405678"><span id="local-6989586621680405684"><span id="local-6989586621680405688"><span id="local-6989586621680405691"><span id="local-6989586621680405696"><span id="local-6989586621680405700"><span id="local-6989586621680405707"><span id="local-6989586621680405714"><span id="local-6989586621680405716"><span id="local-6989586621680405718"><span id="local-6989586621680405726"><span id="local-6989586621680405733"><span id="local-6989586621680405735"><span id="local-6989586621680405737"><span id="local-6989586621680405745"><span id="local-6989586621680405750"><span id="local-6989586621680405754"><span id="local-6989586621680405757"><span id="local-6989586621680405761"><span id="local-6989586621680405765"><span id="local-6989586621680405767"><span id="local-6989586621680405769"><span id="local-6989586621680405777"><span id="local-6989586621680405784"><span id="local-6989586621680405786"><span id="local-6989586621680405788"><span id="local-6989586621680405796"><span id="local-6989586621680405801"><span id="local-6989586621680405805"><span id="local-6989586621680405808"><span id="local-6989586621680405812"><span id="local-6989586621680405816"><span id="local-6989586621680405818"><span id="local-6989586621680405820"><span id="local-6989586621680405828"><span id="local-6989586621680405835"><span id="local-6989586621680405837"><span id="local-6989586621680405839"><span id="local-6989586621680405847"><span id="local-6989586621680405853"><span id="local-6989586621680405857"><span id="local-6989586621680405860"><span id="local-6989586621680405865"><span id="local-6989586621680405869"><span id="local-6989586621680405871"><span id="local-6989586621680405873"><span id="local-6989586621680405881"><span id="local-6989586621680405885"><span id="local-6989586621680405889"><span id="local-6989586621680405892"><span id="local-6989586621680405895"><span id="local-6989586621680405899"><span id="local-6989586621680405906"><span id="local-6989586621680405913"><span id="local-6989586621680405915"><span id="local-6989586621680405917"><span id="local-6989586621680405925"><span id="local-6989586621680405929"><span id="local-6989586621680405933"><span id="local-6989586621680405936"><span id="local-6989586621680405939"><span id="local-6989586621680405943"><span id="local-6989586621680405950"><span id="local-6989586621680405957"><span id="local-6989586621680405959"><span id="local-6989586621680405961"><span id="local-6989586621680405969"><span id="local-6989586621680405975"><span id="local-6989586621680405979"><span id="local-6989586621680405982"><span id="local-6989586621680405987"><span id="local-6989586621680405991"><span id="local-6989586621680405998"><span id="local-6989586621680406005"><span id="local-6989586621680406007"><span id="local-6989586621680406009"><span id="local-6989586621680406017"><span id="local-6989586621680406024"><span id="local-6989586621680406026"><span id="local-6989586621680406028"><span id="local-6989586621680406036"><span id="local-6989586621680406045"><span id="local-6989586621680406049"><span id="local-6989586621680406052"><span id="local-6989586621680406060"><span id="local-6989586621680406064"><span id="local-6989586621680406066"><span id="local-6989586621680406068"><span id="local-6989586621680406076"><span id="local-6989586621680406083"><span id="local-6989586621680406085"><span id="local-6989586621680406087"><span id="local-6989586621680406095"><span id="local-6989586621680406102"><span id="local-6989586621680406106"><span id="local-6989586621680406109"><span id="local-6989586621680406115"><span id="local-6989586621680406119"><span id="local-6989586621680406121"><span id="local-6989586621680406123"><span id="local-6989586621680406131"><span id="local-6989586621680406138"><span id="local-6989586621680406140"><span id="local-6989586621680406142"><span id="local-6989586621680406150"><span id="local-6989586621680406155"><span id="local-6989586621680406159"><span id="local-6989586621680406162"><span id="local-6989586621680406166"><span id="local-6989586621680406170"><span id="local-6989586621680406172"><span id="local-6989586621680406174"><span id="local-6989586621680406182"><span id="local-6989586621680406187"><span id="local-6989586621680406191"><span id="local-6989586621680406194"><span id="local-6989586621680406198"><span id="local-6989586621680406202"><span id="local-6989586621680406209"><span id="local-6989586621680406216"><span id="local-6989586621680406218"><span id="local-6989586621680406220"><span id="local-6989586621680406228"><span id="local-6989586621680406235"><span id="local-6989586621680406237"><span id="local-6989586621680406239"><span id="local-6989586621680406247"><span id="local-6989586621680406253"><span id="local-6989586621680406257"><span id="local-6989586621680406260"><span id="local-6989586621680406265"><span id="local-6989586621680406269"><span id="local-6989586621680406271"><span id="local-6989586621680406273"><span id="local-6989586621680406281"><span id="local-6989586621680406283"><span id="local-6989586621680406287"><span id="local-6989586621680406290"><span id="local-6989586621680406292"><span id="local-6989586621680406296"><span id="local-6989586621680406303"><span id="local-6989586621680406310"><span id="local-6989586621680406312"><span id="local-6989586621680406314"><span id="local-6989586621680406322"><span id="local-6989586621680406329"><span id="local-6989586621680406331"><span id="local-6989586621680406333"><span id="local-6989586621680406341"><span id="local-6989586621680406346"><span id="local-6989586621680406350"><span id="local-6989586621680406353"><span id="local-6989586621680406357"><span id="local-6989586621680406361"><span id="local-6989586621680406363"><span id="local-6989586621680406365"><span id="local-6989586621680406373"><span id="local-6989586621680406383"><span id="local-6989586621680406387"><span id="local-6989586621680406390"><span id="local-6989586621680406399"><span id="local-6989586621680406403"><span id="local-6989586621680406410"><span id="local-6989586621680406417"><span id="local-6989586621680406419"><span id="local-6989586621680406421"><span id="local-6989586621680406429"><span id="local-6989586621680406435"><span id="local-6989586621680406439"><span id="local-6989586621680406442"><span id="local-6989586621680406447"><span id="local-6989586621680406451"><span id="local-6989586621680406458"><span id="local-6989586621680406465"><span id="local-6989586621680406467"><span id="local-6989586621680406469"><span id="local-6989586621680406477"><span id="local-6989586621680406482"><span id="local-6989586621680406486"><span id="local-6989586621680406489"><span id="local-6989586621680406493"><span id="local-6989586621680406497"><span id="local-6989586621680406504"><span id="local-6989586621680406511"><span id="local-6989586621680406513"><span id="local-6989586621680406515"><span id="local-6989586621680406523"><span id="local-6989586621680406527"><span id="local-6989586621680406531"><span id="local-6989586621680406534"><span id="local-6989586621680406537"><span id="local-6989586621680406541"><span id="local-6989586621680406548"><span id="local-6989586621680406555"><span id="local-6989586621680406557"><span id="local-6989586621680406559"><span id="local-6989586621680406567"><span id="local-6989586621680406571"><span id="local-6989586621680406575"><span id="local-6989586621680406578"><span id="local-6989586621680406581"><span id="local-6989586621680406585"><span id="local-6989586621680406592"><span id="local-6989586621680406599"><span id="local-6989586621680406601"><span id="local-6989586621680406603"><span id="local-6989586621680406611"><span id="local-6989586621680406615"><span id="local-6989586621680406619"><span id="local-6989586621680406622"><span id="local-6989586621680406625"><span id="local-6989586621680406629"><span id="local-6989586621680406636"><span id="local-6989586621680406643"><span id="local-6989586621680406645"><span id="local-6989586621680406647"><span id="local-6989586621680406655"><span id="local-6989586621680406662"><span id="local-6989586621680406664"><span id="local-6989586621680406666"><span id="local-6989586621680406674"><span id="local-6989586621680406680"><span id="local-6989586621680406684"><span id="local-6989586621680406687"><span id="local-6989586621680406692"><span id="local-6989586621680406696"><span id="local-6989586621680406698"><span id="local-6989586621680406700"><span id="local-6989586621680406708"><span id="local-6989586621680406715"><span id="local-6989586621680406717"><span id="local-6989586621680406719"><span id="local-6989586621680406727"><span id="local-6989586621680406731"><span id="local-6989586621680406735"><span id="local-6989586621680406738"><span id="local-6989586621680406741"><span id="local-6989586621680406745"><span id="local-6989586621680406747"><span id="local-6989586621680406749"><span id="local-6989586621680406757"><span id="local-6989586621680406764"><span id="local-6989586621680406768"><span id="local-6989586621680406771"><span id="local-6989586621680406777"><span id="local-6989586621680406781"><span id="local-6989586621680406788"><span id="local-6989586621680406795"><span id="local-6989586621680406797"><span id="local-6989586621680406799"><span id="local-6989586621680406807"><span id="local-6989586621680406814"><span id="local-6989586621680406816"><span id="local-6989586621680406818"><span id="local-6989586621680406826"><span id="local-6989586621680406833"><span id="local-6989586621680406837"><span id="local-6989586621680406840"><span id="local-6989586621680406846"><span id="local-6989586621680406850"><span id="local-6989586621680406852"><span id="local-6989586621680406854"><span id="local-6989586621680406862"><span id="local-6989586621680406869"><span id="local-6989586621680406871"><span id="local-6989586621680406873"><span id="local-6989586621680406881"><span id="local-6989586621680406886"><span id="local-6989586621680406890"><span id="local-6989586621680406893"><span id="local-6989586621680406897"><span id="local-6989586621680406901"><span id="local-6989586621680406903"><span id="local-6989586621680406905"><span id="local-6989586621680406913"><span id="local-6989586621680406920"><span id="local-6989586621680406922"><span id="local-6989586621680406924"><span id="local-6989586621680406932"><span id="local-6989586621680406942"><span id="local-6989586621680406946"><span id="local-6989586621680406949"><span id="local-6989586621680406958"><span id="local-6989586621680406962"><span id="local-6989586621680406964"><span id="local-6989586621680406966"><span id="local-6989586621680406974"><span id="local-6989586621680406981"><span id="local-6989586621680406983"><span id="local-6989586621680406985"><span id="local-6989586621680406993"><span id="local-6989586621680407001"><span id="local-6989586621680407005"><span id="local-6989586621680407008"><span id="local-6989586621680407015"><span id="local-6989586621680407019"><span id="local-6989586621680407021"><span id="local-6989586621680407023"><span id="local-6989586621680407031"><span id="local-6989586621680407038"><span id="local-6989586621680407040"><span id="local-6989586621680407042"><span id="local-6989586621680407050"><span id="local-6989586621680407060"><span id="local-6989586621680407064"><span id="local-6989586621680407067"><span id="local-6989586621680407076"><span id="local-6989586621680407080"><span id="local-6989586621680407082"><span id="local-6989586621680407084"><span id="local-6989586621680407092"><span id="local-6989586621680407099"><span id="local-6989586621680407101"><span id="local-6989586621680407103"><span id="local-6989586621680407111"><span id="local-6989586621680407125"><span id="local-6989586621680407129"><span id="local-6989586621680407132"><span id="local-6989586621680407145"><span id="local-6989586621680407149"><span id="local-6989586621680407151"><span id="local-6989586621680407153"><span id="local-6989586621680407161"><span id="local-6989586621680407168"><span id="local-6989586621680407170"><span id="local-6989586621680407172"><span id="local-6989586621680407180"><span id="local-6989586621680407200"><span id="local-6989586621680407204"><span id="local-6989586621680407207"><span id="local-6989586621680407226"><span id="local-6989586621680407230"><span id="local-6989586621680407232"><span id="local-6989586621680407234"><span id="local-6989586621680407242"><span id="local-6989586621680407249"><span id="local-6989586621680407251"><span id="local-6989586621680407253"><span id="local-6989586621680407261"><span id="local-6989586621680407268"><span id="local-6989586621680407272"><span id="local-6989586621680407275"><span id="local-6989586621680407281"><span id="local-6989586621680407285"><span id="local-6989586621680407287"><span id="local-6989586621680407289"><span id="local-6989586621680407297"><span id="local-6989586621680407304"><span id="local-6989586621680407306"><span id="local-6989586621680407308"><span id="local-6989586621680407316"><span id="local-6989586621680407329"><span id="local-6989586621680407333"><span id="local-6989586621680407336"><span id="local-6989586621680407348"><span id="local-6989586621680407352"><span id="local-6989586621680407354"><span id="local-6989586621680407356"><span id="local-6989586621680407364"><span id="local-6989586621680407371"><span id="local-6989586621680407375"><span id="local-6989586621680407378"><span id="local-6989586621680407384"><span id="local-6989586621680407388"><span id="local-6989586621680407395"><span id="local-6989586621680407402"><span id="local-6989586621680407404"><span id="local-6989586621680407406"><span id="local-6989586621680407414"><span id="local-6989586621680407422"><span id="local-6989586621680407426"><span id="local-6989586621680407429"><span id="local-6989586621680407436"><span id="local-6989586621680407440"><span id="local-6989586621680407447"><span id="local-6989586621680407454"><span id="local-6989586621680407456"><span id="local-6989586621680407458"><span id="local-6989586621680407466"><span id="local-6989586621680407473"><span id="local-6989586621680407475"><span id="local-6989586621680407477"><span id="local-6989586621680407485"><span id="local-6989586621680407496"><span id="local-6989586621680407500"><span id="local-6989586621680407503"><span id="local-6989586621680407513"><span id="local-6989586621680407517"><span id="local-6989586621680407519"><span id="local-6989586621680407521"><span id="local-6989586621680407529"><span id="local-6989586621680407536"><span id="local-6989586621680407538"><span id="local-6989586621680407540"><span id="local-6989586621680407548"><span id="local-6989586621680407553"><span id="local-6989586621680407557"><span id="local-6989586621680407560"><span id="local-6989586621680407564"><span id="local-6989586621680407568"><span id="local-6989586621680407570"><span id="local-6989586621680407572"><span id="local-6989586621680407580"><span id="local-6989586621680407587"><span id="local-6989586621680407589"><span id="local-6989586621680407591"><span id="local-6989586621680407599"><span id="local-6989586621680407605"><span id="local-6989586621680407609"><span id="local-6989586621680407612"><span id="local-6989586621680407617"><span id="local-6989586621680407621"><span id="local-6989586621680407623"><span id="local-6989586621680407625"><span id="local-6989586621680407633"><span id="local-6989586621680407640"><span id="local-6989586621680407642"><span id="local-6989586621680407644"><span id="local-6989586621680407652"><span id="local-6989586621680407657"><span id="local-6989586621680407661"><span id="local-6989586621680407664"><span id="local-6989586621680407668"><span id="local-6989586621680407672"><span id="local-6989586621680407674"><span id="local-6989586621680407676"><span id="local-6989586621680407684"><span id="local-6989586621680407689"><span id="local-6989586621680407693"><span id="local-6989586621680407696"><span id="local-6989586621680407700"><span id="local-6989586621680407704"><span id="local-6989586621680407711"><span id="local-6989586621680407718"><span id="local-6989586621680407720"><span id="local-6989586621680407722"><span id="local-6989586621680407730"><span id="local-6989586621680407739"><span id="local-6989586621680407743"><span id="local-6989586621680407746"><span id="local-6989586621680407754"><span id="local-6989586621680407758"><span id="local-6989586621680407765"><span id="local-6989586621680407772"><span id="local-6989586621680407774"><span id="local-6989586621680407776"><span id="local-6989586621680407784"><span id="local-6989586621680407791"><span id="local-6989586621680407793"><span id="local-6989586621680407795"><span id="local-6989586621680407803"><span id="local-6989586621680407812"><span id="local-6989586621680407816"><span id="local-6989586621680407819"><span id="local-6989586621680407827"><span id="local-6989586621680407831"><span id="local-6989586621680407833"><span id="local-6989586621680407835"><span id="local-6989586621680407843"><span id="local-6989586621680407850"><span id="local-6989586621680407852"><span id="local-6989586621680407854"><span id="local-6989586621680407862"><span id="local-6989586621680407867"><span id="local-6989586621680407871"><span id="local-6989586621680407874"><span id="local-6989586621680407878"><span id="local-6989586621680407882"><span id="local-6989586621680407884"><span id="local-6989586621680407886"><span id="local-6989586621680407894"><span id="local-6989586621680407901"><span id="local-6989586621680407903"><span id="local-6989586621680407905"><span id="local-6989586621680407913"><span id="local-6989586621680407921"><span id="local-6989586621680407925"><span id="local-6989586621680407928"><span id="local-6989586621680407935"><span id="local-6989586621680407939"><span id="local-6989586621680407941"><span id="local-6989586621680407943"><span id="local-6989586621680407951"><span id="local-6989586621680407955"><span id="local-6989586621680407959"><span id="local-6989586621680407962"><span id="local-6989586621680407965"><span id="local-6989586621680407969"><span id="local-6989586621680407976"><span id="local-6989586621680407983"><span id="local-6989586621680407985"><span id="local-6989586621680407987"><span id="local-6989586621680407995"><span id="local-6989586621680407999"><span id="local-6989586621680408003"><span id="local-6989586621680408006"><span id="local-6989586621680408009"><span id="local-6989586621680408013"><span id="local-6989586621680408020"><span id="local-6989586621680408027"><span id="local-6989586621680408029"><span id="local-6989586621680408031"><span id="local-6989586621680408039"><span id="local-6989586621680408046"><span id="local-6989586621680408048"><span id="local-6989586621680408050"><span id="local-6989586621680408058"><span id="local-6989586621680408062"><span id="local-6989586621680408066"><span id="local-6989586621680408069"><span id="local-6989586621680408072"><span id="local-6989586621680408076"><span id="local-6989586621680408078"><span id="local-6989586621680408080"><span id="local-6989586621680408088"><span id="local-6989586621680408095"><span id="local-6989586621680408097"><span id="local-6989586621680408099"><span id="local-6989586621680408107"><span id="local-6989586621680408114"><span id="local-6989586621680408118"><span id="local-6989586621680408121"><span id="local-6989586621680408127"><span id="local-6989586621680408131"><span id="local-6989586621680408133"><span id="local-6989586621680408135"><span id="local-6989586621680408143"><span id="local-6989586621680408150"><span id="local-6989586621680408152"><span id="local-6989586621680408154"><span id="local-6989586621680408162"><span id="local-6989586621680408168"><span id="local-6989586621680408172"><span id="local-6989586621680408175"><span id="local-6989586621680408180"><span id="local-6989586621680408184"><span id="local-6989586621680408186"><span id="local-6989586621680408188"><span id="local-6989586621680408196"><span id="local-6989586621680408203"><span id="local-6989586621680408205"><span id="local-6989586621680408207"><span id="local-6989586621680408215"><span id="local-6989586621680408220"><span id="local-6989586621680408224"><span id="local-6989586621680408227"><span id="local-6989586621680408231"><span id="local-6989586621680408235"><span id="local-6989586621680408237"><span id="local-6989586621680408239"><span id="local-6989586621680408247"><span id="local-6989586621680408251"><span id="local-6989586621680408255"><span id="local-6989586621680408258"><span id="local-6989586621680408261"><span id="local-6989586621680408265"><span id="local-6989586621680408272"><span id="local-6989586621680408279"><span id="local-6989586621680408281"><span id="local-6989586621680408283"><span id="local-6989586621680408291"><span id="local-6989586621680408298"><span id="local-6989586621680408300"><span id="local-6989586621680408302"><span id="local-6989586621680408310"><span id="local-6989586621680408317"><span id="local-6989586621680408321"><span id="local-6989586621680408324"><span id="local-6989586621680408330"><span id="local-6989586621680408334"><span id="local-6989586621680408336"><span id="local-6989586621680408338"><span id="local-6989586621680408346"><span id="local-6989586621680408353"><span id="local-6989586621680408355"><span id="local-6989586621680408357"><span id="local-6989586621680408365"><span id="local-6989586621680408371"><span id="local-6989586621680408375"><span id="local-6989586621680408378"><span id="local-6989586621680408383"><span id="local-6989586621680408387"><span id="local-6989586621680408389"><span id="local-6989586621680408391"><span id="local-6989586621680408399"><span id="local-6989586621680408406"><span id="local-6989586621680408408"><span id="local-6989586621680408410"><span id="local-6989586621680408418"><span id="local-6989586621680408426"><span id="local-6989586621680408430"><span id="local-6989586621680408433"><span id="local-6989586621680408440"><span id="local-6989586621680408444"><span id="local-6989586621680408446"><span id="local-6989586621680408448"><span id="local-6989586621680408456"><span id="local-6989586621680408463"><span id="local-6989586621680408465"><span id="local-6989586621680408467"><span id="local-6989586621680408475"><span id="local-6989586621680408479"><span id="local-6989586621680408483"><span id="local-6989586621680408486"><span id="local-6989586621680408489"><span id="local-6989586621680408493"><span id="local-6989586621680408495"><span id="local-6989586621680408497"><span id="local-6989586621680408505"><span id="local-6989586621680408512"><span id="local-6989586621680408514"><span id="local-6989586621680408516"><span id="local-6989586621680408524"><span id="local-6989586621680408530"><span id="local-6989586621680408534"><span id="local-6989586621680408537"><span id="local-6989586621680408542"><span id="local-6989586621680408546"><span id="local-6989586621680408548"><span id="local-6989586621680408550"><span id="local-6989586621680408558"><span id="local-6989586621680408566"><span id="local-6989586621680408570"><span id="local-6989586621680408573"><span id="local-6989586621680408580"><span id="local-6989586621680408584"><span id="local-6989586621680408586"><span id="local-6989586621680408588"><span id="local-6989586621680408596"><span id="local-6989586621680408603"><span id="local-6989586621680408605"><span id="local-6989586621680408607"><span id="local-6989586621680408615"><span id="local-6989586621680408621"><span id="local-6989586621680408625"><span id="local-6989586621680408628"><span id="local-6989586621680408633"><span id="local-6989586621680408637"><span id="local-6989586621680408644"><span id="local-6989586621680408651"><span id="local-6989586621680408653"><span id="local-6989586621680408655"><span id="local-6989586621680408663"><span id="local-6989586621680408667"><span id="local-6989586621680408671"><span id="local-6989586621680408674"><span id="local-6989586621680408677"><span id="local-6989586621680408681"><span id="local-6989586621680408688"><span id="local-6989586621680408695"><span id="local-6989586621680408697"><span id="local-6989586621680408699"><span id="local-6989586621680408707"><span id="local-6989586621680408713"><span id="local-6989586621680408717"><span id="local-6989586621680408720"><span id="local-6989586621680408725"><span id="local-6989586621680408729"><span id="local-6989586621680408736"><span id="local-6989586621680408743"><span id="local-6989586621680408745"><span id="local-6989586621680408747"><span id="local-6989586621680408755"><span id="local-6989586621680408757"><span id="local-6989586621680408761"><span id="local-6989586621680408764"><span id="local-6989586621680408766"><span id="local-6989586621680408770"><span id="local-6989586621680408777"><span id="local-6989586621680408784"><span id="local-6989586621680408786"><span id="local-6989586621680408788"><span id="local-6989586621680408796"><span id="local-6989586621680408803"><span id="local-6989586621680408805"><span id="local-6989586621680408807"><span id="local-6989586621680408815"><span id="local-6989586621680408819"><span id="local-6989586621680408823"><span id="local-6989586621680408826"><span id="local-6989586621680408829"><span id="local-6989586621680408833"><span id="local-6989586621680408835"><span id="local-6989586621680408837"><span id="local-6989586621680408845"><span id="local-6989586621680408850"><span id="local-6989586621680408854"><span id="local-6989586621680408857"><span id="local-6989586621680408861"><span id="local-6989586621680408865"><span id="local-6989586621680408872"><span id="local-6989586621680408879"><span id="local-6989586621680408881"><span id="local-6989586621680408883"><span id="local-6989586621680408891"><span id="local-6989586621680408897"><span id="local-6989586621680408901"><span id="local-6989586621680408904"><span id="local-6989586621680408909"><span id="local-6989586621680408913"><span id="local-6989586621680408920"><span id="local-6989586621680408927"><span id="local-6989586621680408929"><span id="local-6989586621680408931"><span id="local-6989586621680408939"><span id="local-6989586621680408946"><span id="local-6989586621680408948"><span id="local-6989586621680408950"><span id="local-6989586621680408958"><span id="local-6989586621680408963"><span id="local-6989586621680408967"><span id="local-6989586621680408970"><span id="local-6989586621680408974"><span id="local-6989586621680408978"><span id="local-6989586621680408980"><span id="local-6989586621680408982"><span id="local-6989586621680408990"><span id="local-6989586621680408997"><span id="local-6989586621680408999"><span id="local-6989586621680409001"><span id="local-6989586621680409009"><span id="local-6989586621680409016"><span id="local-6989586621680409020"><span id="local-6989586621680409023"><span id="local-6989586621680409029"><span id="local-6989586621680409033"><span id="local-6989586621680409035"><span id="local-6989586621680409037"><span id="local-6989586621680409045"><span id="local-6989586621680409052"><span id="local-6989586621680409054"><span id="local-6989586621680409056"><span id="local-6989586621680409064"><span id="local-6989586621680409070"><span id="local-6989586621680409074"><span id="local-6989586621680409077"><span id="local-6989586621680409082"><span id="local-6989586621680409086"><span id="local-6989586621680409088"><span id="local-6989586621680409090"><span id="local-6989586621680409098"><span id="local-6989586621680409105"><span id="local-6989586621680409107"><span id="local-6989586621680409109"><span id="local-6989586621680409117"><span id="local-6989586621680409123"><span id="local-6989586621680409127"><span id="local-6989586621680409130"><span id="local-6989586621680409135"><span id="local-6989586621680409139"><span id="local-6989586621680409141"><span id="local-6989586621680409143"><span id="local-6989586621680409151"><span id="local-6989586621680409158"><span id="local-6989586621680409160"><span id="local-6989586621680409162"><span id="local-6989586621680409170"><span id="local-6989586621680409174"><span id="local-6989586621680409178"><span id="local-6989586621680409181"><span id="local-6989586621680409184"><span id="local-6989586621680409188"><span id="local-6989586621680409190"><span id="local-6989586621680409192"><span id="local-6989586621680409200"><span id="local-6989586621680409207"><span id="local-6989586621680409209"><span id="local-6989586621680409211"><span id="local-6989586621680409219"><span id="local-6989586621680409224"><span id="local-6989586621680409228"><span id="local-6989586621680409231"><span id="local-6989586621680409235"><span id="local-6989586621680409239"><span id="local-6989586621680409246"><span id="local-6989586621680409253"><span id="local-6989586621680409255"><span id="local-6989586621680409257"><span id="local-6989586621680409265"><span id="local-6989586621680409271"><span id="local-6989586621680409275"><span id="local-6989586621680409278"><span id="local-6989586621680409283"><span id="local-6989586621680409287"><span id="local-6989586621680409289"><span id="local-6989586621680409291"><span id="local-6989586621680409299"><span id="local-6989586621680409306"><span id="local-6989586621680409308"><span id="local-6989586621680409310"><span id="local-6989586621680409318"><span id="local-6989586621680409323"><span id="local-6989586621680409327"><span id="local-6989586621680409330"><span id="local-6989586621680409334"><span id="local-6989586621680409338"><span id="local-6989586621680409340"><span id="local-6989586621680409342"><span id="local-6989586621680409350"><span id="local-6989586621680409357"><span id="local-6989586621680409359"><span id="local-6989586621680409361"><span id="local-6989586621680409369"><span id="local-6989586621680409376"><span id="local-6989586621680409380"><span id="local-6989586621680409383"><span id="local-6989586621680409389"><span id="local-6989586621680409393"><span id="local-6989586621680409395"><span id="local-6989586621680409397"><span id="local-6989586621680409405"><span id="local-6989586621680409412"><span id="local-6989586621680409414"><span id="local-6989586621680409416"><span id="local-6989586621680409424"><span id="local-6989586621680409436"><span id="local-6989586621680409440"><span id="local-6989586621680409443"><span id="local-6989586621680409454"><span id="local-6989586621680409458"><span id="local-6989586621680409460"><span id="local-6989586621680409462"><span id="local-6989586621680409470"><span id="local-6989586621680409472"><span id="local-6989586621680409476"><span id="local-6989586621680409479"><span id="local-6989586621680409481"><span id="local-6989586621680409485"><span id="local-6989586621680409492"><span id="local-6989586621680409499"><span id="local-6989586621680409508"><span id="local-6989586621680409513"><span id="local-6989586621680409523"><span id="local-6989586621680409531"><span id="local-6989586621680409537"><span id="local-6989586621680409541"><span id="local-6989586621680409547"><span id="local-6989586621680409551"><span id="local-6989586621680409568"><span id="local-6989586621680409583"><span id="local-6989586621680409591"><span id="local-6989586621680409597"><span id="local-6989586621680409606"><span id="local-6989586621680409613"><span id="local-6989586621680409620"><span id="local-6989586621680409625"><span id="local-6989586621680409631"><span id="local-6989586621680409635"><span id="local-6989586621680409642"><span id="local-6989586621680409647"><span id="local-6989586621680409653"><span id="local-6989586621680409657"><span id="local-6989586621680409665"><span id="local-6989586621680409671"><span id="local-6989586621680409679"><span id="local-6989586621680409685"><span id="local-6989586621680409694"><span id="local-6989586621680409701"><span id="local-6989586621680409707"><span id="local-6989586621680409711"><span id="local-6989586621680409720"><span id="local-6989586621680409727"><span id="local-6989586621680409736"><span id="local-6989586621680409743"><span id="local-6989586621680409751"><span id="local-6989586621680409757"><span id="local-6989586621680409767"><span id="local-6989586621680409775"><span id="local-6989586621680409782"><span id="local-6989586621680409787"><span id="local-6989586621680409795"><span id="local-6989586621680409801"><span id="local-6989586621680409807"><span id="local-6989586621680409811"><span id="local-6989586621680409822"><span id="local-6989586621680409831"><span id="local-6989586621680409838"><span id="local-6989586621680409843"><span id="local-6989586621680409856"><span id="local-6989586621680409867"><span id="local-6989586621680409873"><span id="local-6989586621680409877"><span id="local-6989586621680409883"><span id="local-6989586621680409887"><span id="local-6989586621680409894"><span id="local-6989586621680409899"><span id="local-6989586621680409905"><span id="local-6989586621680409909"><span id="local-6989586621680409917"><span id="local-6989586621680409923"><span id="local-6989586621680409933"><span id="local-6989586621680409941"><span id="local-6989586621680409951"><span id="local-6989586621680409959"><span id="local-6989586621680409965"><span id="local-6989586621680409969"><span id="local-6989586621680409978"><span id="local-6989586621680409985"><span id="local-6989586621680410000"><span id="local-6989586621680410013"><span id="local-6989586621680410020"><span id="local-6989586621680410025"><span id="local-6989586621680410034"><span id="local-6989586621680410041"><span id="local-6989586621680410049"><span id="local-6989586621680410055"><span id="local-6989586621680410063"><span id="local-6989586621680410069"><span id="local-6989586621680410076"><span id="local-6989586621680410081"><span id="local-6989586621680410088"><span id="local-6989586621680410093"><span id="local-6989586621680410100"><span id="local-6989586621680410105"><span id="local-6989586621680410112"><span id="local-6989586621680410117"><span id="local-6989586621680410123"><span id="local-6989586621680410127"><span id="local-6989586621680410134"><span id="local-6989586621680410139"><span id="local-6989586621680410145"><span id="local-6989586621680410149"><span id="local-6989586621680410155"><span id="local-6989586621680410159"><span id="local-6989586621680410165"><span id="local-6989586621680410169"><span id="local-6989586621680410177"><span id="local-6989586621680410183"><span id="local-6989586621680410191"><span id="local-6989586621680410197"><span id="local-6989586621680410204"><span id="local-6989586621680410209"><span id="local-6989586621680410216"><span id="local-6989586621680410221"><span id="local-6989586621680410227"><span id="local-6989586621680410231"><span id="local-6989586621680410239"><span id="local-6989586621680410245"><span id="local-6989586621680410254"><span id="local-6989586621680410261"><span id="local-6989586621680410269"><span id="local-6989586621680410275"><span id="local-6989586621680410282"><span id="local-6989586621680410287"><span id="local-6989586621680410295"><span id="local-6989586621680410301"><span id="local-6989586621680410308"><span id="local-6989586621680410313"><span id="local-6989586621680410321"><span id="local-6989586621680410327"><span id="local-6989586621680410333"><span id="local-6989586621680410337"><span id="local-6989586621680410345"><span id="local-6989586621680410351"><span id="local-6989586621680410358"><span id="local-6989586621680410363"><span id="local-6989586621680410374"><span id="local-6989586621680410383"><span id="local-6989586621680410393"><span id="local-6989586621680410401"><span id="local-6989586621680410412"><span id="local-6989586621680410421"><span id="local-6989586621680410436"><span id="local-6989586621680410449"><span id="local-6989586621680410470"><span id="local-6989586621680410489"><span id="local-6989586621680410497"><span id="local-6989586621680410503"><span id="local-6989586621680410515"><span id="local-6989586621680410525"><span id="local-6989586621680410538"><span id="local-6989586621680410549"><span id="local-6989586621680410556"><span id="local-6989586621680410561"><span id="local-6989586621680410569"><span id="local-6989586621680410575"><span id="local-6989586621680410582"><span id="local-6989586621680410587"><span id="local-6989586621680410596"><span id="local-6989586621680410603"><span id="local-6989586621680410610"><span id="local-6989586621680410615"><span id="local-6989586621680410624"><span id="local-6989586621680410631"><span id="local-6989586621680410637"><span id="local-6989586621680410641"><span id="local-6989586621680410650"><span id="local-6989586621680410657"><span id="local-6989586621680410664"><span id="local-6989586621680410669"><span id="local-6989586621680410676"><span id="local-6989586621680410681"><span id="local-6989586621680410690"><span id="local-6989586621680410697"><span id="local-6989586621680410705"><span id="local-6989586621680410711"><span id="local-6989586621680410720"><span id="local-6989586621680410727"><span id="local-6989586621680410733"><span id="local-6989586621680410737"><span id="local-6989586621680410744"><span id="local-6989586621680410749"><span id="local-6989586621680410758"><span id="local-6989586621680410765"><span id="local-6989586621680410771"><span id="local-6989586621680410775"><span id="local-6989586621680410782"><span id="local-6989586621680410787"><span id="local-6989586621680410796"><span id="local-6989586621680410803"><span id="local-6989586621680410811"><span id="local-6989586621680410817"><span id="local-6989586621680410825"><span id="local-6989586621680410831"><span id="local-6989586621680410837"><span id="local-6989586621680410841"><span id="local-6989586621680410849"><span id="local-6989586621680410855"><span id="local-6989586621680410862"><span id="local-6989586621680410867"><span id="local-6989586621680410875"><span id="local-6989586621680410881"><span id="local-6989586621680410893"><span id="UseItem__"><span id="sequence__"><span id="hand__"><span id="UseItem"><span id="sequence"><span id="hand"><span id="UseItemOn__"><span id="insideblock__"><span id="cursor__"><span id="face__"><span id="location__"><span id="hand__"><span id="UseItemOn"><span id="insideblock"><span id="cursor"><span id="face"><span id="location"><span id="hand"><span id="TeleportToEntity__"><span id="targetentityid__"><span id="TeleportToEntity"><span id="targetentityid"><span id="SwingArm__"><span id="hand__"><span id="SwingArm"><span id="hand"><span id="UpdateSign"><span id="lines"><span id="isfronttext"><span id="location"><span id="ProgramStructureBlock__"><span id="flags__"><span id="seed__"><span id="integrity__"><span id="metadata___"><span id="rotation__"><span id="mirror__"><span id="size__"><span id="offset__"><span id="name__"><span id="mode__"><span id="action__"><span id="location__"><span id="ProgramStructureBlock"><span id="flags"><span id="seed"><span id="integrity"><span id="metadata_"><span id="rotation"><span id="mirror"><span id="size"><span id="offset"><span id="name"><span id="mode"><span id="action"><span id="location"><span id="ProgramJigsawBlock"><span id="jointtype"><span id="finalstate"><span id="pool"><span id="target"><span id="name"><span id="location"><span id="SetCreativeModeSlot"><span id="slotdata_"><span id="slot"><span id="ProgramCommandBlockMinecart__"><span id="trackoutput__"><span id="command__"><span id="entityid__"><span id="ProgramCommandBlockMinecart"><span id="trackoutput"><span id="command"><span id="entityid"><span id="ProgramCommandBlock__"><span id="flags__"><span id="mode__"><span id="command__"><span id="location__"><span id="ProgramCommandBlock"><span id="flags"><span id="mode"><span id="command"><span id="location"><span id="SetHeldItemServerbound"><span id="slot"><span id="SetBeaconEffect__"><span id="secondaryeffect__"><span id="primaryeffect__"><span id="SetBeaconEffect"><span id="secondaryeffect"><span id="primaryeffect"><span id="SelectTrade__"><span id="slot__"><span id="SelectTrade"><span id="slot"><span id="SeenAdvancements__"><span id="tabid__"><span id="action__"><span id="SeenAdvancements"><span id="tabid"><span id="action"><span id="ResourcePackResponsePlay__"><span id="status__"><span id="ResourcePackResponsePlay"><span id="status"><span id="RenameItem"><span id="name"><span id="SetSeenRecipe"><span id="recipe"><span id="ChangeRecipeBookSettings__"><span id="filteractive__"><span id="bookopen__"><span id="bookid__"><span id="ChangeRecipeBookSettings"><span id="filteractive"><span id="bookopen"><span id="bookid"><span id="PongPlay"><span id="id"><span id="PlayerLoaded"><span id="PlayerInput"><span id="flags"><span id="forward"><span id="sideways"><span id="PlayerCommand__"><span id="data___"><span id="actionid__"><span id="entityid__"><span id="PlayerCommand"><span id="data_"><span id="actionid"><span id="entityid"><span id="PlayerAction__"><span id="sequence__"><span id="face__"><span id="location__"><span id="actionid__"><span id="PlayerAction"><span id="sequence"><span id="face"><span id="location"><span id="actionid"><span id="ServerboundPlayerAbilities"><span id="flags"><span id="PlaceRecipe"><span id="makeall"><span id="recipe"><span id="windowid"><span id="PingRequestPlay"><span id="id"><span id="PickItemFromEntity__"><span id="entityid__"><span id="PickItemFromEntity"><span id="entityid"><span id="PickItemFromBlock"><span id="location"><span id="PaddleBoat"><span id="rightpaddleturning"><span id="leftpaddleturning"><span id="MoveVehicleServerbound"><span id="rotation"><span id="position"><span id="SetPlayerMovementFlags"><span id="flags"><span id="SetPlayerRotation"><span id="onground"><span id="rotation"><span id="SetPlayerPositionAndRotation__"><span id="teleportid__"><span id="flags__"><span id="rotation__"><span id="position__"><span id="SetPlayerPositionAndRotation"><span id="teleportid"><span id="flags"><span id="rotation"><span id="position"><span id="SetPlayerPosition__"><span id="teleportid__"><span id="flags__"><span id="rotation__"><span id="position__"><span id="SetPlayerPosition"><span id="teleportid"><span id="flags"><span id="rotation"><span id="position"><span id="LockDifficulty"><span id="locked"><span id="JigsawGenerate__"><span id="keepjigsaws__"><span id="levels__"><span id="location__"><span id="JigsawGenerate"><span id="keepjigsaws"><span id="levels"><span id="location"><span id="Interact__"><span id="sneaking__"><span id="hand__"><span id="target__"><span id="type___"><span id="entityid__"><span id="Interact"><span id="sneaking"><span id="hand"><span id="target"><span id="type_"><span id="entityid"><span id="QueryEntityTag__"><span id="entityid__"><span id="transactionid__"><span id="QueryEntityTag"><span id="entityid"><span id="transactionid"><span id="EditBook__"><span id="title__"><span id="pages__"><span id="hand__"><span id="EditBook"><span id="title"><span id="pages"><span id="hand"><span id="DebugSampleSubscription__"><span id="data___"><span id="DebugSampleSubscription"><span id="data_"><span id="CookieResponsePlay"><span id="value"><span id="key"><span id="ChangeContainerSlotState"><span id="state"><span id="slot"><span id="windowid"><span id="CloseContainerServerbound"><span id="windowid"><span id="ClickContainer__"><span id="slots__"><span id="mode__"><span id="button__"><span id="slot__"><span id="stateid__"><span id="windowid__"><span id="ClickContainer"><span id="slots"><span id="mode"><span id="button"><span id="slot"><span id="stateid"><span id="windowid"><span id="ClickContainerButton"><span id="buttonid"><span id="windowid"><span id="AcknowledgeConfiguration"><span id="CommandSuggestionsRequest__"><span id="text__"><span id="id__"><span id="CommandSuggestionsRequest"><span id="text"><span id="id"><span id="ClientInformationPlay__"><span id="allowserverlistings__"><span id="enabletextfiltering__"><span id="mainhand__"><span id="displayedskinparts__"><span id="chatcolors__"><span id="chatmode__"><span id="viewdistance__"><span id="locale__"><span id="ClientInformationPlay"><span id="allowserverlistings"><span id="enabletextfiltering"><span id="mainhand"><span id="displayedskinparts"><span id="chatcolors"><span id="chatmode"><span id="viewdistance"><span id="locale"><span id="ClientTickEnd"><span id="ClientStatus__"><span id="actionid__"><span id="ClientStatus"><span id="actionid"><span id="ChunkBatchReceived"><span id="PlayerSession"><span id="signature"><span id="publickey"><span id="sessionid"><span id="ChatMessage"><span id="lastseenmessages"><span id="signedpreview"><span id="signature"><span id="salt"><span id="timestamp"><span id="message"><span id="SignedChatCommand"><span id="lastseenmessages"><span id="signedpreview"><span id="argumentsignatures"><span id="salt"><span id="timestamp"><span id="command"><span id="ServerboundChatCommand"><span id="lastseenmessages"><span id="signedpreview"><span id="argumentsignatures"><span id="salt"><span id="timestamp"><span id="command"><span id="AcknowledgeMessage"><span id="messageid"><span id="ServerboundChangeDifficulty"><span id="difficulty"><span id="BundleItemSelected__"><span id="slot__"><span id="BundleItemSelected"><span id="slot"><span id="QueryBlockEntityTag__"><span id="location__"><span id="transactionid__"><span id="QueryBlockEntityTag"><span id="location"><span id="transactionid"><span id="ConfirmTeleportation__"><span id="teleportid__"><span id="ConfirmTeleportation"><span id="teleportid"><span id="SetTabListHeaderAndFooter"><span id="footer"><span id="header"><span id="StoreCookie"><span id="value"><span id="key"><span id="StopSound__"><span id="sound__"><span id="source__"><span id="flags__"><span id="StopSound"><span id="sound"><span id="source"><span id="flags"><span id="StartConfiguration"><span id="SoundEffect__"><span id="pitch__"><span id="volume__"><span id="position__"><span id="soundcategory__"><span id="soundid__"><span id="SoundEffect"><span id="pitch"><span id="volume"><span id="position"><span id="soundcategory"><span id="soundid"><span id="EntitySoundEffect__"><span id="pitch__"><span id="volume__"><span id="entityid__"><span id="soundcategory__"><span id="soundid__"><span id="EntitySoundEffect"><span id="pitch"><span id="volume"><span id="entityid"><span id="soundcategory"><span id="soundid"><span id="SetTitleAnimationTimes"><span id="fadeout"><span id="stay"><span id="fadein"><span id="SetTitleText"><span id="text"><span id="UpdateTime"><span id="timeofday"><span id="worldage"><span id="SetSubtitleText"><span id="text"><span id="SetSimulationDistance__"><span id="simulationdistance__"><span id="SetSimulationDistance"><span id="simulationdistance"><span id="UpdateScore__"><span id="value__"><span id="objectivename__"><span id="action__"><span id="entityname__"><span id="UpdateScore"><span id="value"><span id="objectivename"><span id="action"><span id="entityname"><span id="UpdateTeams__"><span id="players__"><span id="color__"><span id="collisionrule__"><span id="nametagvisibility__"><span id="flags__"><span id="suffix__"><span id="prefix__"><span id="displayname__"><span id="mode__"><span id="teamname__"><span id="UpdateTeams"><span id="players"><span id="color"><span id="collisionrule"><span id="nametagvisibility"><span id="flags"><span id="suffix"><span id="prefix"><span id="displayname"><span id="mode"><span id="teamname"><span id="SetPlayerInventorySlot"><span id="slotdata_"><span id="slot"><span id="SetPassengers__"><span id="passengerids__"><span id="entityid__"><span id="SetPassengers"><span id="passengerids"><span id="entityid"><span id="UpdateObjectives__"><span id="type___"><span id="displayname__"><span id="mode__"><span id="name__"><span id="UpdateObjectives"><span id="type_"><span id="displayname"><span id="mode"><span id="name"><span id="SetHeldItem"><span id="slot"><span id="SetHealth__"><span id="foodsaturation__"><span id="food__"><span id="health__"><span id="SetHealth"><span id="foodsaturation"><span id="food"><span id="health"><span id="SetExperience__"><span id="totalexperience__"><span id="level__"><span id="experiencebar__"><span id="SetExperience"><span id="totalexperience"><span id="level"><span id="experiencebar"><span id="SetEquipment__"><span id="equipment__"><span id="entityid__"><span id="SetEquipment"><span id="equipment"><span id="entityid"><span id="SetEntityVelocity__"><span id="velocity__"><span id="entityid__"><span id="SetEntityVelocity"><span id="velocity"><span id="entityid"><span id="LinkEntities__"><span id="passengerids__"><span id="vehicleid__"><span id="LinkEntities"><span id="passengerids"><span id="vehicleid"><span id="SetEntityMetadata__"><span id="metadata___"><span id="entityid__"><span id="SetEntityMetadata"><span id="metadata_"><span id="entityid"><span id="DisplayObjective"><span id="name"><span id="position"><span id="SetDefaultSpawnPosition"><span id="angle"><span id="location"><span id="SetCursorItem"><span id="slotdata_"><span id="SetRenderDistance__"><span id="viewdistance__"><span id="SetRenderDistance"><span id="viewdistance"><span id="SetCenterChunk__"><span id="chunkz__"><span id="chunkx__"><span id="SetCenterChunk"><span id="chunkz"><span id="chunkx"><span id="SetCamera__"><span id="cameraid__"><span id="SetCamera"><span id="cameraid"><span id="SetBorderWarningDistance__"><span id="warningblocks__"><span id="SetBorderWarningDistance"><span id="warningblocks"><span id="SetBorderWarningDelay__"><span id="warningtime__"><span id="SetBorderWarningDelay"><span id="warningtime"><span id="SetBorderSize"><span id="size"><span id="SetBorderLerpSize__"><span id="speed__"><span id="newsize__"><span id="oldsize__"><span id="SetBorderLerpSize"><span id="speed"><span id="newsize"><span id="oldsize"><span id="SetBorderCenter"><span id="z"><span id="x"><span id="SetActionBarText"><span id="text"><span id="ServerData"><span id="enforcesecurechat"><span id="icon"><span id="motd"><span id="SelectAdvancementsTab"><span id="identifier"><span id="UpdateSectionBlocks__"><span id="blocks__"><span id="trustedges__"><span id="sectionposition__"><span id="UpdateSectionBlocks"><span id="blocks"><span id="trustedges"><span id="sectionposition"><span id="SetHeadRotation__"><span id="headyaw__"><span id="entityid__"><span id="SetHeadRotation"><span id="headyaw"><span id="entityid"><span id="Respawn"><span id="copymetadata_"><span id="isflat"><span id="isdebug"><span id="previousgamemode"><span id="gamemode"><span id="hashedseed"><span id="worldname"><span id="dimension"><span id="AddResourcePack"><span id="hash"><span id="url"><span id="RemoveResourcePack"><span id="ResetScore"><span id="action"><span id="playername"><span id="objectivename"><span id="RemoveEntityEffect__"><span id="effectid__"><span id="entityid__"><span id="RemoveEntityEffect"><span id="effectid"><span id="entityid"><span id="RemoveEntities__"><span id="entityids__"><span id="RemoveEntities"><span id="entityids"><span id="RecipeBookSettings__"><span id="filteractive__"><span id="bookopen__"><span id="bookid__"><span id="RecipeBookSettings"><span id="filteractive"><span id="bookopen"><span id="bookid"><span id="RecipeBookRemove"><span id="recipe"><span id="RecipeBookAdd"><span id="recipe"><span id="PlayerRotation"><span id="onground"><span id="rotation"><span id="SynchronizePlayerPosition__"><span id="teleportid__"><span id="flags__"><span id="rotation__"><span id="position__"><span id="SynchronizePlayerPosition"><span id="teleportid"><span id="flags"><span id="rotation"><span id="position"><span id="LookAt__"><span id="isentity__"><span id="position__"><span id="target__"><span id="LookAt"><span id="isentity"><span id="position"><span id="target"><span id="PlayerInfoUpdate__"><span id="data___"><span id="action__"><span id="PlayerInfoUpdate"><span id="data_"><span id="action"><span id="PlayerInfoRemove"><span id="players"><span id="CombatDeath__"><span id="message__"><span id="entityid__"><span id="playerid__"><span id="CombatDeath"><span id="message"><span id="entityid"><span id="playerid"><span id="EnterCombat"><span id="EndCombat__"><span id="entityid__"><span id="duration__"><span id="EndCombat"><span id="entityid"><span id="duration"><span id="PlayerChatMessage"><span id="lastseenmessages"><span id="signedpreview"><span id="signature"><span id="salt"><span id="timestamp"><span id="message"><span id="sender"><span id="ClientboundPlayerAbilities"><span id="walkingspeed"><span id="flyingspeed"><span id="flags"><span id="PlaceGhostRecipe"><span id="recipe"><span id="windowid"><span id="PlayPingResponse"><span id="id"><span id="PlayPing"><span id="id"><span id="OpenSignEditor"><span id="location"><span id="OpenScreen__"><span id="title__"><span id="type___"><span id="windowid__"><span id="OpenScreen"><span id="title"><span id="type_"><span id="windowid"><span id="OpenBook__"><span id="hand__"><span id="OpenBook"><span id="hand"><span id="MoveVehicle"><span id="rotation"><span id="position"><span id="UpdateEntityRotation__"><span id="onground__"><span id="rotation__"><span id="entityid__"><span id="UpdateEntityRotation"><span id="onground"><span id="rotation"><span id="entityid"><span id="MoveMinecartAlongTrack__"><span id="location__"><span id="entityid__"><span id="MoveMinecartAlongTrack"><span id="location"><span id="entityid"><span id="UpdateEntityPositionAndRotation__"><span id="onground__"><span id="rotation__"><span id="deltaz__"><span id="deltay__"><span id="deltax__"><span id="entityid__"><span id="UpdateEntityPositionAndRotation"><span id="onground"><span id="rotation"><span id="deltaz"><span id="deltay"><span id="deltax"><span id="entityid"><span id="UpdateEntityPosition__"><span id="onground__"><span id="deltaz__"><span id="deltay__"><span id="deltax__"><span id="entityid__"><span id="UpdateEntityPosition"><span id="onground"><span id="deltaz"><span id="deltay"><span id="deltax"><span id="entityid"><span id="MerchantOffers__"><span id="canrestock__"><span id="isregularvillager__"><span id="experience__"><span id="villagerlevel__"><span id="offers__"><span id="windowid__"><span id="MerchantOffers"><span id="canrestock"><span id="isregularvillager"><span id="experience"><span id="villagerlevel"><span id="offers"><span id="windowid"><span id="MapData__"><span id="data___"><span id="z__"><span id="x__"><span id="rows__"><span id="columns__"><span id="icons__"><span id="locked__"><span id="trackingposition__"><span id="scale__"><span id="mapid__"><span id="MapData"><span id="data_"><span id="z"><span id="x"><span id="rows"><span id="columns"><span id="icons"><span id="locked"><span id="trackingposition"><span id="scale"><span id="mapid"><span id="Login__"><span id="isflat__"><span id="isdebug__"><span id="enablerespawnscreen__"><span id="reduceddebuginfo__"><span id="simulationdistance__"><span id="viewdistance__"><span id="maxplayers__"><span id="hashedseed__"><span id="worldname__"><span id="dimension__"><span id="dimensioncodec__"><span id="worldnames__"><span id="previousgamemode__"><span id="gamemode__"><span id="ishardcore__"><span id="entityid__"><span id="Login"><span id="isflat"><span id="isdebug"><span id="enablerespawnscreen"><span id="reduceddebuginfo"><span id="simulationdistance"><span id="viewdistance"><span id="maxplayers"><span id="hashedseed"><span id="worldname"><span id="dimension"><span id="dimensioncodec"><span id="worldnames"><span id="previousgamemode"><span id="gamemode"><span id="ishardcore"><span id="entityid"><span id="UpdateLight__"><span id="data___"><span id="chunkz__"><span id="chunkx__"><span id="UpdateLight"><span id="data_"><span id="chunkz"><span id="chunkx"><span id="ParticleEffect__"><span id="data___"><span id="count__"><span id="maxspeed__"><span id="offset__"><span id="position__"><span id="longdistance__"><span id="particleid__"><span id="ParticleEffect"><span id="data_"><span id="count"><span id="maxspeed"><span id="offset"><span id="position"><span id="longdistance"><span id="particleid"><span id="WorldEvent"><span id="disablerelativevolume"><span id="data_"><span id="location"><span id="event"><span id="ChunkDataAndUpdateLight"><span id="lightdata_"><span id="data_"><span id="chunkz"><span id="chunkx"><span id="InitializeWorldBorder__"><span id="warningblocks__"><span id="warningtime__"><span id="portalteleportboundary__"><span id="speed__"><span id="newradius__"><span id="oldradius__"><span id="z__"><span id="x__"><span id="InitializeWorldBorder"><span id="warningblocks"><span id="warningtime"><span id="portalteleportboundary"><span id="speed"><span id="newradius"><span id="oldradius"><span id="z"><span id="x"><span id="HurtAnimation__"><span id="damagedirection__"><span id="entityid__"><span id="HurtAnimation"><span id="damagedirection"><span id="entityid"><span id="OpenHorseScreen__"><span id="entityid__"><span id="slotcount__"><span id="windowid__"><span id="OpenHorseScreen"><span id="entityid"><span id="slotcount"><span id="windowid"><span id="GameEvent__"><span id="data___"><span id="event__"><span id="GameEvent"><span id="data_"><span id="event"><span id="UnloadChunk"><span id="chunkz"><span id="chunkx"><span id="Explosion"><span id="playermotion"><span id="affectedblocks"><span id="radius"><span id="position"><span id="TeleportEntity__"><span id="onground__"><span id="rotation__"><span id="position__"><span id="entityid__"><span id="TeleportEntity"><span id="onground"><span id="rotation"><span id="position"><span id="entityid"><span id="EntityEvent__"><span id="event__"><span id="entityid__"><span id="EntityEvent"><span id="event"><span id="entityid"><span id="DisguisedChatMessage__"><span id="targetname__"><span id="sendername__"><span id="chattype__"><span id="message__"><span id="DisguisedChatMessage"><span id="targetname"><span id="sendername"><span id="chattype"><span id="message"><span id="Disconnect"><span id="reason"><span id="DeleteMessage"><span id="messageid"><span id="DebugSample__"><span id="data___"><span id="DebugSample"><span id="data_"><span id="DamageEvent__"><span id="amount__"><span id="type___"><span id="sourceid__"><span id="entityid__"><span id="DamageEvent"><span id="amount"><span id="type_"><span id="sourceid"><span id="entityid"><span id="ChatSuggestions__"><span id="suggestions__"><span id="id__"><span id="ChatSuggestions"><span id="suggestions"><span id="id"><span id="SetCooldown__"><span id="cooldown__"><span id="itemid__"><span id="SetCooldown"><span id="cooldown"><span id="itemid"><span id="CookieRequest"><span id="key"><span id="SetContainerSlot__"><span id="data___"><span id="slot__"><span id="stateid__"><span id="windowid__"><span id="SetContainerSlot"><span id="data_"><span id="slot"><span id="stateid"><span id="windowid"><span id="SetContainerProperty__"><span id="value__"><span id="property__"><span id="windowid__"><span id="SetContainerProperty"><span id="value"><span id="property"><span id="windowid"><span id="SetContainerContent__"><span id="carrieditem__"><span id="slots__"><span id="stateid__"><span id="windowid__"><span id="SetContainerContent"><span id="carrieditem"><span id="slots"><span id="stateid"><span id="windowid"><span id="CloseContainer__"><span id="windowid__"><span id="CloseContainer"><span id="windowid"><span id="Commands__"><span id="rootindex__"><span id="nodes__"><span id="Commands"><span id="rootindex"><span id="nodes"><span id="CommandMatch"><span id="tooltip"><span id="match"><span id="CommandSuggestionsResponse__"><span id="matches__"><span id="length__"><span id="start__"><span id="id__"><span id="CommandSuggestionsResponse"><span id="matches"><span id="length"><span id="start"><span id="id"><span id="ClearTitles"><span id="reset"><span id="ChunkBiomes"><span id="data_"><span id="z"><span id="x"><span id="ChunkBatchStarted"><span id="ChunkBatchFinished__"><span id="batchsize__"><span id="ChunkBatchFinished"><span id="batchsize"><span id="ChangeDifficulty"><span id="locked"><span id="difficulty"><span id="BossBar"><span id="action"><span id="uuid"><span id="BlockUpdate__"><span id="blockid__"><span id="location__"><span id="BlockUpdate"><span id="blockid"><span id="location"><span id="BlockAction__"><span id="blocktype__"><span id="actionparam__"><span id="actionid__"><span id="location__"><span id="BlockAction"><span id="blocktype"><span id="actionparam"><span id="actionid"><span id="location"><span id="BlockEntityData__"><span id="data___"><span id="type___"><span id="location__"><span id="BlockEntityData"><span id="data_"><span id="type_"><span id="location"><span id="SetBlockDestroyStage__"><span id="destroystage__"><span id="location__"><span id="entityid__"><span id="SetBlockDestroyStage"><span id="destroystage"><span id="location"><span id="entityid"><span id="AcknowledgeBlockChange__"><span id="sequence__"><span id="AcknowledgeBlockChange"><span id="sequence"><span id="AwardStatistics_Entry__"><span id="value__"><span id="statisticid__"><span id="categoryid__"><span id="AwardStatistics_Entry"><span id="value"><span id="statisticid"><span id="categoryid"><span id="AwardStatistics"><span id="stats"><span id="EntityAnimation__"><span id="animation__"><span id="entityid__"><span id="EntityAnimation"><span id="animation"><span id="entityid"><span id="SpawnExperienceOrb__"><span id="count__"><span id="position__"><span id="entityid__"><span id="SpawnExperienceOrb"><span id="count"><span id="position"><span id="entityid"><span id="SpawnEntity__"><span id="velocity__"><span id="data___"><span id="rotation__"><span id="position__"><span id="type___"><span id="entityuuid__"><span id="entityid__"><span id="SpawnEntity"><span id="velocity"><span id="data_"><span id="rotation"><span id="position"><span id="type_"><span id="entityuuid"><span id="entityid"><span id="BundleDelimiter"></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span><span class="">[pkmacro|
+-- Clientbound packets
+data BundleDelimiter {}
+
+data SpawnEntity {
+  entityid :: Int32 via VarInt,
+  entityuuid :: UUID,
+  type_ :: Int32 via VarInt,
+  position :: V3 Double,
+  rotation :: V2 Int8 via V2 Int8Angle,
+  data_ :: Int32 via VarInt,
+  velocity :: V3 Double via V3 (Fixed' Int16 SetEntityVelocityRes Double),
+}
+
+data SpawnExperienceOrb {
+  entityid :: Int32 via VarInt,
+  position :: V3 Double,
+  count :: Int16,
+}
+
+data EntityAnimation {
+  entityid :: Int32 via VarInt,
+  animation :: Word8,
+}
+
+data AwardStatistics {
+  stats :: V.Vector AwardStatistics_Entry,
+}
+
+data AwardStatistics_Entry {
+  categoryid :: Int32 via VarInt,
+  statisticid :: Int32 via VarInt,
+  value :: Int32 via VarInt,
+}
+
+data AcknowledgeBlockChange {
+  sequence :: Int32 via VarInt,
+}
+
+data SetBlockDestroyStage {
+  entityid :: Int32 via VarInt,
+  location :: Position,
+  destroystage :: Word8,
+}
+
+data BlockEntityData {
+  location :: Position,
+  type_ :: Int32 via VarInt,
+  data_ :: Tg,
+}
+
+data BlockAction {
+  location :: Position,
+  actionid :: Word8,
+  actionparam :: Word8,
+  blocktype :: Int32 via VarInt,
+}
+
+data BlockUpdate {
+  location :: Position,
+  blockid :: Int32 via VarInt,
+}
+
+data BossBar {
+  uuid :: UUID,
+  action :: BossBarAction,
+}
+
+data ChangeDifficulty {
+  difficulty :: Word8,
+  locked :: Bool,
+}
+
+data ChunkBatchFinished {
+  batchsize :: Int32 via VarInt,
+}
+
+data ChunkBatchStarted {}
+
+data ChunkBiomes {
+  x :: Int32,
+  z :: Int32,
+  data_ :: ChunkData,
+}
+
+data ClearTitles {
+  reset :: Bool,
+}
+
+data CommandSuggestionsResponse {
+  id :: Int32 via VarInt,
+  start :: Int32 via VarInt,
+  length :: Int32 via VarInt,
+  matches :: V.Vector CommandMatch,
+}
+
+data CommandMatch {
+  match :: Text,
+  tooltip :: Maybe TextComponent,
+}
+
+data Commands {
+  nodes :: V.Vector CommandNode,
+  rootindex :: Int32 via VarInt,
+}
+
+data CloseContainer {
+  windowid :: Int32 via VarInt,
+}
+
+data SetContainerContent {
+  windowid :: Int32 via VarInt,
+  stateid :: Int32 via VarInt,
+  slots :: V.Vector Slot,
+  carrieditem :: Slot,
+}
+
+data SetContainerProperty {
+  windowid :: Int32 via VarInt,
+  property :: Int16,
+  value :: Int16,
+}
+
+data SetContainerSlot {
+  windowid :: Int32 via VarInt,
+  stateid :: Int32 via VarInt,
+  slot :: Int16,
+  data_ :: Slot,
+}
+
+data CookieRequest {
+  key :: Text,
+}
+
+data SetCooldown {
+  itemid :: Int32 via VarInt,
+  cooldown :: Int32 via VarInt,
+}
+
+data ChatSuggestions {
+  id :: Int32 via VarInt,
+  suggestions :: V.Vector Text,
+}
+
+data DamageEvent {
+  entityid :: Int32 via VarInt,
+  sourceid :: Int32 via VarInt,
+  type_ :: Int32 via VarInt,
+  amount :: Float,
+}
+
+data DebugSample {
+  data_ :: ByteString via TakeRest,
+}
+
+data DeleteMessage {
+  messageid :: UUID,
+}
+
+data Disconnect {
+  reason :: Text,
+}
+
+data DisguisedChatMessage {
+  message :: TextComponent,
+  chattype :: Int32 via VarInt,
+  sendername :: TextComponent,
+  targetname :: Maybe TextComponent,
+}
+
+data EntityEvent {
+  entityid :: Int32 via VarInt,
+  event :: Word8,
+}
+
+data TeleportEntity {
+  entityid :: Int32 via VarInt,
+  position :: V3 Double,
+  rotation :: V2 Int8 via V2 Int8Angle,
+  onground :: Bool,
+}
+
+data Explosion {
+  position :: V3 Float,
+  radius :: Float,
+  affectedblocks :: V.Vector Position,
+  playermotion :: V3 Float,
+}
+
+data UnloadChunk {
+  chunkx :: Int32,
+  chunkz :: Int32,
+}
+
+data GameEvent {
+  event :: Int32 via VarInt,
+  data_ :: Float,
+}
+
+data OpenHorseScreen {
+  windowid :: Word8,
+  slotcount :: Int32 via VarInt,
+  entityid :: Int32,
+}
+
+data HurtAnimation {
+  entityid :: Int32 via VarInt,
+  damagedirection :: Float,
+}
+
+data InitializeWorldBorder {
+  x :: Double,
+  z :: Double,
+  oldradius :: Double,
+  newradius :: Double,
+  speed :: Int64 via VarLong,
+  portalteleportboundary :: Int32 via VarInt,
+  warningtime :: Int32 via VarInt,
+  warningblocks :: Int32 via VarInt,
+}
+
+data ChunkDataAndUpdateLight {
+  chunkx :: Int32,
+  chunkz :: Int32,
+  data_ :: ChunkData,
+  lightdata_ :: LightData,
+}
+
+data WorldEvent {
+  event :: Int32,
+  location :: Position,
+  data_ :: Int32,
+  disablerelativevolume :: Bool,
+}
+
+data ParticleEffect {
+  particleid :: Int32 via VarInt,
+  longdistance :: Bool,
+  position :: V3 Double,
+  offset :: V3 Float,
+  maxspeed :: Float,
+  count :: Int32,
+  data_ :: ParticleData,
+}
+
+data UpdateLight {
+  chunkx :: Int32 via VarInt,
+  chunkz :: Int32 via VarInt,
+  data_ :: LightData,
+}
+
+data Login {
+  entityid :: Int32,
+  ishardcore :: Bool,
+  gamemode :: Word8,
+  previousgamemode :: Int8,
+  worldnames :: V.Vector Text,
+  dimensioncodec :: Tg,
+  dimension :: Tg,
+  worldname :: Text,
+  hashedseed :: Int64,
+  maxplayers :: Int32 via VarInt,
+  viewdistance :: Int32 via VarInt,
+  simulationdistance :: Int32 via VarInt,
+  reduceddebuginfo :: Bool,
+  enablerespawnscreen :: Bool,
+  isdebug :: Bool,
+  isflat :: Bool,
+}
+
+data MapData {
+  mapid :: Int32 via VarInt,
+  scale :: Int8,
+  trackingposition :: Bool,
+  locked :: Bool,
+  icons :: V.Vector MapIcon,
+  columns :: Int8,
+  rows :: Int8,
+  x :: Int8,
+  z :: Int8,
+  data_ :: ByteString,
+}
+
+data MerchantOffers {
+  windowid :: Word8,
+  offers :: V.Vector MerchantOffer,
+  villagerlevel :: Int32 via VarInt,
+  experience :: Int32 via VarInt,
+  isregularvillager :: Bool,
+  canrestock :: Bool,
+}
+
+data UpdateEntityPosition {
+  entityid :: Int32 via VarInt,
+  deltax :: Int16,
+  deltay :: Int16,
+  deltaz :: Int16,
+  onground :: Bool,
+}
+
+data UpdateEntityPositionAndRotation {
+  entityid :: Int32 via VarInt,
+  deltax :: Int16,
+  deltay :: Int16,
+  deltaz :: Int16,
+  rotation :: V2 Int8 via V2 Int8Angle,
+  onground :: Bool,
+}
+
+data MoveMinecartAlongTrack {
+  entityid :: Int32 via VarInt,
+  location :: Position,
+}
+
+data UpdateEntityRotation {
+  entityid :: Int32 via VarInt,
+  rotation :: V2 Int8 via V2 Int8Angle,
+  onground :: Bool,
+}
+
+data MoveVehicle {
+  position :: V3 Double,
+  rotation :: V2 Float,
+}
+
+data OpenBook {
+  hand :: Int32 via VarInt,
+}
+
+data OpenScreen {
+  windowid :: Int32 via VarInt,
+  type_ :: Text,
+  title :: TextComponent,
+}
+
+data OpenSignEditor {
+  location :: Position,
+}
+
+data PlayPing {
+  id :: Int64,
+}
+
+data PlayPingResponse {
+  id :: Int64,
+}
+
+data PlaceGhostRecipe {
+  windowid :: Word8,
+  recipe :: Text,
+}
+
+data ClientboundPlayerAbilities {
+  flags :: Word8,
+  flyingspeed :: Float,
+  walkingspeed :: Float,
+}
+
+data PlayerChatMessage {
+  sender :: UUID,
+  message :: Text,
+  timestamp :: Int64,
+  salt :: Int64,
+  signature :: ByteString,
+  signedpreview :: Bool,
+  lastseenmessages :: V.Vector UUID,
+}
+
+data EndCombat {
+  duration :: Int32 via VarInt,
+  entityid :: Int32,
+}
+
+data EnterCombat {}
+
+data CombatDeath {
+  playerid :: Int32 via VarInt,
+  entityid :: Int32 via VarInt,
+  message :: Text,
+}
+
+data PlayerInfoRemove {
+  players :: V.Vector UUID,
+}
+
+data PlayerInfoUpdate {
+  action :: Int32 via VarInt,
+  data_ :: ByteString via TakeRest,
+}
+
+data LookAt {
+  target :: Int32 via VarInt,
+  position :: V3 Double,
+  isentity :: Bool,
+}
+
+data SynchronizePlayerPosition {
+  position :: V3 Double,
+  rotation :: V2 Float,
+  flags :: Word8,
+  teleportid :: Int32 via VarInt,
+}
+
+data PlayerRotation {
+  rotation :: V2 Float,
+  onground :: Bool,
+}
+
+data RecipeBookAdd {
+  recipe :: Text,
+}
+
+data RecipeBookRemove {
+  recipe :: Text,
+}
+
+data RecipeBookSettings {
+  bookid :: Int32 via VarInt,
+  bookopen :: Bool,
+  filteractive :: Bool,
+}
+
+data RemoveEntities {
+  entityids :: V.Vector Int32 via V.Vector VarInt,
+}
+
+data RemoveEntityEffect {
+  entityid :: Int32 via VarInt,
+  effectid :: Word8,
+}
+
+data ResetScore {
+  objectivename :: Text,
+  playername :: Text,
+  action :: Word8,
+}
+
+data RemoveResourcePack {}
+
+data AddResourcePack {
+  url :: Text,
+  hash :: Text,
+}
+
+data Respawn {
+  dimension :: Tg,
+  worldname :: Text,
+  hashedseed :: Int64,
+  gamemode :: Word8,
+  previousgamemode :: Int8,
+  isdebug :: Bool,
+  isflat :: Bool,
+  copymetadata_ :: Bool,
+}
+
+data SetHeadRotation {
+  entityid :: Int32 via VarInt,
+  headyaw :: Int8 via Int8Angle,
+}
+
+data UpdateSectionBlocks {
+  sectionposition :: Int64,
+  trustedges :: Bool,
+  blocks :: V.Vector Int64 via V.Vector VarLong,
+}
+
+data SelectAdvancementsTab {
+  identifier :: Text,
+}
+
+data ServerData {
+  motd :: TextComponent,
+  icon :: Text,
+  enforcesecurechat :: Bool,
+}
+
+data SetActionBarText {
+  text :: TextComponent,
+}
+
+data SetBorderCenter {
+  x :: Double,
+  z :: Double,
+}
+
+data SetBorderLerpSize {
+  oldsize :: Double,
+  newsize :: Double,
+  speed :: Int64 via VarLong,
+}
+
+data SetBorderSize {
+  size :: Double,
+}
+
+data SetBorderWarningDelay {
+  warningtime :: Int32 via VarInt,
+}
+
+data SetBorderWarningDistance {
+  warningblocks :: Int32 via VarInt,
+}
+
+data SetCamera {
+  cameraid :: Int32 via VarInt,
+}
+
+data SetCenterChunk {
+  chunkx :: Int32 via VarInt,
+  chunkz :: Int32 via VarInt,
+}
+
+data SetRenderDistance {
+  viewdistance :: Int32 via VarInt,
+}
+
+data SetCursorItem {
+  slotdata_ :: Slot,
+}
+
+data SetDefaultSpawnPosition {
+  location :: Position,
+  angle :: Float,
+}
+
+data DisplayObjective {
+  position :: Word8,
+  name :: Text,
+}
+
+data SetEntityMetadata {
+  entityid :: Int32 via VarInt,
+  metadata_ :: ByteString via TakeRest,
+}
+
+data LinkEntities {
+  vehicleid :: Int32 via VarInt,
+  passengerids :: V.Vector Int32 via V.Vector VarInt,
+}
+
+data SetEntityVelocity {
+  entityid :: Int32 via VarInt,
+  velocity :: V3 Int16,
+}
+
+data SetEquipment {
+  entityid :: Int32 via VarInt,
+  equipment :: V.Vector Slot,
+}
+
+data SetExperience {
+  experiencebar :: Float,
+  level :: Int32 via VarInt,
+  totalexperience :: Int32 via VarInt,
+}
+
+data SetHealth {
+  health :: Float,
+  food :: Int32 via VarInt,
+  foodsaturation :: Float,
+}
+
+data SetHeldItem {
+  slot :: Word8,
+}
+
+data UpdateObjectives {
+  name :: Text,
+  mode :: Word8,
+  displayname :: Text,
+  type_ :: Int32 via VarInt,
+}
+
+data SetPassengers {
+  entityid :: Int32 via VarInt,
+  passengerids :: V.Vector Int32 via V.Vector VarInt,
+}
+
+data SetPlayerInventorySlot {
+  slot :: Int16,
+  slotdata_ :: Slot,
+}
+
+data UpdateTeams {
+  teamname :: Text,
+  mode :: Word8,
+  displayname :: Text,
+  prefix :: Text,
+  suffix :: Text,
+  flags :: Word8,
+  nametagvisibility :: Text,
+  collisionrule :: Text,
+  color :: Int32 via VarInt,
+  players :: V.Vector Text,
+}
+
+data UpdateScore {
+  entityname :: Text,
+  action :: Word8,
+  objectivename :: Text,
+  value :: Int32 via VarInt,
+}
+
+data SetSimulationDistance {
+  simulationdistance :: Int32 via VarInt,
+}
+
+data SetSubtitleText {
+  text :: TextComponent,
+}
+
+data UpdateTime {
+  worldage :: Int64,
+  timeofday :: Int64,
+}
+
+data SetTitleText {
+  text :: TextComponent,
+}
+
+data SetTitleAnimationTimes {
+  fadein :: Int32,
+  stay :: Int32,
+  fadeout :: Int32,
+}
+
+data EntitySoundEffect {
+  soundid :: Int32 via VarInt,
+  soundcategory :: Int32 via VarInt,
+  entityid :: Int32 via VarInt,
+  volume :: Float,
+  pitch :: Float,
+}
+
+data SoundEffect {
+  soundid :: Int32 via VarInt,
+  soundcategory :: Int32 via VarInt,
+  position :: V3 Int32,
+  volume :: Float,
+  pitch :: Float,
+}
+
+data StartConfiguration {}
+
+data StopSound {
+  flags :: Word8,
+  source :: Int32 via VarInt,
+  sound :: Int32 via VarInt,
+}
+
+data StoreCookie {
+  key :: Text,
+  value :: Text,
+}
+
+data SetTabListHeaderAndFooter {
+  header :: TextComponent,
+  footer :: TextComponent,
+}
+
+-- Serverbound packets
+
+data ConfirmTeleportation {
+  teleportid :: Int32 via VarInt,
+}
+
+data QueryBlockEntityTag {
+  transactionid :: Int32 via VarInt,
+  location :: Position,
+}
+
+data BundleItemSelected {
+  slot :: Int32 via VarInt,
+}
+
+data ServerboundChangeDifficulty {
+  difficulty :: Word8,
+}
+
+data AcknowledgeMessage {
+  messageid :: UUID,
+}
+
+data ServerboundChatCommand {
+  command :: Text,
+  timestamp :: Int64,
+  salt :: Int64,
+  argumentsignatures :: ByteString,
+  signedpreview :: Bool,
+  lastseenmessages :: V.Vector UUID,
+}
+
+data SignedChatCommand {
+  command :: Text,
+  timestamp :: Int64,
+  salt :: Int64,
+  argumentsignatures :: ByteString,
+  signedpreview :: Bool,
+  lastseenmessages :: V.Vector UUID,
+}
+
+data ChatMessage {
+  message :: Text,
+  timestamp :: Int64,
+  salt :: Int64,
+  signature :: ByteString,
+  signedpreview :: Bool,
+  lastseenmessages :: V.Vector UUID,
+}
+
+data PlayerSession {
+  sessionid :: UUID,
+  publickey :: ByteString,
+  signature :: ByteString,
+}
+
+data ChunkBatchReceived {}
+
+data ClientStatus {
+  actionid :: Int32 via VarInt,
+}
+
+data ClientTickEnd {}
+
+data ClientInformationPlay {
+  locale :: Text,
+  viewdistance :: Int8,
+  chatmode :: Int32 via VarInt,
+  chatcolors :: Bool,
+  displayedskinparts :: Word8,
+  mainhand :: Int32 via VarInt,
+  enabletextfiltering :: Bool,
+  allowserverlistings :: Bool,
+}
+
+data CommandSuggestionsRequest {
+  id :: Int32 via VarInt,
+  text :: Text,
+}
+
+data AcknowledgeConfiguration {}
+
+data ClickContainerButton {
+  windowid :: Word8,
+  buttonid :: Word8,
+}
+
+data ClickContainer {
+  windowid :: Word8,
+  stateid :: Int32 via VarInt,
+  slot :: Int16,
+  button :: Int8,
+  mode :: Int32 via VarInt,
+  slots :: V.Vector Slot,
+}
+
+data CloseContainerServerbound {
+  windowid :: Word8,
+}
+
+data ChangeContainerSlotState {
+  windowid :: Word8,
+  slot :: Int16,
+  state :: Int8,
+}
+
+data CookieResponsePlay {
+  key :: Text,
+  value :: Text,
+}
+
+data DebugSampleSubscription {
+  data_ :: ByteString via TakeRest,
+}
+
+data EditBook {
+  hand :: Int32 via VarInt,
+  pages :: V.Vector Text,
+  title :: Text,
+}
+
+data QueryEntityTag {
+  transactionid :: Int32 via VarInt,
+  entityid :: Int32 via VarInt,
+}
+
+data Interact {
+  entityid :: Int32 via VarInt,
+  type_ :: Int32 via VarInt,
+  target :: V3 Float,
+  hand :: Int32 via VarInt,
+  sneaking :: Bool,
+}
+
+data JigsawGenerate {
+  location :: Position,
+  levels :: Int32 via VarInt,
+  keepjigsaws :: Bool,
+}
+
+data LockDifficulty {
+  locked :: Bool,
+}
+
+data SetPlayerPosition {
+  position :: V3 Double,
+  rotation :: V2 Float,
+  flags :: Word8,
+  teleportid :: Int32 via VarInt,
+}
+
+data SetPlayerPositionAndRotation {
+  position :: V3 Double,
+  rotation :: V2 Float,
+  flags :: Word8,
+  teleportid :: Int32 via VarInt,
+}
+
+data SetPlayerRotation {
+  rotation :: V2 Float,
+  onground :: Bool,
+}
+
+data SetPlayerMovementFlags {
+  flags :: Word8,
+}
+
+data MoveVehicleServerbound {
+  position :: V3 Double,
+  rotation :: V2 Float,
+}
+
+data PaddleBoat {
+  leftpaddleturning :: Bool,
+  rightpaddleturning :: Bool,
+}
+
+data PickItemFromBlock {
+  location :: Position,
+}
+
+data PickItemFromEntity {
+  entityid :: Int32 via VarInt,
+}
+
+data PingRequestPlay {
+  id :: Int64,
+}
+
+data PlaceRecipe {
+  windowid :: Word8,
+  recipe :: Text,
+  makeall :: Bool,
+}
+
+data ServerboundPlayerAbilities {
+  flags :: Word8,
+}
+
+data PlayerAction {
+  actionid :: Int32 via VarInt,
+  location :: Position,
+  face :: Int8,
+  sequence :: Int32 via VarInt,
+}
+
+data PlayerCommand {
+  entityid :: Int32 via VarInt,
+  actionid :: Int32 via VarInt,
+  data_ :: Int32,
+}
+
+data PlayerInput {
+  sideways :: Float,
+  forward :: Float,
+  flags :: Word8,
+}
+
+data PlayerLoaded {}
+
+data PongPlay {
+  id :: Int64,
+}
+
+data ChangeRecipeBookSettings {
+  bookid :: Int32 via VarInt,
+  bookopen :: Bool,
+  filteractive :: Bool,
+}
+
+data SetSeenRecipe {
+  recipe :: Text,
+}
+
+data RenameItem {
+  name :: Text,
+}
+
+data ResourcePackResponsePlay {
+  status :: Int32 via VarInt,
+}
+
+data SeenAdvancements {
+  action :: Int32 via VarInt,
+  tabid :: Text,
+}
+
+data SelectTrade {
+  slot :: Int32 via VarInt,
+}
+
+data SetBeaconEffect {
+  primaryeffect :: Int32 via VarInt,
+  secondaryeffect :: Int32 via VarInt,
+}
+
+data SetHeldItemServerbound {
+  slot :: Word8,
+}
+
+data ProgramCommandBlock {
+  location :: Position,
+  command :: Text,
+  mode :: Int32 via VarInt,
+  flags :: Word8,
+}
+
+data ProgramCommandBlockMinecart {
+  entityid :: Int32 via VarInt,
+  command :: Text,
+  trackoutput :: Bool,
+}
+
+data SetCreativeModeSlot {
+  slot :: Int16,
+  slotdata_ :: Slot,
+}
+
+data ProgramJigsawBlock {
+  location :: Position,
+  name :: Text,
+  target :: Text,
+  pool :: Text,
+  finalstate :: Text,
+  jointtype :: Text,
+}
+
+data ProgramStructureBlock {
+  location :: Position,
+  action :: Int32 via VarInt,
+  mode :: Int32 via VarInt,
+  name :: Text,
+  offset :: V3 Int8,
+  size :: V3 Int8,
+  mirror :: Int32 via VarInt,
+  rotation :: Int32 via VarInt,
+  metadata_ :: Text,
+  integrity :: Float,
+  seed :: Int64 via VarLong,
+  flags :: Word8,
+}
+
+data UpdateSign {
+  location :: Position,
+  isfronttext :: Bool,
+  lines :: V.Vector Text,
+}
+
+data SwingArm {
+  hand :: Int32 via VarInt,
+}
+
+data TeleportToEntity {
+  targetentityid :: Int32 via VarInt,
+}
+
+data UseItemOn {
+  hand :: Int32 via VarInt,
+  location :: Position,
+  face :: Int32 via VarInt,
+  cursor :: V3 Float,
+  insideblock :: Bool,
+}
+
+data UseItem {
+  hand :: Int32 via VarInt,
+  sequence :: Int32 via VarInt,
+}
+|]</span><span>
+</span><span id="line-1026"></span></pre></body></html>

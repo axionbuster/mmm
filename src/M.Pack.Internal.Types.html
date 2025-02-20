@@ -1,0 +1,928 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span id="local-6989586621680374596"><span id="local-6989586621680374597"></span></span><span class="hs-comment">-- |</span><span>
+</span><span id="line-2"></span><span class="hs-comment">-- Module: M.Pack.Internal.Types</span><span>
+</span><span id="line-3"></span><span class="hs-comment">-- Description: Core serialization type system</span><span>
+</span><span id="line-4"></span><span class="hs-comment">-- Copyright: (c) axionbuster, 2025</span><span>
+</span><span id="line-5"></span><span class="hs-comment">-- License: BSD-3-Clause</span><span>
+</span><span id="line-6"></span><span class="hs-comment">--</span><span>
+</span><span id="line-7"></span><span class="hs-comment">-- Defines the core type system for binary serialization and deserialization,</span><span>
+</span><span id="line-8"></span><span class="hs-comment">-- including Pack and Unpack typeclasses and related utilities.</span><span>
+</span><span id="line-9"></span><span class="hs-keyword">module</span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html"><span class="hs-identifier">M.Pack.Internal.Types</span></a></span><span>
+</span><span id="line-10"></span><span>  </span><span class="hs-special">(</span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#Pack"><span class="hs-identifier">Pack</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span>
+</span><span id="line-11"></span><span>    </span><span class="annot"><a href="M.Pack.Internal.Types.html#SomePack"><span class="hs-identifier">SomePack</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span>
+</span><span id="line-12"></span><span>    </span><span class="annot"><a href="M.Pack.Internal.Types.html#Unpack"><span class="hs-identifier">Unpack</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span>
+</span><span id="line-13"></span><span>    </span><span class="annot"><a href="M.Pack.Internal.Types.html#SomeUnpack"><span class="hs-identifier">SomeUnpack</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span>
+</span><span id="line-14"></span><span>    </span><span class="annot"><a href="M.Pack.Internal.Types.html#Parser"><span class="hs-identifier">Parser</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-15"></span><span>    </span><span class="annot"><a href="M.Pack.Internal.Types.html#Result"><span class="hs-identifier">Result</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-16"></span><span>    </span><span class="annot"><a href="M.Pack.Internal.Types.html#ParseError"><span class="hs-identifier">ParseError</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span>
+</span><span id="line-17"></span><span>    </span><span class="annot"><a href="M.Pack.Internal.Types.html#parsepure"><span class="hs-identifier">parsepure</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-18"></span><span>    </span><span class="annot"><a href="M.Pack.Internal.Types.html#parsepure0"><span class="hs-identifier">parsepure0</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-19"></span><span>    </span><span class="annot"><a href="M.Pack.Internal.Types.html#castsomepack"><span class="hs-identifier">castsomepack</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-20"></span><span>    </span><span class="annot"><a href="M.Pack.Internal.Types.html#castsomeunpack"><span class="hs-identifier">castsomeunpack</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-21"></span><span>    </span><span class="annot"><a href="M.Pack.Internal.Types.html#unpacksome"><span class="hs-identifier">unpacksome</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-22"></span><span>  </span><span class="hs-special">)</span><span>
+</span><span id="line-23"></span><span class="hs-keyword">where</span><span>
+</span><span id="line-24"></span><span>
+</span><span id="line-25"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Control.Applicative</span></span><span>
+</span><span id="line-26"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Control.Exception</span></span><span>
+</span><span id="line-27"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Control.Monad.ST.Strict</span></span><span>
+</span><span id="line-28"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.ByteString</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">ByteString</span></span><span class="hs-special">)</span><span>
+</span><span id="line-29"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.ByteString.Builder</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">Builder</span></span><span class="hs-special">)</span><span>
+</span><span id="line-30"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Data</span></span><span>
+</span><span id="line-31"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.String</span></span><span>
+</span><span id="line-32"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Void</span></span><span>
+</span><span id="line-33"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">FlatParse.Stateful</span></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">F</span></span><span>
+</span><span id="line-34"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">GHC.Generics</span></span><span>
+</span><span id="line-35"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Language.Haskell.TH.Syntax</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">Lift</span></span><span class="hs-special">)</span><span>
+</span><span id="line-36"></span><span>
+</span><span id="line-37"></span><span class="annot"><span class="hs-comment">-- | our parser type</span></span><span>
+</span><span id="line-38"></span><span class="hs-keyword">type</span><span> </span><span id="Parser"><span class="annot"><a href="M.Pack.Internal.Types.html#Parser"><span class="hs-identifier hs-var">Parser</span></a></span></span><span> </span><span id="local-6989586621680374609"><span class="annot"><a href="#local-6989586621680374609"><span class="hs-identifier hs-type">st</span></a></span></span><span> </span><span id="local-6989586621680374610"><span class="annot"><a href="#local-6989586621680374610"><span class="hs-identifier hs-type">r</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="hs-identifier hs-type">F.ParserT</span></span><span> </span><span class="annot"><a href="#local-6989586621680374609"><span class="hs-identifier hs-type">st</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680374610"><span class="hs-identifier hs-type">r</span></a></span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#ParseError"><span class="hs-identifier hs-type">ParseError</span></a></span><span>
+</span><span id="line-39"></span><span>
+</span><span id="line-40"></span><span class="annot"><span class="hs-comment">-- | our parse result</span></span><span>
+</span><span id="line-41"></span><span class="hs-keyword">type</span><span> </span><span id="Result"><span class="annot"><a href="M.Pack.Internal.Types.html#Result"><span class="hs-identifier hs-var">Result</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="hs-identifier hs-type">F.Result</span></span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#ParseError"><span class="hs-identifier hs-type">ParseError</span></a></span><span>
+</span><span id="line-42"></span><span>
+</span><span id="line-43"></span><span class="annot"><span class="hs-comment">-- | our parser error type</span></span><span>
+</span><span id="line-44"></span><span class="hs-keyword">newtype</span><span> </span><span id="ParseError"><span class="annot"><a href="M.Pack.Internal.Types.html#ParseError"><span class="hs-identifier hs-var">ParseError</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="ParseError"><span class="annot"><a href="M.Pack.Internal.Types.html#ParseError"><span class="hs-identifier hs-var">ParseError</span></a></span></span><span> </span><span class="hs-special">{</span><span id="showparseerror"><span class="annot"><span class="annottext">ParseError -&gt; String
+</span><a href="M.Pack.Internal.Types.html#showparseerror"><span class="hs-identifier hs-var hs-var">showparseerror</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">String</span></span><span class="hs-special">}</span><span> </span><span class="hs-comment">-- generic message</span><span>
+</span><span id="line-45"></span><span>  </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">newtype</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621680374614"><span id="local-6989586621680374620"><span class="annot"><span class="annottext">ParseError -&gt; ParseError -&gt; Bool
+(ParseError -&gt; ParseError -&gt; Bool)
+-&gt; (ParseError -&gt; ParseError -&gt; Bool) -&gt; Eq ParseError
+forall a. (a -&gt; a -&gt; Bool) -&gt; (a -&gt; a -&gt; Bool) -&gt; Eq a
+$c== :: ParseError -&gt; ParseError -&gt; Bool
+== :: ParseError -&gt; ParseError -&gt; Bool
+$c/= :: ParseError -&gt; ParseError -&gt; Bool
+/= :: ParseError -&gt; ParseError -&gt; Bool
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Eq</span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680374631"><span id="local-6989586621680374637"><span id="local-6989586621680374642"><span id="local-6989586621680374647"><span id="local-6989586621680374652"><span id="local-6989586621680374657"><span id="local-6989586621680374662"><span class="annot"><span class="annottext">Eq ParseError
+Eq ParseError =&gt;
+(ParseError -&gt; ParseError -&gt; Ordering)
+-&gt; (ParseError -&gt; ParseError -&gt; Bool)
+-&gt; (ParseError -&gt; ParseError -&gt; Bool)
+-&gt; (ParseError -&gt; ParseError -&gt; Bool)
+-&gt; (ParseError -&gt; ParseError -&gt; Bool)
+-&gt; (ParseError -&gt; ParseError -&gt; ParseError)
+-&gt; (ParseError -&gt; ParseError -&gt; ParseError)
+-&gt; Ord ParseError
+ParseError -&gt; ParseError -&gt; Bool
+ParseError -&gt; ParseError -&gt; Ordering
+ParseError -&gt; ParseError -&gt; ParseError
+forall a.
+Eq a =&gt;
+(a -&gt; a -&gt; Ordering)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; Ord a
+$ccompare :: ParseError -&gt; ParseError -&gt; Ordering
+compare :: ParseError -&gt; ParseError -&gt; Ordering
+$c&lt; :: ParseError -&gt; ParseError -&gt; Bool
+&lt; :: ParseError -&gt; ParseError -&gt; Bool
+$c&lt;= :: ParseError -&gt; ParseError -&gt; Bool
+&lt;= :: ParseError -&gt; ParseError -&gt; Bool
+$c&gt; :: ParseError -&gt; ParseError -&gt; Bool
+&gt; :: ParseError -&gt; ParseError -&gt; Bool
+$c&gt;= :: ParseError -&gt; ParseError -&gt; Bool
+&gt;= :: ParseError -&gt; ParseError -&gt; Bool
+$cmax :: ParseError -&gt; ParseError -&gt; ParseError
+max :: ParseError -&gt; ParseError -&gt; ParseError
+$cmin :: ParseError -&gt; ParseError -&gt; ParseError
+min :: ParseError -&gt; ParseError -&gt; ParseError
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Ord</span></span></span></span></span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680374676"><span id="local-6989586621680374682"><span id="local-6989586621680374687"><span class="annot"><span class="annottext">Int -&gt; ParseError -&gt; String -&gt; String
+[ParseError] -&gt; String -&gt; String
+ParseError -&gt; String
+(Int -&gt; ParseError -&gt; String -&gt; String)
+-&gt; (ParseError -&gt; String)
+-&gt; ([ParseError] -&gt; String -&gt; String)
+-&gt; Show ParseError
+forall a.
+(Int -&gt; a -&gt; String -&gt; String)
+-&gt; (a -&gt; String) -&gt; ([a] -&gt; String -&gt; String) -&gt; Show a
+$cshowsPrec :: Int -&gt; ParseError -&gt; String -&gt; String
+showsPrec :: Int -&gt; ParseError -&gt; String -&gt; String
+$cshow :: ParseError -&gt; String
+show :: ParseError -&gt; String
+$cshowList :: [ParseError] -&gt; String -&gt; String
+showList :: [ParseError] -&gt; String -&gt; String
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Show</span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680374698"><span class="annot"><span class="annottext">String -&gt; ParseError
+(String -&gt; ParseError) -&gt; IsString ParseError
+forall a. (String -&gt; a) -&gt; IsString a
+$cfromString :: String -&gt; ParseError
+fromString :: String -&gt; ParseError
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var">IsString</span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680374704"><span id="local-6989586621680374709"><span id="local-6989586621680374715"><span class="annot"><span class="annottext">NonEmpty ParseError -&gt; ParseError
+ParseError -&gt; ParseError -&gt; ParseError
+(ParseError -&gt; ParseError -&gt; ParseError)
+-&gt; (NonEmpty ParseError -&gt; ParseError)
+-&gt; (forall b. Integral b =&gt; b -&gt; ParseError -&gt; ParseError)
+-&gt; Semigroup ParseError
+forall b. Integral b =&gt; b -&gt; ParseError -&gt; ParseError
+forall a.
+(a -&gt; a -&gt; a)
+-&gt; (NonEmpty a -&gt; a)
+-&gt; (forall b. Integral b =&gt; b -&gt; a -&gt; a)
+-&gt; Semigroup a
+$c&lt;&gt; :: ParseError -&gt; ParseError -&gt; ParseError
+&lt;&gt; :: ParseError -&gt; ParseError -&gt; ParseError
+$csconcat :: NonEmpty ParseError -&gt; ParseError
+sconcat :: NonEmpty ParseError -&gt; ParseError
+$cstimes :: forall b. Integral b =&gt; b -&gt; ParseError -&gt; ParseError
+stimes :: forall b. Integral b =&gt; b -&gt; ParseError -&gt; ParseError
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Semigroup</span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680374727"><span id="local-6989586621680374732"><span id="local-6989586621680374736"><span class="annot"><span class="annottext">Semigroup ParseError
+ParseError
+Semigroup ParseError =&gt;
+ParseError
+-&gt; (ParseError -&gt; ParseError -&gt; ParseError)
+-&gt; ([ParseError] -&gt; ParseError)
+-&gt; Monoid ParseError
+[ParseError] -&gt; ParseError
+ParseError -&gt; ParseError -&gt; ParseError
+forall a.
+Semigroup a =&gt;
+a -&gt; (a -&gt; a -&gt; a) -&gt; ([a] -&gt; a) -&gt; Monoid a
+$cmempty :: ParseError
+mempty :: ParseError
+$cmappend :: ParseError -&gt; ParseError -&gt; ParseError
+mappend :: ParseError -&gt; ParseError -&gt; ParseError
+$cmconcat :: [ParseError] -&gt; ParseError
+mconcat :: [ParseError] -&gt; ParseError
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Monoid</span></span></span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-46"></span><span>  </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">stock</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">Typeable</span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680374744"><span id="local-6989586621680374749"><span id="local-6989586621680374753"><span id="local-6989586621680374755"><span id="local-6989586621680374757"><span id="local-6989586621680374763"><span id="local-6989586621680374768"><span id="local-6989586621680374771"><span id="local-6989586621680374774"><span id="local-6989586621680374777"><span id="local-6989586621680374780"><span id="local-6989586621680374783"><span id="local-6989586621680374788"><span id="local-6989586621680374793"><span class="annot"><span class="annottext">Typeable ParseError
+Typeable ParseError =&gt;
+(forall (c :: * -&gt; *).
+ (forall d b. Data d =&gt; c (d -&gt; b) -&gt; d -&gt; c b)
+ -&gt; (forall g. g -&gt; c g) -&gt; ParseError -&gt; c ParseError)
+-&gt; (forall (c :: * -&gt; *).
+    (forall b r. Data b =&gt; c (b -&gt; r) -&gt; c r)
+    -&gt; (forall r. r -&gt; c r) -&gt; Constr -&gt; c ParseError)
+-&gt; (ParseError -&gt; Constr)
+-&gt; (ParseError -&gt; DataType)
+-&gt; (forall (t :: * -&gt; *) (c :: * -&gt; *).
+    Typeable t =&gt;
+    (forall d. Data d =&gt; c (t d)) -&gt; Maybe (c ParseError))
+-&gt; (forall (t :: * -&gt; * -&gt; *) (c :: * -&gt; *).
+    Typeable t =&gt;
+    (forall d e. (Data d, Data e) =&gt; c (t d e))
+    -&gt; Maybe (c ParseError))
+-&gt; ((forall b. Data b =&gt; b -&gt; b) -&gt; ParseError -&gt; ParseError)
+-&gt; (forall r r'.
+    (r -&gt; r' -&gt; r)
+    -&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; ParseError -&gt; r)
+-&gt; (forall r r'.
+    (r' -&gt; r -&gt; r)
+    -&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; ParseError -&gt; r)
+-&gt; (forall u. (forall d. Data d =&gt; d -&gt; u) -&gt; ParseError -&gt; [u])
+-&gt; (forall u.
+    Int -&gt; (forall d. Data d =&gt; d -&gt; u) -&gt; ParseError -&gt; u)
+-&gt; (forall (m :: * -&gt; *).
+    Monad m =&gt;
+    (forall d. Data d =&gt; d -&gt; m d) -&gt; ParseError -&gt; m ParseError)
+-&gt; (forall (m :: * -&gt; *).
+    MonadPlus m =&gt;
+    (forall d. Data d =&gt; d -&gt; m d) -&gt; ParseError -&gt; m ParseError)
+-&gt; (forall (m :: * -&gt; *).
+    MonadPlus m =&gt;
+    (forall d. Data d =&gt; d -&gt; m d) -&gt; ParseError -&gt; m ParseError)
+-&gt; Data ParseError
+ParseError -&gt; Constr
+ParseError -&gt; DataType
+(forall b. Data b =&gt; b -&gt; b) -&gt; ParseError -&gt; ParseError
+forall a.
+Typeable a =&gt;
+(forall (c :: * -&gt; *).
+ (forall d b. Data d =&gt; c (d -&gt; b) -&gt; d -&gt; c b)
+ -&gt; (forall g. g -&gt; c g) -&gt; a -&gt; c a)
+-&gt; (forall (c :: * -&gt; *).
+    (forall b r. Data b =&gt; c (b -&gt; r) -&gt; c r)
+    -&gt; (forall r. r -&gt; c r) -&gt; Constr -&gt; c a)
+-&gt; (a -&gt; Constr)
+-&gt; (a -&gt; DataType)
+-&gt; (forall (t :: * -&gt; *) (c :: * -&gt; *).
+    Typeable t =&gt;
+    (forall d. Data d =&gt; c (t d)) -&gt; Maybe (c a))
+-&gt; (forall (t :: * -&gt; * -&gt; *) (c :: * -&gt; *).
+    Typeable t =&gt;
+    (forall d e. (Data d, Data e) =&gt; c (t d e)) -&gt; Maybe (c a))
+-&gt; ((forall b. Data b =&gt; b -&gt; b) -&gt; a -&gt; a)
+-&gt; (forall r r'.
+    (r -&gt; r' -&gt; r) -&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; a -&gt; r)
+-&gt; (forall r r'.
+    (r' -&gt; r -&gt; r) -&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; a -&gt; r)
+-&gt; (forall u. (forall d. Data d =&gt; d -&gt; u) -&gt; a -&gt; [u])
+-&gt; (forall u. Int -&gt; (forall d. Data d =&gt; d -&gt; u) -&gt; a -&gt; u)
+-&gt; (forall (m :: * -&gt; *).
+    Monad m =&gt;
+    (forall d. Data d =&gt; d -&gt; m d) -&gt; a -&gt; m a)
+-&gt; (forall (m :: * -&gt; *).
+    MonadPlus m =&gt;
+    (forall d. Data d =&gt; d -&gt; m d) -&gt; a -&gt; m a)
+-&gt; (forall (m :: * -&gt; *).
+    MonadPlus m =&gt;
+    (forall d. Data d =&gt; d -&gt; m d) -&gt; a -&gt; m a)
+-&gt; Data a
+forall u. Int -&gt; (forall d. Data d =&gt; d -&gt; u) -&gt; ParseError -&gt; u
+forall u. (forall d. Data d =&gt; d -&gt; u) -&gt; ParseError -&gt; [u]
+forall r r'.
+(r -&gt; r' -&gt; r)
+-&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; ParseError -&gt; r
+forall r r'.
+(r' -&gt; r -&gt; r)
+-&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; ParseError -&gt; r
+forall (m :: * -&gt; *).
+Monad m =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; ParseError -&gt; m ParseError
+forall (m :: * -&gt; *).
+MonadPlus m =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; ParseError -&gt; m ParseError
+forall (c :: * -&gt; *).
+(forall b r. Data b =&gt; c (b -&gt; r) -&gt; c r)
+-&gt; (forall r. r -&gt; c r) -&gt; Constr -&gt; c ParseError
+forall (c :: * -&gt; *).
+(forall d b. Data d =&gt; c (d -&gt; b) -&gt; d -&gt; c b)
+-&gt; (forall g. g -&gt; c g) -&gt; ParseError -&gt; c ParseError
+forall (t :: * -&gt; *) (c :: * -&gt; *).
+Typeable t =&gt;
+(forall d. Data d =&gt; c (t d)) -&gt; Maybe (c ParseError)
+forall (t :: * -&gt; * -&gt; *) (c :: * -&gt; *).
+Typeable t =&gt;
+(forall d e. (Data d, Data e) =&gt; c (t d e)) -&gt; Maybe (c ParseError)
+$cgfoldl :: forall (c :: * -&gt; *).
+(forall d b. Data d =&gt; c (d -&gt; b) -&gt; d -&gt; c b)
+-&gt; (forall g. g -&gt; c g) -&gt; ParseError -&gt; c ParseError
+gfoldl :: forall (c :: * -&gt; *).
+(forall d b. Data d =&gt; c (d -&gt; b) -&gt; d -&gt; c b)
+-&gt; (forall g. g -&gt; c g) -&gt; ParseError -&gt; c ParseError
+$cgunfold :: forall (c :: * -&gt; *).
+(forall b r. Data b =&gt; c (b -&gt; r) -&gt; c r)
+-&gt; (forall r. r -&gt; c r) -&gt; Constr -&gt; c ParseError
+gunfold :: forall (c :: * -&gt; *).
+(forall b r. Data b =&gt; c (b -&gt; r) -&gt; c r)
+-&gt; (forall r. r -&gt; c r) -&gt; Constr -&gt; c ParseError
+$ctoConstr :: ParseError -&gt; Constr
+toConstr :: ParseError -&gt; Constr
+$cdataTypeOf :: ParseError -&gt; DataType
+dataTypeOf :: ParseError -&gt; DataType
+$cdataCast1 :: forall (t :: * -&gt; *) (c :: * -&gt; *).
+Typeable t =&gt;
+(forall d. Data d =&gt; c (t d)) -&gt; Maybe (c ParseError)
+dataCast1 :: forall (t :: * -&gt; *) (c :: * -&gt; *).
+Typeable t =&gt;
+(forall d. Data d =&gt; c (t d)) -&gt; Maybe (c ParseError)
+$cdataCast2 :: forall (t :: * -&gt; * -&gt; *) (c :: * -&gt; *).
+Typeable t =&gt;
+(forall d e. (Data d, Data e) =&gt; c (t d e)) -&gt; Maybe (c ParseError)
+dataCast2 :: forall (t :: * -&gt; * -&gt; *) (c :: * -&gt; *).
+Typeable t =&gt;
+(forall d e. (Data d, Data e) =&gt; c (t d e)) -&gt; Maybe (c ParseError)
+$cgmapT :: (forall b. Data b =&gt; b -&gt; b) -&gt; ParseError -&gt; ParseError
+gmapT :: (forall b. Data b =&gt; b -&gt; b) -&gt; ParseError -&gt; ParseError
+$cgmapQl :: forall r r'.
+(r -&gt; r' -&gt; r)
+-&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; ParseError -&gt; r
+gmapQl :: forall r r'.
+(r -&gt; r' -&gt; r)
+-&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; ParseError -&gt; r
+$cgmapQr :: forall r r'.
+(r' -&gt; r -&gt; r)
+-&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; ParseError -&gt; r
+gmapQr :: forall r r'.
+(r' -&gt; r -&gt; r)
+-&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; ParseError -&gt; r
+$cgmapQ :: forall u. (forall d. Data d =&gt; d -&gt; u) -&gt; ParseError -&gt; [u]
+gmapQ :: forall u. (forall d. Data d =&gt; d -&gt; u) -&gt; ParseError -&gt; [u]
+$cgmapQi :: forall u. Int -&gt; (forall d. Data d =&gt; d -&gt; u) -&gt; ParseError -&gt; u
+gmapQi :: forall u. Int -&gt; (forall d. Data d =&gt; d -&gt; u) -&gt; ParseError -&gt; u
+$cgmapM :: forall (m :: * -&gt; *).
+Monad m =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; ParseError -&gt; m ParseError
+gmapM :: forall (m :: * -&gt; *).
+Monad m =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; ParseError -&gt; m ParseError
+$cgmapMp :: forall (m :: * -&gt; *).
+MonadPlus m =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; ParseError -&gt; m ParseError
+gmapMp :: forall (m :: * -&gt; *).
+MonadPlus m =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; ParseError -&gt; m ParseError
+$cgmapMo :: forall (m :: * -&gt; *).
+MonadPlus m =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; ParseError -&gt; m ParseError
+gmapMo :: forall (m :: * -&gt; *).
+MonadPlus m =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; ParseError -&gt; m ParseError
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Data</span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680374804"><span id="local-6989586621680374806"><span class="annot"><span class="annottext">(forall x. ParseError -&gt; Rep ParseError x)
+-&gt; (forall x. Rep ParseError x -&gt; ParseError) -&gt; Generic ParseError
+forall x. Rep ParseError x -&gt; ParseError
+forall x. ParseError -&gt; Rep ParseError x
+forall a.
+(forall x. a -&gt; Rep a x) -&gt; (forall x. Rep a x -&gt; a) -&gt; Generic a
+$cfrom :: forall x. ParseError -&gt; Rep ParseError x
+from :: forall x. ParseError -&gt; Rep ParseError x
+$cto :: forall x. Rep ParseError x -&gt; ParseError
+to :: forall x. Rep ParseError x -&gt; ParseError
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Generic</span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680374812"><span id="local-6989586621680374820"><span class="annot"><span class="annottext">(forall (m :: * -&gt; *). Quote m =&gt; ParseError -&gt; m Exp)
+-&gt; (forall (m :: * -&gt; *).
+    Quote m =&gt;
+    ParseError -&gt; Code m ParseError)
+-&gt; Lift ParseError
+forall t.
+(forall (m :: * -&gt; *). Quote m =&gt; t -&gt; m Exp)
+-&gt; (forall (m :: * -&gt; *). Quote m =&gt; t -&gt; Code m t) -&gt; Lift t
+forall (m :: * -&gt; *). Quote m =&gt; ParseError -&gt; m Exp
+forall (m :: * -&gt; *). Quote m =&gt; ParseError -&gt; Code m ParseError
+$clift :: forall (m :: * -&gt; *). Quote m =&gt; ParseError -&gt; m Exp
+lift :: forall (m :: * -&gt; *). Quote m =&gt; ParseError -&gt; m Exp
+$cliftTyped :: forall (m :: * -&gt; *). Quote m =&gt; ParseError -&gt; Code m ParseError
+liftTyped :: forall (m :: * -&gt; *). Quote m =&gt; ParseError -&gt; Code m ParseError
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Lift</span></span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-47"></span><span>  </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">anyclass</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621680374834"><span id="local-6989586621680374838"><span id="local-6989586621680374841"><span id="local-6989586621680374844"><span class="annot"><span class="annottext">Show ParseError
+Typeable ParseError
+(Typeable ParseError, Show ParseError) =&gt;
+(ParseError -&gt; SomeException)
+-&gt; (SomeException -&gt; Maybe ParseError)
+-&gt; (ParseError -&gt; String)
+-&gt; (ParseError -&gt; Bool)
+-&gt; Exception ParseError
+SomeException -&gt; Maybe ParseError
+ParseError -&gt; Bool
+ParseError -&gt; String
+ParseError -&gt; SomeException
+forall e.
+(Typeable e, Show e) =&gt;
+(e -&gt; SomeException)
+-&gt; (SomeException -&gt; Maybe e)
+-&gt; (e -&gt; String)
+-&gt; (e -&gt; Bool)
+-&gt; Exception e
+$ctoException :: ParseError -&gt; SomeException
+toException :: ParseError -&gt; SomeException
+$cfromException :: SomeException -&gt; Maybe ParseError
+fromException :: SomeException -&gt; Maybe ParseError
+$cdisplayException :: ParseError -&gt; String
+displayException :: ParseError -&gt; String
+$cbacktraceDesired :: ParseError -&gt; Bool
+backtraceDesired :: ParseError -&gt; Bool
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Exception</span></span></span></span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-48"></span><span>
+</span><span id="line-49"></span><span class="annot"><span class="hs-comment">-- | run a pure parser efficiently (by inlining)</span></span><span>
+</span><span id="line-50"></span><span id="local-6989586621680374349"><span id="local-6989586621680374350"><span class="annot"><a href="M.Pack.Internal.Types.html#parsepure"><span class="hs-identifier hs-type">parsepure</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">(</span><span class="hs-keyword">forall</span><span> </span><span id="local-6989586621680374348"><span class="annot"><a href="#local-6989586621680374348"><span class="hs-identifier hs-type">st</span></a></span></span><span class="hs-operator">.</span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#Parser"><span class="hs-identifier hs-type">Parser</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680374348"><span class="hs-identifier hs-type">st</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680374349"><span class="hs-identifier hs-type">r</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680374350"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621680374349"><span class="hs-identifier hs-type">r</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Int</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">ByteString</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#Result"><span class="hs-identifier hs-type">Result</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680374350"><span class="hs-identifier hs-type">a</span></a></span></span></span><span>
+</span><span id="line-51"></span><span id="parsepure"><span class="annot"><span class="annottext">parsepure :: forall r a.
+(forall (st :: ZeroBitType). Parser st r a)
+-&gt; r -&gt; Int -&gt; ByteString -&gt; Result a
+</span><a href="M.Pack.Internal.Types.html#parsepure"><span class="hs-identifier hs-var hs-var">parsepure</span></a></span></span><span> </span><span id="local-6989586621680374847"><span class="annot"><span class="annottext">forall (st :: ZeroBitType). Parser st r a
+</span><a href="#local-6989586621680374847"><span class="hs-identifier hs-var">p</span></a></span></span><span> </span><span id="local-6989586621680374848"><span class="annot"><span class="annottext">r
+</span><a href="#local-6989586621680374848"><span class="hs-identifier hs-var">r</span></a></span></span><span> </span><span id="local-6989586621680374849"><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621680374849"><span class="hs-identifier hs-var">i</span></a></span></span><span> </span><span id="local-6989586621680374850"><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621680374850"><span class="hs-identifier hs-var">b</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(forall s. ST s (Result a)) -&gt; Result a
+forall a. (forall s. ST s a) -&gt; a
+</span><span class="hs-identifier hs-var">runST</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">ParserST s r ParseError a
+-&gt; r -&gt; Int -&gt; ByteString -&gt; ST s (Result a)
+forall s r e a.
+ParserST s r e a -&gt; r -&gt; Int -&gt; ByteString -&gt; ST s (Result e a)
+</span><span class="hs-identifier hs-var">F.runParserST</span></span><span> </span><span class="annot"><span class="annottext">ParserST s r ParseError a
+forall (st :: ZeroBitType). Parser st r a
+</span><a href="#local-6989586621680374847"><span class="hs-identifier hs-var">p</span></a></span><span> </span><span class="annot"><span class="annottext">r
+</span><a href="#local-6989586621680374848"><span class="hs-identifier hs-var">r</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621680374849"><span class="hs-identifier hs-var">i</span></a></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621680374850"><span class="hs-identifier hs-var">b</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-52"></span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#parsepure"><span class="hs-pragma hs-type">parsepure</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-53"></span><span>
+</span><span id="line-54"></span><span class="annot"><span class="hs-comment">-- | run a pure parser with no state efficiently (by inlining)</span></span><span>
+</span><span id="line-55"></span><span id="local-6989586621680374367"><span class="annot"><a href="M.Pack.Internal.Types.html#parsepure0"><span class="hs-identifier hs-type">parsepure0</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">(</span><span class="hs-keyword">forall</span><span> </span><span id="local-6989586621680374366"><span class="annot"><a href="#local-6989586621680374366"><span class="hs-identifier hs-type">st</span></a></span></span><span class="hs-operator">.</span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#Parser"><span class="hs-identifier hs-type">Parser</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680374366"><span class="hs-identifier hs-type">st</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span> </span><span class="annot"><a href="#local-6989586621680374367"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">ByteString</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#Result"><span class="hs-identifier hs-type">Result</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680374367"><span class="hs-identifier hs-type">a</span></a></span></span><span>
+</span><span id="line-56"></span><span id="parsepure0"><span class="annot"><span class="annottext">parsepure0 :: forall a.
+(forall (st :: ZeroBitType). Parser st () a)
+-&gt; ByteString -&gt; Result a
+</span><a href="M.Pack.Internal.Types.html#parsepure0"><span class="hs-identifier hs-var hs-var">parsepure0</span></a></span></span><span> </span><span id="local-6989586621680374853"><span class="annot"><span class="annottext">forall (st :: ZeroBitType). Parser st () a
+</span><a href="#local-6989586621680374853"><span class="hs-identifier hs-var">p</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(forall (st :: ZeroBitType). Parser st () a)
+-&gt; () -&gt; Int -&gt; ByteString -&gt; Result a
+forall r a.
+(forall (st :: ZeroBitType). Parser st r a)
+-&gt; r -&gt; Int -&gt; ByteString -&gt; Result a
+</span><a href="M.Pack.Internal.Types.html#parsepure"><span class="hs-identifier hs-var">parsepure</span></a></span><span> </span><span class="annot"><span class="annottext">Parser st () a
+forall (st :: ZeroBitType). Parser st () a
+</span><a href="#local-6989586621680374853"><span class="hs-identifier hs-var">p</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">0</span></span><span>
+</span><span id="line-57"></span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#parsepure0"><span class="hs-pragma hs-type">parsepure0</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-58"></span><span>
+</span><span id="line-59"></span><span class="annot"><span class="hs-comment">-- | produce a 'Builder' from a value</span></span><span>
+</span><span id="line-60"></span><span class="hs-keyword">class</span><span> </span><span id="Pack"><span class="annot"><a href="M.Pack.Internal.Types.html#Pack"><span class="hs-identifier hs-var">Pack</span></a></span></span><span> </span><span id="local-6989586621680374370"><span class="annot"><a href="#local-6989586621680374370"><span class="hs-identifier hs-type">a</span></a></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-61"></span><span>  </span><span class="hs-comment">-- | produce a 'Builder' from a value</span><span>
+</span><span id="line-62"></span><span>  </span><span id="pack"><span class="annot"><a href="M.Pack.Internal.Types.html#pack"><span class="hs-identifier hs-type">pack</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="#local-6989586621680374370"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Builder</span></span><span>
+</span><span id="line-63"></span><span>  </span><span class="hs-keyword">default</span><span> </span><span id="pack"><span class="annot"><a href="M.Pack.Internal.Types.html#pack"><span class="hs-identifier hs-type">pack</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">Generic</span></span><span> </span><span class="annot"><a href="#local-6989586621680374370"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#GPack"><span class="hs-identifier hs-type">GPack</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">Rep</span></span><span> </span><span class="annot"><a href="#local-6989586621680374370"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="#local-6989586621680374370"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Builder</span></span><span>
+</span><span id="line-64"></span><span>  </span><span id="local-6989586621680374856"><span class="annot"><a href="M.Pack.Internal.Types.html#pack"><span class="hs-identifier hs-var hs-var">pack</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Rep a Any -&gt; Builder
+forall a. Rep a a -&gt; Builder
+forall {k} (f :: k -&gt; *) (a :: k). GPack f =&gt; f a -&gt; Builder
+</span><a href="M.Pack.Internal.Types.html#gpack"><span class="hs-identifier hs-var">gpack</span></a></span><span> </span><span class="annot"><span class="annottext">(Rep a Any -&gt; Builder) -&gt; (a -&gt; Rep a Any) -&gt; a -&gt; Builder
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">a -&gt; Rep a Any
+forall x. a -&gt; Rep a x
+forall a x. Generic a =&gt; a -&gt; Rep a x
+</span><span class="hs-identifier hs-var">from</span></span></span><span>
+</span><span id="line-65"></span><span>  </span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#pack"><span class="hs-pragma hs-type">pack</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-66"></span><span>
+</span><span id="line-67"></span><span class="annot"><span class="hs-comment">-- | existential 'Pack' container</span></span><span>
+</span><span id="line-68"></span><span class="hs-keyword">data</span><span> </span><span id="SomePack"><span class="annot"><a href="M.Pack.Internal.Types.html#SomePack"><span class="hs-identifier hs-var">SomePack</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">forall</span><span> </span><span id="local-6989586621680374863"><span class="annot"><a href="#local-6989586621680374863"><span class="hs-identifier hs-type">a</span></a></span></span><span class="hs-operator">.</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">Typeable</span></span><span> </span><span class="annot"><a href="#local-6989586621680374863"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#Pack"><span class="hs-identifier hs-type">Pack</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680374863"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Show</span></span><span> </span><span class="annot"><a href="#local-6989586621680374863"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span id="SomePack"><span class="annot"><a href="M.Pack.Internal.Types.html#SomePack"><span class="hs-identifier hs-var">SomePack</span></a></span></span><span> </span><span class="annot"><a href="#local-6989586621680374863"><span class="hs-identifier hs-type">a</span></a></span><span>
+</span><span id="line-69"></span><span>  </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">stock</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">Typeable</span></span><span class="hs-special">)</span><span>
+</span><span id="line-70"></span><span>
+</span><span id="line-71"></span><span class="hs-keyword">instance</span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#Pack"><span class="hs-identifier hs-type">Pack</span></a></span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#SomePack"><span class="hs-identifier hs-type">SomePack</span></a></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-72"></span><span>  </span><span id="local-6989586621680374868"><span class="annot"><span class="annottext">pack :: SomePack -&gt; Builder
+</span><a href="M.Pack.Internal.Types.html#pack"><span class="hs-identifier hs-var hs-var hs-var">pack</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="M.Pack.Internal.Types.html#SomePack"><span class="hs-identifier hs-type">SomePack</span></a></span><span> </span><span id="local-6989586621680374873"><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621680374873"><span class="hs-identifier hs-var">x</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">a -&gt; Builder
+forall a. Pack a =&gt; a -&gt; Builder
+</span><a href="M.Pack.Internal.Types.html#pack"><span class="hs-identifier hs-var">pack</span></a></span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621680374873"><span class="hs-identifier hs-var">x</span></a></span><span>
+</span><span id="line-73"></span><span>  </span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#pack"><span class="hs-pragma hs-type">pack</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-74"></span><span>
+</span><span id="line-75"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621680374875"><span id="local-6989586621680374880"><span class="annot"><span class="hs-identifier hs-type">Show</span></span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#SomePack"><span class="hs-identifier hs-type">SomePack</span></a></span></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-76"></span><span>  </span><span id="local-6989586621680374882"><span class="annot"><span class="annottext">show :: SomePack -&gt; String
+</span><span class="hs-identifier hs-var hs-var hs-var">show</span></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="M.Pack.Internal.Types.html#SomePack"><span class="hs-identifier hs-type">SomePack</span></a></span><span> </span><span id="local-6989586621680374887"><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621680374887"><span class="hs-identifier hs-var">x</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">a -&gt; String
+forall a. Show a =&gt; a -&gt; String
+</span><span class="hs-identifier hs-var">show</span></span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621680374887"><span class="hs-identifier hs-var">x</span></a></span><span>
+</span><span id="line-77"></span><span>  </span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><span class="hs-pragma hs-type">show</span></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-78"></span><span>
+</span><span id="line-79"></span><span class="annot"><span class="hs-comment">-- | cast a 'SomePack' to a type</span></span><span>
+</span><span id="line-80"></span><span id="local-6989586621680374383"><span class="annot"><a href="M.Pack.Internal.Types.html#castsomepack"><span class="hs-identifier hs-type">castsomepack</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">Typeable</span></span><span> </span><span class="annot"><a href="#local-6989586621680374383"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#SomePack"><span class="hs-identifier hs-type">SomePack</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Maybe</span></span><span> </span><span class="annot"><a href="#local-6989586621680374383"><span class="hs-identifier hs-type">a</span></a></span></span><span>
+</span><span id="line-81"></span><span id="castsomepack"><span class="annot"><span class="annottext">castsomepack :: forall a. Typeable a =&gt; SomePack -&gt; Maybe a
+</span><a href="M.Pack.Internal.Types.html#castsomepack"><span class="hs-identifier hs-var hs-var">castsomepack</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="M.Pack.Internal.Types.html#SomePack"><span class="hs-identifier hs-type">SomePack</span></a></span><span> </span><span id="local-6989586621680374894"><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621680374894"><span class="hs-identifier hs-var">a</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">a -&gt; Maybe a
+forall a b. (Typeable a, Typeable b) =&gt; a -&gt; Maybe b
+</span><span class="hs-identifier hs-var">cast</span></span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621680374894"><span class="hs-identifier hs-var">a</span></a></span><span>
+</span><span id="line-82"></span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#castsomepack"><span class="hs-pragma hs-type">castsomepack</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-83"></span><span>
+</span><span id="line-84"></span><span class="annot"><span class="hs-comment">-- | retrieve a 'Parser' for a type</span></span><span>
+</span><span id="line-85"></span><span class="hs-keyword">class</span><span> </span><span id="Unpack"><span class="annot"><a href="M.Pack.Internal.Types.html#Unpack"><span class="hs-identifier hs-var">Unpack</span></a></span></span><span> </span><span id="local-6989586621680374388"><span class="annot"><a href="#local-6989586621680374388"><span class="hs-identifier hs-type">a</span></a></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-86"></span><span>  </span><span class="hs-comment">-- | retrieve a 'Parser' for a type</span><span>
+</span><span id="line-87"></span><span>  </span><span id="unpack"><span class="annot"><a href="M.Pack.Internal.Types.html#unpack"><span class="hs-identifier hs-type">unpack</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span id="local-6989586621680374416"><span id="local-6989586621680374417"><span class="annot"><a href="M.Pack.Internal.Types.html#Parser"><span class="hs-identifier hs-type">Parser</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680374416"><span class="hs-identifier hs-type">st</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680374417"><span class="hs-identifier hs-type">r</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680374388"><span class="hs-identifier hs-type">a</span></a></span></span></span><span>
+</span><span id="line-88"></span><span>  </span><span class="hs-keyword">default</span><span> </span><span id="unpack"><span class="annot"><a href="M.Pack.Internal.Types.html#unpack"><span class="hs-identifier hs-type">unpack</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span id="local-6989586621680374390"><span id="local-6989586621680374391"><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">Generic</span></span><span> </span><span class="annot"><a href="#local-6989586621680374388"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#GUnpack"><span class="hs-identifier hs-type">GUnpack</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">Rep</span></span><span> </span><span class="annot"><a href="#local-6989586621680374388"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#Parser"><span class="hs-identifier hs-type">Parser</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680374390"><span class="hs-identifier hs-type">st</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680374391"><span class="hs-identifier hs-type">r</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680374388"><span class="hs-identifier hs-type">a</span></a></span></span></span><span>
+</span><span id="line-89"></span><span>  </span><span id="local-6989586621680374898"><span class="annot"><a href="M.Pack.Internal.Types.html#unpack"><span class="hs-identifier hs-var hs-var">unpack</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Rep a Any -&gt; a
+forall a x. Generic a =&gt; Rep a x -&gt; a
+forall x. Rep a x -&gt; a
+</span><span class="hs-identifier hs-var">to</span></span><span> </span><span class="annot"><span class="annottext">(Rep a Any -&gt; a)
+-&gt; ParserT st r ParseError (Rep a Any) -&gt; ParserT st r ParseError a
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-operator hs-var">&lt;$&gt;</span></span><span> </span><span class="annot"><span class="annottext">ParserT st r ParseError (Rep a Any)
+forall (st :: ZeroBitType) r a. Parser st r (Rep a a)
+forall {k} (f :: k -&gt; *) (st :: ZeroBitType) r (a :: k).
+GUnpack f =&gt;
+Parser st r (f a)
+</span><a href="M.Pack.Internal.Types.html#gunpack"><span class="hs-identifier hs-var">gunpack</span></a></span></span><span>
+</span><span id="line-90"></span><span>  </span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#unpack"><span class="hs-pragma hs-type">unpack</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-91"></span><span>
+</span><span id="line-92"></span><span class="hs-comment">-- | existential 'Unpack' container</span><span>
+</span><span id="line-93"></span><span class="hs-comment">--</span><span>
+</span><span id="line-94"></span><span class="hs-comment">-- to 'unpack' this, try using 'unpacksome' with a type application</span><span>
+</span><span id="line-95"></span><span class="hs-keyword">data</span><span> </span><span id="SomeUnpack"><span class="annot"><a href="M.Pack.Internal.Types.html#SomeUnpack"><span class="hs-identifier hs-var">SomeUnpack</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">forall</span><span> </span><span id="local-6989586621680374907"><span class="annot"><a href="#local-6989586621680374907"><span class="hs-identifier hs-type">a</span></a></span></span><span class="hs-operator">.</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">Typeable</span></span><span> </span><span class="annot"><a href="#local-6989586621680374907"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#Unpack"><span class="hs-identifier hs-type">Unpack</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680374907"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Show</span></span><span> </span><span class="annot"><a href="#local-6989586621680374907"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span id="SomeUnpack"><span class="annot"><a href="M.Pack.Internal.Types.html#SomeUnpack"><span class="hs-identifier hs-var">SomeUnpack</span></a></span></span><span> </span><span class="annot"><a href="#local-6989586621680374907"><span class="hs-identifier hs-type">a</span></a></span><span>
+</span><span id="line-96"></span><span>  </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">stock</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">Typeable</span></span><span class="hs-special">)</span><span>
+</span><span id="line-97"></span><span>
+</span><span id="line-98"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621680374910"><span id="local-6989586621680374915"><span class="annot"><span class="hs-identifier hs-type">Show</span></span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#SomeUnpack"><span class="hs-identifier hs-type">SomeUnpack</span></a></span></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-99"></span><span>  </span><span id="local-6989586621680374917"><span class="annot"><span class="annottext">show :: SomeUnpack -&gt; String
+</span><span class="hs-identifier hs-var hs-var hs-var">show</span></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="M.Pack.Internal.Types.html#SomeUnpack"><span class="hs-identifier hs-type">SomeUnpack</span></a></span><span> </span><span id="local-6989586621680374922"><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621680374922"><span class="hs-identifier hs-var">x</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">a -&gt; String
+forall a. Show a =&gt; a -&gt; String
+</span><span class="hs-identifier hs-var">show</span></span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621680374922"><span class="hs-identifier hs-var">x</span></a></span><span>
+</span><span id="line-100"></span><span>  </span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><span class="hs-pragma hs-type">show</span></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-101"></span><span>
+</span><span id="line-102"></span><span class="annot"><span class="hs-comment">-- | use a type application to retrieve a 'SomeUnpack'</span></span><span>
+</span><span id="line-103"></span><span class="annot"><a href="M.Pack.Internal.Types.html#unpacksome"><span class="hs-identifier hs-type">unpacksome</span></a></span><span> </span><span class="hs-glyph">::</span><span>
+</span><span id="line-104"></span><span>  </span><span class="hs-keyword">forall</span><span> </span><span id="local-6989586621680374409"><span class="annot"><a href="#local-6989586621680374409"><span class="hs-identifier hs-type">a</span></a></span></span><span> </span><span id="local-6989586621680374410"><span class="annot"><a href="#local-6989586621680374410"><span class="hs-identifier hs-type">st</span></a></span></span><span> </span><span id="local-6989586621680374411"><span class="annot"><a href="#local-6989586621680374411"><span class="hs-identifier hs-type">r</span></a></span></span><span class="hs-operator">.</span><span>
+</span><span id="line-105"></span><span>  </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">Typeable</span></span><span> </span><span class="annot"><a href="#local-6989586621680374409"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#Unpack"><span class="hs-identifier hs-type">Unpack</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680374409"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Show</span></span><span> </span><span class="annot"><a href="#local-6989586621680374409"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=&gt;</span><span>
+</span><span id="line-106"></span><span>  </span><span class="annot"><a href="M.Pack.Internal.Types.html#Parser"><span class="hs-identifier hs-type">Parser</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680374410"><span class="hs-identifier hs-type">st</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680374411"><span class="hs-identifier hs-type">r</span></a></span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#SomeUnpack"><span class="hs-identifier hs-type">SomeUnpack</span></a></span><span>
+</span><span id="line-107"></span><span id="unpacksome"><span class="annot"><span class="annottext">unpacksome :: forall a (st :: ZeroBitType) r.
+(Typeable a, Unpack a, Show a) =&gt;
+Parser st r SomeUnpack
+</span><a href="M.Pack.Internal.Types.html#unpacksome"><span class="hs-identifier hs-var hs-var">unpacksome</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">a -&gt; SomeUnpack
+forall a. (Typeable a, Unpack a, Show a) =&gt; a -&gt; SomeUnpack
+</span><a href="M.Pack.Internal.Types.html#SomeUnpack"><span class="hs-identifier hs-var">SomeUnpack</span></a></span><span> </span><span class="annot"><span class="annottext">(a -&gt; SomeUnpack)
+-&gt; ParserT st r ParseError a -&gt; ParserT st r ParseError SomeUnpack
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-operator hs-var">&lt;$&gt;</span></span><span> </span><span class="annot"><span class="annottext">forall a (st :: ZeroBitType) r. Unpack a =&gt; Parser st r a
+</span><a href="M.Pack.Internal.Types.html#unpack"><span class="hs-identifier hs-var">unpack</span></a></span><span> </span><span class="hs-glyph">@</span><span class="annot"><a href="#local-6989586621680374409"><span class="hs-identifier hs-type">a</span></a></span><span>
+</span><span id="line-108"></span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#unpacksome"><span class="hs-pragma hs-type">unpacksome</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-109"></span><span>
+</span><span id="line-110"></span><span class="annot"><span class="hs-comment">-- | cast a 'SomeUnpack' to a type</span></span><span>
+</span><span id="line-111"></span><span id="local-6989586621680374418"><span class="annot"><a href="M.Pack.Internal.Types.html#castsomeunpack"><span class="hs-identifier hs-type">castsomeunpack</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">Typeable</span></span><span> </span><span class="annot"><a href="#local-6989586621680374418"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#SomeUnpack"><span class="hs-identifier hs-type">SomeUnpack</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Maybe</span></span><span> </span><span class="annot"><a href="#local-6989586621680374418"><span class="hs-identifier hs-type">a</span></a></span></span><span>
+</span><span id="line-112"></span><span id="castsomeunpack"><span class="annot"><span class="annottext">castsomeunpack :: forall a. Typeable a =&gt; SomeUnpack -&gt; Maybe a
+</span><a href="M.Pack.Internal.Types.html#castsomeunpack"><span class="hs-identifier hs-var hs-var">castsomeunpack</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="M.Pack.Internal.Types.html#SomeUnpack"><span class="hs-identifier hs-type">SomeUnpack</span></a></span><span> </span><span id="local-6989586621680374937"><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621680374937"><span class="hs-identifier hs-var">a</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">a -&gt; Maybe a
+forall a b. (Typeable a, Typeable b) =&gt; a -&gt; Maybe b
+</span><span class="hs-identifier hs-var">cast</span></span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621680374937"><span class="hs-identifier hs-var">a</span></a></span><span>
+</span><span id="line-113"></span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#castsomeunpack"><span class="hs-pragma hs-type">castsomeunpack</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-114"></span><span>
+</span><span id="line-115"></span><span class="annot"><span class="hs-comment">-- | generic implementor of 'Pack'</span></span><span>
+</span><span id="line-116"></span><span class="hs-keyword">class</span><span> </span><span id="GPack"><span class="annot"><a href="M.Pack.Internal.Types.html#GPack"><span class="hs-identifier hs-var">GPack</span></a></span></span><span> </span><span id="local-6989586621680374376"><span class="annot"><a href="#local-6989586621680374376"><span class="hs-identifier hs-type">f</span></a></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-117"></span><span>  </span><span class="hs-comment">-- | implement 'pack'</span><span>
+</span><span id="line-118"></span><span>  </span><span id="gpack"><span class="annot"><a href="M.Pack.Internal.Types.html#gpack"><span class="hs-identifier hs-type">gpack</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span id="local-6989586621680374374"><span class="annot"><a href="#local-6989586621680374376"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680374374"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Builder</span></span></span><span>
+</span><span id="line-119"></span><span>
+</span><span id="line-120"></span><span class="hs-comment">-- GPack is implemented for most type combos, except sum types</span><span>
+</span><span id="line-121"></span><span class="hs-comment">-- where programmer's attention is required</span><span>
+</span><span id="line-122"></span><span>
+</span><span id="line-123"></span><span class="hs-keyword">instance</span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#GPack"><span class="hs-identifier hs-type">GPack</span></a></span><span> </span><span class="annot"><span class="hs-identifier hs-type">V1</span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-124"></span><span>  </span><span id="local-6989586621680374941"><span class="annot"><span class="annottext">gpack :: forall (a :: k). V1 a -&gt; Builder
+</span><a href="M.Pack.Internal.Types.html#gpack"><span class="hs-identifier hs-var hs-var hs-var">gpack</span></a></span></span><span> </span><span id="local-6989586621680374942"><span class="annot"><span class="annottext">V1 a
+</span><a href="#local-6989586621680374942"><span class="hs-identifier hs-var">v</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">case</span><span> </span><span class="annot"><span class="annottext">V1 a
+</span><a href="#local-6989586621680374942"><span class="hs-identifier hs-var">v</span></a></span><span> </span><span class="hs-keyword">of</span><span> </span><span class="hs-special">{</span><span class="hs-special">}</span><span>
+</span><span id="line-125"></span><span>  </span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#gpack"><span class="hs-pragma hs-type">gpack</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-126"></span><span>
+</span><span id="line-127"></span><span class="hs-keyword">instance</span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#GPack"><span class="hs-identifier hs-type">GPack</span></a></span><span> </span><span class="annot"><span class="hs-identifier hs-type">U1</span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-128"></span><span>  </span><span id="local-6989586621680374947"><span class="annot"><span class="annottext">gpack :: forall (a :: k). U1 a -&gt; Builder
+</span><a href="M.Pack.Internal.Types.html#gpack"><span class="hs-identifier hs-var hs-var hs-var">gpack</span></a></span></span><span> </span><span class="annot"><span class="annottext">U1 a
+</span><span class="hs-identifier">_</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Builder
+forall a. Monoid a =&gt; a
+</span><span class="hs-identifier hs-var">mempty</span></span><span>
+</span><span id="line-129"></span><span>  </span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#gpack"><span class="hs-pragma hs-type">gpack</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-130"></span><span>
+</span><span id="line-131"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621680374430"><span id="local-6989586621680374432"><span class="hs-special">(</span><span class="annot"><a href="M.Pack.Internal.Types.html#Pack"><span class="hs-identifier hs-type">Pack</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680374430"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#GPack"><span class="hs-identifier hs-type">GPack</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">K1</span></span><span> </span><span class="annot"><a href="#local-6989586621680374432"><span class="hs-identifier hs-type">i</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680374430"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-132"></span><span>  </span><span id="local-6989586621680374952"><span class="annot"><span class="annottext">gpack :: forall (a :: k). K1 i a a -&gt; Builder
+</span><a href="M.Pack.Internal.Types.html#gpack"><span class="hs-identifier hs-var hs-var hs-var">gpack</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">K1</span></span><span> </span><span id="local-6989586621680374954"><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621680374954"><span class="hs-identifier hs-var">x</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">a -&gt; Builder
+forall a. Pack a =&gt; a -&gt; Builder
+</span><a href="M.Pack.Internal.Types.html#pack"><span class="hs-identifier hs-var">pack</span></a></span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621680374954"><span class="hs-identifier hs-var">x</span></a></span><span>
+</span><span id="line-133"></span><span>  </span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#gpack"><span class="hs-pragma hs-type">gpack</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-134"></span><span>
+</span><span id="line-135"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621680374440"><span id="local-6989586621680374441"><span id="local-6989586621680374442"><span class="hs-special">(</span><span class="annot"><a href="M.Pack.Internal.Types.html#GPack"><span class="hs-identifier hs-type">GPack</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680374440"><span class="hs-identifier hs-type">f</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#GPack"><span class="hs-identifier hs-type">GPack</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">M1</span></span><span> </span><span class="annot"><a href="#local-6989586621680374441"><span class="hs-identifier hs-type">i</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680374442"><span class="hs-identifier hs-type">c</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680374440"><span class="hs-identifier hs-type">f</span></a></span><span class="hs-special">)</span></span></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-136"></span><span>  </span><span id="local-6989586621680374959"><span class="annot"><span class="annottext">gpack :: forall (a :: k). M1 i c f a -&gt; Builder
+</span><a href="M.Pack.Internal.Types.html#gpack"><span class="hs-identifier hs-var hs-var hs-var">gpack</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">M1</span></span><span> </span><span id="local-6989586621680374961"><span class="annot"><span class="annottext">f a
+</span><a href="#local-6989586621680374961"><span class="hs-identifier hs-var">x</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">f a -&gt; Builder
+forall (a :: k). f a -&gt; Builder
+forall {k} (f :: k -&gt; *) (a :: k). GPack f =&gt; f a -&gt; Builder
+</span><a href="M.Pack.Internal.Types.html#gpack"><span class="hs-identifier hs-var">gpack</span></a></span><span> </span><span class="annot"><span class="annottext">f a
+</span><a href="#local-6989586621680374961"><span class="hs-identifier hs-var">x</span></a></span><span>
+</span><span id="line-137"></span><span>  </span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#gpack"><span class="hs-pragma hs-type">gpack</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-138"></span><span>
+</span><span id="line-139"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621680374448"><span id="local-6989586621680374449"><span class="hs-special">(</span><span class="annot"><a href="M.Pack.Internal.Types.html#GPack"><span class="hs-identifier hs-type">GPack</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680374448"><span class="hs-identifier hs-type">f</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#GPack"><span class="hs-identifier hs-type">GPack</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680374449"><span class="hs-identifier hs-type">g</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#GPack"><span class="hs-identifier hs-type">GPack</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621680374448"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="annot"><span class="hs-operator hs-type">:*:</span></span><span> </span><span class="annot"><a href="#local-6989586621680374449"><span class="hs-identifier hs-type">g</span></a></span><span class="hs-special">)</span></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-140"></span><span>  </span><span id="local-6989586621680374970"><span class="annot"><span class="annottext">gpack :: forall (a :: k). (:*:) f g a -&gt; Builder
+</span><a href="M.Pack.Internal.Types.html#gpack"><span class="hs-identifier hs-var hs-var hs-var">gpack</span></a></span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621680374971"><span class="annot"><span class="annottext">f a
+</span><a href="#local-6989586621680374971"><span class="hs-identifier hs-var">x</span></a></span></span><span> </span><span class="annot"><span class="hs-operator hs-type">:*:</span></span><span> </span><span id="local-6989586621680374973"><span class="annot"><span class="annottext">g a
+</span><a href="#local-6989586621680374973"><span class="hs-identifier hs-var">y</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">f a -&gt; Builder
+forall (a :: k). f a -&gt; Builder
+forall {k} (f :: k -&gt; *) (a :: k). GPack f =&gt; f a -&gt; Builder
+</span><a href="M.Pack.Internal.Types.html#gpack"><span class="hs-identifier hs-var">gpack</span></a></span><span> </span><span class="annot"><span class="annottext">f a
+</span><a href="#local-6989586621680374971"><span class="hs-identifier hs-var">x</span></a></span><span> </span><span class="annot"><span class="annottext">Builder -&gt; Builder -&gt; Builder
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">&lt;&gt;</span></span><span> </span><span class="annot"><span class="annottext">g a -&gt; Builder
+forall (a :: k). g a -&gt; Builder
+forall {k} (f :: k -&gt; *) (a :: k). GPack f =&gt; f a -&gt; Builder
+</span><a href="M.Pack.Internal.Types.html#gpack"><span class="hs-identifier hs-var">gpack</span></a></span><span> </span><span class="annot"><span class="annottext">g a
+</span><a href="#local-6989586621680374973"><span class="hs-identifier hs-var">y</span></a></span><span>
+</span><span id="line-141"></span><span>  </span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#gpack"><span class="hs-pragma hs-type">gpack</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-142"></span><span>
+</span><span id="line-143"></span><span class="annot"><span class="hs-comment">-- | generic implementor of 'Unpack'</span></span><span>
+</span><span id="line-144"></span><span class="hs-keyword">class</span><span> </span><span id="GUnpack"><span class="annot"><a href="M.Pack.Internal.Types.html#GUnpack"><span class="hs-identifier hs-var">GUnpack</span></a></span></span><span> </span><span id="local-6989586621680374406"><span class="annot"><a href="#local-6989586621680374406"><span class="hs-identifier hs-type">f</span></a></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-145"></span><span>  </span><span class="hs-comment">-- | implement 'unpack'</span><span>
+</span><span id="line-146"></span><span>  </span><span id="gunpack"><span class="annot"><a href="M.Pack.Internal.Types.html#gunpack"><span class="hs-identifier hs-type">gunpack</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span id="local-6989586621680374402"><span id="local-6989586621680374403"><span id="local-6989586621680374404"><span class="annot"><a href="M.Pack.Internal.Types.html#Parser"><span class="hs-identifier hs-type">Parser</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680374402"><span class="hs-identifier hs-type">st</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680374403"><span class="hs-identifier hs-type">r</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621680374406"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680374404"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span></span></span></span><span>
+</span><span id="line-147"></span><span>
+</span><span id="line-148"></span><span class="hs-keyword">instance</span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#GUnpack"><span class="hs-identifier hs-type">GUnpack</span></a></span><span> </span><span class="annot"><span class="hs-identifier hs-type">V1</span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-149"></span><span>  </span><span id="local-6989586621680374978"><span class="annot"><span class="annottext">gunpack :: forall (st :: ZeroBitType) r (a :: k). Parser st r (V1 a)
+</span><a href="M.Pack.Internal.Types.html#gunpack"><span class="hs-identifier hs-var hs-var hs-var">gunpack</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">ParseError -&gt; ParserT st r ParseError (V1 a)
+forall e (st :: ZeroBitType) r a. e -&gt; ParserT st r e a
+</span><span class="hs-identifier hs-var">F.err</span></span><span> </span><span class="annot"><span class="annottext">ParseError
+</span><span class="hs-string">&quot;impossible (GUnpack V1)&quot;</span></span><span>
+</span><span id="line-150"></span><span>  </span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#gunpack"><span class="hs-pragma hs-type">gunpack</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-151"></span><span>
+</span><span id="line-152"></span><span class="hs-keyword">instance</span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#GUnpack"><span class="hs-identifier hs-type">GUnpack</span></a></span><span> </span><span class="annot"><span class="hs-identifier hs-type">U1</span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-153"></span><span>  </span><span id="local-6989586621680374984"><span class="annot"><span class="annottext">gunpack :: forall (st :: ZeroBitType) r (a :: k). Parser st r (U1 a)
+</span><a href="M.Pack.Internal.Types.html#gunpack"><span class="hs-identifier hs-var hs-var hs-var">gunpack</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">U1 a -&gt; ParserT st r ParseError (U1 a)
+forall a. a -&gt; ParserT st r ParseError a
+forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><span class="hs-identifier hs-var">pure</span></span><span> </span><span class="annot"><span class="annottext">U1 a
+forall k (p :: k). U1 p
+</span><span class="hs-identifier hs-var">U1</span></span><span>
+</span><span id="line-154"></span><span>  </span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#gunpack"><span class="hs-pragma hs-type">gunpack</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-155"></span><span>
+</span><span id="line-156"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621680374475"><span id="local-6989586621680374477"><span class="hs-special">(</span><span class="annot"><a href="M.Pack.Internal.Types.html#Unpack"><span class="hs-identifier hs-type">Unpack</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680374475"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#GUnpack"><span class="hs-identifier hs-type">GUnpack</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">K1</span></span><span> </span><span class="annot"><a href="#local-6989586621680374477"><span class="hs-identifier hs-type">i</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680374475"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-157"></span><span>  </span><span id="local-6989586621680374991"><span class="annot"><span class="annottext">gunpack :: forall (st :: ZeroBitType) r (a :: k). Parser st r (K1 i a a)
+</span><a href="M.Pack.Internal.Types.html#gunpack"><span class="hs-identifier hs-var hs-var hs-var">gunpack</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">a -&gt; K1 i a a
+forall k i c (p :: k). c -&gt; K1 i c p
+</span><span class="hs-identifier hs-var">K1</span></span><span> </span><span class="annot"><span class="annottext">(a -&gt; K1 i a a)
+-&gt; ParserT st r ParseError a -&gt; ParserT st r ParseError (K1 i a a)
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-operator hs-var">&lt;$&gt;</span></span><span> </span><span class="annot"><span class="annottext">ParserT st r ParseError a
+forall (st :: ZeroBitType) r. Parser st r a
+forall a (st :: ZeroBitType) r. Unpack a =&gt; Parser st r a
+</span><a href="M.Pack.Internal.Types.html#unpack"><span class="hs-identifier hs-var">unpack</span></a></span><span>
+</span><span id="line-158"></span><span>  </span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#gunpack"><span class="hs-pragma hs-type">gunpack</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-159"></span><span>
+</span><span id="line-160"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621680374490"><span id="local-6989586621680374491"><span id="local-6989586621680374492"><span class="hs-special">(</span><span class="annot"><a href="M.Pack.Internal.Types.html#GUnpack"><span class="hs-identifier hs-type">GUnpack</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680374490"><span class="hs-identifier hs-type">f</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#GUnpack"><span class="hs-identifier hs-type">GUnpack</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">M1</span></span><span> </span><span class="annot"><a href="#local-6989586621680374491"><span class="hs-identifier hs-type">i</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680374492"><span class="hs-identifier hs-type">c</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680374490"><span class="hs-identifier hs-type">f</span></a></span><span class="hs-special">)</span></span></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-161"></span><span>  </span><span id="local-6989586621680374997"><span class="annot"><span class="annottext">gunpack :: forall (st :: ZeroBitType) r (a :: k). Parser st r (M1 i c f a)
+</span><a href="M.Pack.Internal.Types.html#gunpack"><span class="hs-identifier hs-var hs-var hs-var">gunpack</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">f a -&gt; M1 i c f a
+forall k i (c :: Meta) (f :: k -&gt; *) (p :: k). f p -&gt; M1 i c f p
+</span><span class="hs-identifier hs-var">M1</span></span><span> </span><span class="annot"><span class="annottext">(f a -&gt; M1 i c f a)
+-&gt; ParserT st r ParseError (f a)
+-&gt; ParserT st r ParseError (M1 i c f a)
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-operator hs-var">&lt;$&gt;</span></span><span> </span><span class="annot"><span class="annottext">ParserT st r ParseError (f a)
+forall (st :: ZeroBitType) r (a :: k). Parser st r (f a)
+forall {k} (f :: k -&gt; *) (st :: ZeroBitType) r (a :: k).
+GUnpack f =&gt;
+Parser st r (f a)
+</span><a href="M.Pack.Internal.Types.html#gunpack"><span class="hs-identifier hs-var">gunpack</span></a></span><span>
+</span><span id="line-162"></span><span>  </span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#gunpack"><span class="hs-pragma hs-type">gunpack</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-163"></span><span>
+</span><span id="line-164"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621680374505"><span id="local-6989586621680374506"><span class="hs-special">(</span><span class="annot"><a href="M.Pack.Internal.Types.html#GUnpack"><span class="hs-identifier hs-type">GUnpack</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680374505"><span class="hs-identifier hs-type">f</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#GUnpack"><span class="hs-identifier hs-type">GUnpack</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680374506"><span class="hs-identifier hs-type">g</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#GUnpack"><span class="hs-identifier hs-type">GUnpack</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621680374505"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="annot"><span class="hs-operator hs-type">:*:</span></span><span> </span><span class="annot"><a href="#local-6989586621680374506"><span class="hs-identifier hs-type">g</span></a></span><span class="hs-special">)</span></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-165"></span><span>  </span><span id="local-6989586621680375005"><span class="annot"><span class="annottext">gunpack :: forall (st :: ZeroBitType) r (a :: k). Parser st r ((:*:) f g a)
+</span><a href="M.Pack.Internal.Types.html#gunpack"><span class="hs-identifier hs-var hs-var hs-var">gunpack</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(f a -&gt; g a -&gt; (:*:) f g a)
+-&gt; ParserT st r ParseError (f a)
+-&gt; ParserT st r ParseError (g a)
+-&gt; ParserT st r ParseError ((:*:) f g a)
+forall a b c.
+(a -&gt; b -&gt; c)
+-&gt; ParserT st r ParseError a
+-&gt; ParserT st r ParseError b
+-&gt; ParserT st r ParseError c
+forall (f :: * -&gt; *) a b c.
+Applicative f =&gt;
+(a -&gt; b -&gt; c) -&gt; f a -&gt; f b -&gt; f c
+</span><span class="hs-identifier hs-var">liftA2</span></span><span> </span><span class="annot"><span class="annottext">f a -&gt; g a -&gt; (:*:) f g a
+forall k (f :: k -&gt; *) (g :: k -&gt; *) (p :: k).
+f p -&gt; g p -&gt; (:*:) f g p
+</span><span class="hs-operator hs-var">(:*:)</span></span><span> </span><span class="annot"><span class="annottext">ParserT st r ParseError (f a)
+forall (st :: ZeroBitType) r (a :: k). Parser st r (f a)
+forall {k} (f :: k -&gt; *) (st :: ZeroBitType) r (a :: k).
+GUnpack f =&gt;
+Parser st r (f a)
+</span><a href="M.Pack.Internal.Types.html#gunpack"><span class="hs-identifier hs-var">gunpack</span></a></span><span> </span><span class="annot"><span class="annottext">ParserT st r ParseError (g a)
+forall (st :: ZeroBitType) r (a :: k). Parser st r (g a)
+forall {k} (f :: k -&gt; *) (st :: ZeroBitType) r (a :: k).
+GUnpack f =&gt;
+Parser st r (f a)
+</span><a href="M.Pack.Internal.Types.html#gunpack"><span class="hs-identifier hs-var">gunpack</span></a></span><span>
+</span><span id="line-166"></span><span>  </span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#gunpack"><span class="hs-pragma hs-type">gunpack</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-167"></span><span>
+</span><span id="line-168"></span><span class="hs-comment">-- some very basic instances</span><span>
+</span><span id="line-169"></span><span>
+</span><span id="line-170"></span><span class="hs-keyword">instance</span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#Pack"><span class="hs-identifier hs-type">Pack</span></a></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Void</span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-171"></span><span>  </span><span id="local-6989586621680375009"><span class="annot"><span class="annottext">pack :: Void -&gt; Builder
+</span><a href="M.Pack.Internal.Types.html#pack"><span class="hs-identifier hs-var hs-var hs-var">pack</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Void -&gt; Builder
+forall a. Void -&gt; a
+</span><span class="hs-identifier hs-var">absurd</span></span><span>
+</span><span id="line-172"></span><span>  </span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#pack"><span class="hs-pragma hs-type">pack</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-173"></span><span>
+</span><span id="line-174"></span><span class="hs-keyword">instance</span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#Unpack"><span class="hs-identifier hs-type">Unpack</span></a></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Void</span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-175"></span><span>  </span><span id="local-6989586621680375015"><span class="annot"><span class="annottext">unpack :: forall (st :: ZeroBitType) r. Parser st r Void
+</span><a href="M.Pack.Internal.Types.html#unpack"><span class="hs-identifier hs-var hs-var hs-var">unpack</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">ParseError -&gt; ParserT st r ParseError Void
+forall e (st :: ZeroBitType) r a. e -&gt; ParserT st r e a
+</span><span class="hs-identifier hs-var">F.err</span></span><span> </span><span class="annot"><span class="annottext">ParseError
+</span><span class="hs-string">&quot;impossible (Unpack Void)&quot;</span></span><span>
+</span><span id="line-176"></span><span>  </span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#unpack"><span class="hs-pragma hs-type">unpack</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-177"></span><span>
+</span><span id="line-178"></span><span class="hs-keyword">instance</span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#Pack"><span class="hs-identifier hs-type">Pack</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-179"></span><span>  </span><span id="local-6989586621680375019"><span class="annot"><span class="annottext">pack :: () -&gt; Builder
+</span><a href="M.Pack.Internal.Types.html#pack"><span class="hs-identifier hs-var hs-var hs-var">pack</span></a></span></span><span> </span><span class="annot"><span class="annottext">()
+</span><span class="hs-identifier">_</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Builder
+forall a. Monoid a =&gt; a
+</span><span class="hs-identifier hs-var">mempty</span></span><span>
+</span><span id="line-180"></span><span>  </span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#pack"><span class="hs-pragma hs-type">pack</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-181"></span><span>
+</span><span id="line-182"></span><span class="hs-keyword">instance</span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#Unpack"><span class="hs-identifier hs-type">Unpack</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-183"></span><span>  </span><span id="local-6989586621680375023"><span class="annot"><span class="annottext">unpack :: forall (st :: ZeroBitType) r. Parser st r ()
+</span><a href="M.Pack.Internal.Types.html#unpack"><span class="hs-identifier hs-var hs-var hs-var">unpack</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">() -&gt; ParserT st r ParseError ()
+forall a. a -&gt; ParserT st r ParseError a
+forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><span class="hs-identifier hs-var">pure</span></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span>
+</span><span id="line-184"></span><span>  </span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#unpack"><span class="hs-pragma hs-type">unpack</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-185"></span><span>
+</span><span id="line-186"></span><span class="hs-comment">-- tuples up to five</span><span>
+</span><span id="line-187"></span><span>
+</span><span id="line-188"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621680374524"><span id="local-6989586621680374525"><span class="hs-special">(</span><span class="annot"><a href="M.Pack.Internal.Types.html#Pack"><span class="hs-identifier hs-type">Pack</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680374524"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#Pack"><span class="hs-identifier hs-type">Pack</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680374525"><span class="hs-identifier hs-type">b</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#Pack"><span class="hs-identifier hs-type">Pack</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621680374524"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="#local-6989586621680374525"><span class="hs-identifier hs-type">b</span></a></span><span class="hs-special">)</span></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-189"></span><span>  </span><span id="local-6989586621680375031"><span class="annot"><span class="annottext">pack :: (a, b) -&gt; Builder
+</span><a href="M.Pack.Internal.Types.html#pack"><span class="hs-identifier hs-var hs-var hs-var">pack</span></a></span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621680375032"><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621680375032"><span class="hs-identifier hs-var">a</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680375033"><span class="annot"><span class="annottext">b
+</span><a href="#local-6989586621680375033"><span class="hs-identifier hs-var">b</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">a -&gt; Builder
+forall a. Pack a =&gt; a -&gt; Builder
+</span><a href="M.Pack.Internal.Types.html#pack"><span class="hs-identifier hs-var">pack</span></a></span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621680375032"><span class="hs-identifier hs-var">a</span></a></span><span> </span><span class="annot"><span class="annottext">Builder -&gt; Builder -&gt; Builder
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">&lt;&gt;</span></span><span> </span><span class="annot"><span class="annottext">b -&gt; Builder
+forall a. Pack a =&gt; a -&gt; Builder
+</span><a href="M.Pack.Internal.Types.html#pack"><span class="hs-identifier hs-var">pack</span></a></span><span> </span><span class="annot"><span class="annottext">b
+</span><a href="#local-6989586621680375033"><span class="hs-identifier hs-var">b</span></a></span><span>
+</span><span id="line-190"></span><span>  </span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#pack"><span class="hs-pragma hs-type">pack</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-191"></span><span>
+</span><span id="line-192"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621680374528"><span id="local-6989586621680374529"><span class="hs-special">(</span><span class="annot"><a href="M.Pack.Internal.Types.html#Unpack"><span class="hs-identifier hs-type">Unpack</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680374528"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#Unpack"><span class="hs-identifier hs-type">Unpack</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680374529"><span class="hs-identifier hs-type">b</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#Unpack"><span class="hs-identifier hs-type">Unpack</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621680374528"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="#local-6989586621680374529"><span class="hs-identifier hs-type">b</span></a></span><span class="hs-special">)</span></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-193"></span><span>  </span><span id="local-6989586621680375041"><span class="annot"><span class="annottext">unpack :: forall (st :: ZeroBitType) r. Parser st r (a, b)
+</span><a href="M.Pack.Internal.Types.html#unpack"><span class="hs-identifier hs-var hs-var hs-var">unpack</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(a -&gt; b -&gt; (a, b))
+-&gt; ParserT st r ParseError a
+-&gt; ParserT st r ParseError b
+-&gt; ParserT st r ParseError (a, b)
+forall a b c.
+(a -&gt; b -&gt; c)
+-&gt; ParserT st r ParseError a
+-&gt; ParserT st r ParseError b
+-&gt; ParserT st r ParseError c
+forall (f :: * -&gt; *) a b c.
+Applicative f =&gt;
+(a -&gt; b -&gt; c) -&gt; f a -&gt; f b -&gt; f c
+</span><span class="hs-identifier hs-var">liftA2</span></span><span> </span><span class="hs-special">(</span><span class="hs-special">,</span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">ParserT st r ParseError a
+forall (st :: ZeroBitType) r. Parser st r a
+forall a (st :: ZeroBitType) r. Unpack a =&gt; Parser st r a
+</span><a href="M.Pack.Internal.Types.html#unpack"><span class="hs-identifier hs-var">unpack</span></a></span><span> </span><span class="annot"><span class="annottext">ParserT st r ParseError b
+forall (st :: ZeroBitType) r. Parser st r b
+forall a (st :: ZeroBitType) r. Unpack a =&gt; Parser st r a
+</span><a href="M.Pack.Internal.Types.html#unpack"><span class="hs-identifier hs-var">unpack</span></a></span><span>
+</span><span id="line-194"></span><span>  </span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#unpack"><span class="hs-pragma hs-type">unpack</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-195"></span><span>
+</span><span id="line-196"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621680374535"><span id="local-6989586621680374536"><span id="local-6989586621680374537"><span class="hs-special">(</span><span class="annot"><a href="M.Pack.Internal.Types.html#Pack"><span class="hs-identifier hs-type">Pack</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680374535"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#Pack"><span class="hs-identifier hs-type">Pack</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680374536"><span class="hs-identifier hs-type">b</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#Pack"><span class="hs-identifier hs-type">Pack</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680374537"><span class="hs-identifier hs-type">c</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#Pack"><span class="hs-identifier hs-type">Pack</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621680374535"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="#local-6989586621680374536"><span class="hs-identifier hs-type">b</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="#local-6989586621680374537"><span class="hs-identifier hs-type">c</span></a></span><span class="hs-special">)</span></span></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-197"></span><span>  </span><span id="local-6989586621680375052"><span class="annot"><span class="annottext">pack :: (a, b, c) -&gt; Builder
+</span><a href="M.Pack.Internal.Types.html#pack"><span class="hs-identifier hs-var hs-var hs-var">pack</span></a></span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621680375053"><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621680375053"><span class="hs-identifier hs-var">a</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680375054"><span class="annot"><span class="annottext">b
+</span><a href="#local-6989586621680375054"><span class="hs-identifier hs-var">b</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680375055"><span class="annot"><span class="annottext">c
+</span><a href="#local-6989586621680375055"><span class="hs-identifier hs-var">c</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">a -&gt; Builder
+forall a. Pack a =&gt; a -&gt; Builder
+</span><a href="M.Pack.Internal.Types.html#pack"><span class="hs-identifier hs-var">pack</span></a></span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621680375053"><span class="hs-identifier hs-var">a</span></a></span><span> </span><span class="annot"><span class="annottext">Builder -&gt; Builder -&gt; Builder
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">&lt;&gt;</span></span><span> </span><span class="annot"><span class="annottext">b -&gt; Builder
+forall a. Pack a =&gt; a -&gt; Builder
+</span><a href="M.Pack.Internal.Types.html#pack"><span class="hs-identifier hs-var">pack</span></a></span><span> </span><span class="annot"><span class="annottext">b
+</span><a href="#local-6989586621680375054"><span class="hs-identifier hs-var">b</span></a></span><span> </span><span class="annot"><span class="annottext">Builder -&gt; Builder -&gt; Builder
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">&lt;&gt;</span></span><span> </span><span class="annot"><span class="annottext">c -&gt; Builder
+forall a. Pack a =&gt; a -&gt; Builder
+</span><a href="M.Pack.Internal.Types.html#pack"><span class="hs-identifier hs-var">pack</span></a></span><span> </span><span class="annot"><span class="annottext">c
+</span><a href="#local-6989586621680375055"><span class="hs-identifier hs-var">c</span></a></span><span>
+</span><span id="line-198"></span><span>  </span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#pack"><span class="hs-pragma hs-type">pack</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-199"></span><span>
+</span><span id="line-200"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621680374541"><span id="local-6989586621680374542"><span id="local-6989586621680374543"><span class="hs-special">(</span><span class="annot"><a href="M.Pack.Internal.Types.html#Unpack"><span class="hs-identifier hs-type">Unpack</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680374541"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#Unpack"><span class="hs-identifier hs-type">Unpack</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680374542"><span class="hs-identifier hs-type">b</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#Unpack"><span class="hs-identifier hs-type">Unpack</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680374543"><span class="hs-identifier hs-type">c</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#Unpack"><span class="hs-identifier hs-type">Unpack</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621680374541"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="#local-6989586621680374542"><span class="hs-identifier hs-type">b</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="#local-6989586621680374543"><span class="hs-identifier hs-type">c</span></a></span><span class="hs-special">)</span></span></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-201"></span><span>  </span><span id="local-6989586621680375065"><span class="annot"><span class="annottext">unpack :: forall (st :: ZeroBitType) r. Parser st r (a, b, c)
+</span><a href="M.Pack.Internal.Types.html#unpack"><span class="hs-identifier hs-var hs-var hs-var">unpack</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(a -&gt; b -&gt; c -&gt; (a, b, c))
+-&gt; ParserT st r ParseError a
+-&gt; ParserT st r ParseError b
+-&gt; ParserT st r ParseError c
+-&gt; ParserT st r ParseError (a, b, c)
+forall (f :: * -&gt; *) a b c d.
+Applicative f =&gt;
+(a -&gt; b -&gt; c -&gt; d) -&gt; f a -&gt; f b -&gt; f c -&gt; f d
+</span><span class="hs-identifier hs-var">liftA3</span></span><span> </span><span class="hs-special">(</span><span class="hs-special">,</span><span class="hs-special">,</span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">ParserT st r ParseError a
+forall (st :: ZeroBitType) r. Parser st r a
+forall a (st :: ZeroBitType) r. Unpack a =&gt; Parser st r a
+</span><a href="M.Pack.Internal.Types.html#unpack"><span class="hs-identifier hs-var">unpack</span></a></span><span> </span><span class="annot"><span class="annottext">ParserT st r ParseError b
+forall (st :: ZeroBitType) r. Parser st r b
+forall a (st :: ZeroBitType) r. Unpack a =&gt; Parser st r a
+</span><a href="M.Pack.Internal.Types.html#unpack"><span class="hs-identifier hs-var">unpack</span></a></span><span> </span><span class="annot"><span class="annottext">ParserT st r ParseError c
+forall (st :: ZeroBitType) r. Parser st r c
+forall a (st :: ZeroBitType) r. Unpack a =&gt; Parser st r a
+</span><a href="M.Pack.Internal.Types.html#unpack"><span class="hs-identifier hs-var">unpack</span></a></span><span>
+</span><span id="line-202"></span><span>  </span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#unpack"><span class="hs-pragma hs-type">unpack</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-203"></span><span>
+</span><span id="line-204"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621680374556"><span id="local-6989586621680374557"><span id="local-6989586621680374558"><span id="local-6989586621680374559"><span class="hs-special">(</span><span class="annot"><a href="M.Pack.Internal.Types.html#Pack"><span class="hs-identifier hs-type">Pack</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680374556"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#Pack"><span class="hs-identifier hs-type">Pack</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680374557"><span class="hs-identifier hs-type">b</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#Pack"><span class="hs-identifier hs-type">Pack</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680374558"><span class="hs-identifier hs-type">c</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#Pack"><span class="hs-identifier hs-type">Pack</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680374559"><span class="hs-identifier hs-type">d</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#Pack"><span class="hs-identifier hs-type">Pack</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621680374556"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="#local-6989586621680374557"><span class="hs-identifier hs-type">b</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="#local-6989586621680374558"><span class="hs-identifier hs-type">c</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="#local-6989586621680374559"><span class="hs-identifier hs-type">d</span></a></span><span class="hs-special">)</span></span></span></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-205"></span><span>  </span><span id="local-6989586621680375080"><span class="annot"><span class="annottext">pack :: (a, b, c, d) -&gt; Builder
+</span><a href="M.Pack.Internal.Types.html#pack"><span class="hs-identifier hs-var hs-var hs-var">pack</span></a></span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621680375081"><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621680375081"><span class="hs-identifier hs-var">a</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680375082"><span class="annot"><span class="annottext">b
+</span><a href="#local-6989586621680375082"><span class="hs-identifier hs-var">b</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680375083"><span class="annot"><span class="annottext">c
+</span><a href="#local-6989586621680375083"><span class="hs-identifier hs-var">c</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680375084"><span class="annot"><span class="annottext">d
+</span><a href="#local-6989586621680375084"><span class="hs-identifier hs-var">d</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">a -&gt; Builder
+forall a. Pack a =&gt; a -&gt; Builder
+</span><a href="M.Pack.Internal.Types.html#pack"><span class="hs-identifier hs-var">pack</span></a></span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621680375081"><span class="hs-identifier hs-var">a</span></a></span><span> </span><span class="annot"><span class="annottext">Builder -&gt; Builder -&gt; Builder
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">&lt;&gt;</span></span><span> </span><span class="annot"><span class="annottext">b -&gt; Builder
+forall a. Pack a =&gt; a -&gt; Builder
+</span><a href="M.Pack.Internal.Types.html#pack"><span class="hs-identifier hs-var">pack</span></a></span><span> </span><span class="annot"><span class="annottext">b
+</span><a href="#local-6989586621680375082"><span class="hs-identifier hs-var">b</span></a></span><span> </span><span class="annot"><span class="annottext">Builder -&gt; Builder -&gt; Builder
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">&lt;&gt;</span></span><span> </span><span class="annot"><span class="annottext">c -&gt; Builder
+forall a. Pack a =&gt; a -&gt; Builder
+</span><a href="M.Pack.Internal.Types.html#pack"><span class="hs-identifier hs-var">pack</span></a></span><span> </span><span class="annot"><span class="annottext">c
+</span><a href="#local-6989586621680375083"><span class="hs-identifier hs-var">c</span></a></span><span> </span><span class="annot"><span class="annottext">Builder -&gt; Builder -&gt; Builder
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">&lt;&gt;</span></span><span> </span><span class="annot"><span class="annottext">d -&gt; Builder
+forall a. Pack a =&gt; a -&gt; Builder
+</span><a href="M.Pack.Internal.Types.html#pack"><span class="hs-identifier hs-var">pack</span></a></span><span> </span><span class="annot"><span class="annottext">d
+</span><a href="#local-6989586621680375084"><span class="hs-identifier hs-var">d</span></a></span><span>
+</span><span id="line-206"></span><span>  </span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#pack"><span class="hs-pragma hs-type">pack</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-207"></span><span>
+</span><span id="line-208"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621680374564"><span id="local-6989586621680374565"><span id="local-6989586621680374566"><span id="local-6989586621680374567"><span class="hs-special">(</span><span class="annot"><a href="M.Pack.Internal.Types.html#Unpack"><span class="hs-identifier hs-type">Unpack</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680374564"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#Unpack"><span class="hs-identifier hs-type">Unpack</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680374565"><span class="hs-identifier hs-type">b</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#Unpack"><span class="hs-identifier hs-type">Unpack</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680374566"><span class="hs-identifier hs-type">c</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#Unpack"><span class="hs-identifier hs-type">Unpack</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680374567"><span class="hs-identifier hs-type">d</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#Unpack"><span class="hs-identifier hs-type">Unpack</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621680374564"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="#local-6989586621680374565"><span class="hs-identifier hs-type">b</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="#local-6989586621680374566"><span class="hs-identifier hs-type">c</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="#local-6989586621680374567"><span class="hs-identifier hs-type">d</span></a></span><span class="hs-special">)</span></span></span></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-209"></span><span>  </span><span id="local-6989586621680375099"><span class="annot"><span class="annottext">unpack :: forall (st :: ZeroBitType) r. Parser st r (a, b, c, d)
+</span><a href="M.Pack.Internal.Types.html#unpack"><span class="hs-identifier hs-var hs-var hs-var">unpack</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-special">(</span><span class="hs-special">,</span><span class="hs-special">,</span><span class="hs-special">,</span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">(a -&gt; b -&gt; c -&gt; d -&gt; (a, b, c, d))
+-&gt; ParserT st r ParseError a
+-&gt; ParserT st r ParseError (b -&gt; c -&gt; d -&gt; (a, b, c, d))
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-operator hs-var">&lt;$&gt;</span></span><span> </span><span class="annot"><span class="annottext">ParserT st r ParseError a
+forall (st :: ZeroBitType) r. Parser st r a
+forall a (st :: ZeroBitType) r. Unpack a =&gt; Parser st r a
+</span><a href="M.Pack.Internal.Types.html#unpack"><span class="hs-identifier hs-var">unpack</span></a></span><span> </span><span class="annot"><span class="annottext">ParserT st r ParseError (b -&gt; c -&gt; d -&gt; (a, b, c, d))
+-&gt; ParserT st r ParseError b
+-&gt; ParserT st r ParseError (c -&gt; d -&gt; (a, b, c, d))
+forall a b.
+ParserT st r ParseError (a -&gt; b)
+-&gt; ParserT st r ParseError a -&gt; ParserT st r ParseError b
+forall (f :: * -&gt; *) a b. Applicative f =&gt; f (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-operator hs-var">&lt;*&gt;</span></span><span> </span><span class="annot"><span class="annottext">ParserT st r ParseError b
+forall (st :: ZeroBitType) r. Parser st r b
+forall a (st :: ZeroBitType) r. Unpack a =&gt; Parser st r a
+</span><a href="M.Pack.Internal.Types.html#unpack"><span class="hs-identifier hs-var">unpack</span></a></span><span> </span><span class="annot"><span class="annottext">ParserT st r ParseError (c -&gt; d -&gt; (a, b, c, d))
+-&gt; ParserT st r ParseError c
+-&gt; ParserT st r ParseError (d -&gt; (a, b, c, d))
+forall a b.
+ParserT st r ParseError (a -&gt; b)
+-&gt; ParserT st r ParseError a -&gt; ParserT st r ParseError b
+forall (f :: * -&gt; *) a b. Applicative f =&gt; f (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-operator hs-var">&lt;*&gt;</span></span><span> </span><span class="annot"><span class="annottext">ParserT st r ParseError c
+forall (st :: ZeroBitType) r. Parser st r c
+forall a (st :: ZeroBitType) r. Unpack a =&gt; Parser st r a
+</span><a href="M.Pack.Internal.Types.html#unpack"><span class="hs-identifier hs-var">unpack</span></a></span><span> </span><span class="annot"><span class="annottext">ParserT st r ParseError (d -&gt; (a, b, c, d))
+-&gt; ParserT st r ParseError d
+-&gt; ParserT st r ParseError (a, b, c, d)
+forall a b.
+ParserT st r ParseError (a -&gt; b)
+-&gt; ParserT st r ParseError a -&gt; ParserT st r ParseError b
+forall (f :: * -&gt; *) a b. Applicative f =&gt; f (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-operator hs-var">&lt;*&gt;</span></span><span> </span><span class="annot"><span class="annottext">ParserT st r ParseError d
+forall (st :: ZeroBitType) r. Parser st r d
+forall a (st :: ZeroBitType) r. Unpack a =&gt; Parser st r a
+</span><a href="M.Pack.Internal.Types.html#unpack"><span class="hs-identifier hs-var">unpack</span></a></span><span>
+</span><span id="line-210"></span><span>  </span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#unpack"><span class="hs-pragma hs-type">unpack</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-211"></span><span>
+</span><span id="line-212"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621680374578"><span id="local-6989586621680374579"><span id="local-6989586621680374580"><span id="local-6989586621680374581"><span id="local-6989586621680374582"><span class="hs-special">(</span><span class="annot"><a href="M.Pack.Internal.Types.html#Pack"><span class="hs-identifier hs-type">Pack</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680374578"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#Pack"><span class="hs-identifier hs-type">Pack</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680374579"><span class="hs-identifier hs-type">b</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#Pack"><span class="hs-identifier hs-type">Pack</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680374580"><span class="hs-identifier hs-type">c</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#Pack"><span class="hs-identifier hs-type">Pack</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680374581"><span class="hs-identifier hs-type">d</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#Pack"><span class="hs-identifier hs-type">Pack</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680374582"><span class="hs-identifier hs-type">e</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#Pack"><span class="hs-identifier hs-type">Pack</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621680374578"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="#local-6989586621680374579"><span class="hs-identifier hs-type">b</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="#local-6989586621680374580"><span class="hs-identifier hs-type">c</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="#local-6989586621680374581"><span class="hs-identifier hs-type">d</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="#local-6989586621680374582"><span class="hs-identifier hs-type">e</span></a></span><span class="hs-special">)</span></span></span></span></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-213"></span><span>  </span><span id="local-6989586621680375116"><span class="annot"><span class="annottext">pack :: (a, b, c, d, e) -&gt; Builder
+</span><a href="M.Pack.Internal.Types.html#pack"><span class="hs-identifier hs-var hs-var hs-var">pack</span></a></span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621680375117"><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621680375117"><span class="hs-identifier hs-var">a</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680375118"><span class="annot"><span class="annottext">b
+</span><a href="#local-6989586621680375118"><span class="hs-identifier hs-var">b</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680375119"><span class="annot"><span class="annottext">c
+</span><a href="#local-6989586621680375119"><span class="hs-identifier hs-var">c</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680375120"><span class="annot"><span class="annottext">d
+</span><a href="#local-6989586621680375120"><span class="hs-identifier hs-var">d</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680375121"><span class="annot"><span class="annottext">e
+</span><a href="#local-6989586621680375121"><span class="hs-identifier hs-var">e</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">a -&gt; Builder
+forall a. Pack a =&gt; a -&gt; Builder
+</span><a href="M.Pack.Internal.Types.html#pack"><span class="hs-identifier hs-var">pack</span></a></span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621680375117"><span class="hs-identifier hs-var">a</span></a></span><span> </span><span class="annot"><span class="annottext">Builder -&gt; Builder -&gt; Builder
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">&lt;&gt;</span></span><span> </span><span class="annot"><span class="annottext">b -&gt; Builder
+forall a. Pack a =&gt; a -&gt; Builder
+</span><a href="M.Pack.Internal.Types.html#pack"><span class="hs-identifier hs-var">pack</span></a></span><span> </span><span class="annot"><span class="annottext">b
+</span><a href="#local-6989586621680375118"><span class="hs-identifier hs-var">b</span></a></span><span> </span><span class="annot"><span class="annottext">Builder -&gt; Builder -&gt; Builder
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">&lt;&gt;</span></span><span> </span><span class="annot"><span class="annottext">c -&gt; Builder
+forall a. Pack a =&gt; a -&gt; Builder
+</span><a href="M.Pack.Internal.Types.html#pack"><span class="hs-identifier hs-var">pack</span></a></span><span> </span><span class="annot"><span class="annottext">c
+</span><a href="#local-6989586621680375119"><span class="hs-identifier hs-var">c</span></a></span><span> </span><span class="annot"><span class="annottext">Builder -&gt; Builder -&gt; Builder
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">&lt;&gt;</span></span><span> </span><span class="annot"><span class="annottext">d -&gt; Builder
+forall a. Pack a =&gt; a -&gt; Builder
+</span><a href="M.Pack.Internal.Types.html#pack"><span class="hs-identifier hs-var">pack</span></a></span><span> </span><span class="annot"><span class="annottext">d
+</span><a href="#local-6989586621680375120"><span class="hs-identifier hs-var">d</span></a></span><span> </span><span class="annot"><span class="annottext">Builder -&gt; Builder -&gt; Builder
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">&lt;&gt;</span></span><span> </span><span class="annot"><span class="annottext">e -&gt; Builder
+forall a. Pack a =&gt; a -&gt; Builder
+</span><a href="M.Pack.Internal.Types.html#pack"><span class="hs-identifier hs-var">pack</span></a></span><span> </span><span class="annot"><span class="annottext">e
+</span><a href="#local-6989586621680375121"><span class="hs-identifier hs-var">e</span></a></span><span>
+</span><span id="line-214"></span><span>  </span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#pack"><span class="hs-pragma hs-type">pack</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-215"></span><span>
+</span><span id="line-216"></span><span class="hs-keyword">instance</span><span>
+</span><span id="line-217"></span><span>  </span><span id="local-6989586621680374588"><span id="local-6989586621680374589"><span id="local-6989586621680374590"><span id="local-6989586621680374591"><span id="local-6989586621680374592"><span class="hs-special">(</span><span class="annot"><a href="M.Pack.Internal.Types.html#Unpack"><span class="hs-identifier hs-type">Unpack</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680374588"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#Unpack"><span class="hs-identifier hs-type">Unpack</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680374589"><span class="hs-identifier hs-type">b</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#Unpack"><span class="hs-identifier hs-type">Unpack</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680374590"><span class="hs-identifier hs-type">c</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#Unpack"><span class="hs-identifier hs-type">Unpack</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680374591"><span class="hs-identifier hs-type">d</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#Unpack"><span class="hs-identifier hs-type">Unpack</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680374592"><span class="hs-identifier hs-type">e</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=&gt;</span><span>
+</span><span id="line-218"></span><span>  </span><span class="annot"><a href="M.Pack.Internal.Types.html#Unpack"><span class="hs-identifier hs-type">Unpack</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621680374588"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="#local-6989586621680374589"><span class="hs-identifier hs-type">b</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="#local-6989586621680374590"><span class="hs-identifier hs-type">c</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="#local-6989586621680374591"><span class="hs-identifier hs-type">d</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="#local-6989586621680374592"><span class="hs-identifier hs-type">e</span></a></span><span class="hs-special">)</span></span></span></span></span></span><span>
+</span><span id="line-219"></span><span>  </span><span class="hs-keyword">where</span><span>
+</span><span id="line-220"></span><span>  </span><span id="local-6989586621680375139"><span class="annot"><span class="annottext">unpack :: forall (st :: ZeroBitType) r. Parser st r (a, b, c, d, e)
+</span><a href="M.Pack.Internal.Types.html#unpack"><span class="hs-identifier hs-var hs-var hs-var">unpack</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-special">(</span><span class="hs-special">,</span><span class="hs-special">,</span><span class="hs-special">,</span><span class="hs-special">,</span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">(a -&gt; b -&gt; c -&gt; d -&gt; e -&gt; (a, b, c, d, e))
+-&gt; ParserT st r ParseError a
+-&gt; ParserT st r ParseError (b -&gt; c -&gt; d -&gt; e -&gt; (a, b, c, d, e))
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-operator hs-var">&lt;$&gt;</span></span><span> </span><span class="annot"><span class="annottext">ParserT st r ParseError a
+forall (st :: ZeroBitType) r. Parser st r a
+forall a (st :: ZeroBitType) r. Unpack a =&gt; Parser st r a
+</span><a href="M.Pack.Internal.Types.html#unpack"><span class="hs-identifier hs-var">unpack</span></a></span><span> </span><span class="annot"><span class="annottext">ParserT st r ParseError (b -&gt; c -&gt; d -&gt; e -&gt; (a, b, c, d, e))
+-&gt; ParserT st r ParseError b
+-&gt; ParserT st r ParseError (c -&gt; d -&gt; e -&gt; (a, b, c, d, e))
+forall a b.
+ParserT st r ParseError (a -&gt; b)
+-&gt; ParserT st r ParseError a -&gt; ParserT st r ParseError b
+forall (f :: * -&gt; *) a b. Applicative f =&gt; f (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-operator hs-var">&lt;*&gt;</span></span><span> </span><span class="annot"><span class="annottext">ParserT st r ParseError b
+forall (st :: ZeroBitType) r. Parser st r b
+forall a (st :: ZeroBitType) r. Unpack a =&gt; Parser st r a
+</span><a href="M.Pack.Internal.Types.html#unpack"><span class="hs-identifier hs-var">unpack</span></a></span><span> </span><span class="annot"><span class="annottext">ParserT st r ParseError (c -&gt; d -&gt; e -&gt; (a, b, c, d, e))
+-&gt; ParserT st r ParseError c
+-&gt; ParserT st r ParseError (d -&gt; e -&gt; (a, b, c, d, e))
+forall a b.
+ParserT st r ParseError (a -&gt; b)
+-&gt; ParserT st r ParseError a -&gt; ParserT st r ParseError b
+forall (f :: * -&gt; *) a b. Applicative f =&gt; f (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-operator hs-var">&lt;*&gt;</span></span><span> </span><span class="annot"><span class="annottext">ParserT st r ParseError c
+forall (st :: ZeroBitType) r. Parser st r c
+forall a (st :: ZeroBitType) r. Unpack a =&gt; Parser st r a
+</span><a href="M.Pack.Internal.Types.html#unpack"><span class="hs-identifier hs-var">unpack</span></a></span><span> </span><span class="annot"><span class="annottext">ParserT st r ParseError (d -&gt; e -&gt; (a, b, c, d, e))
+-&gt; ParserT st r ParseError d
+-&gt; ParserT st r ParseError (e -&gt; (a, b, c, d, e))
+forall a b.
+ParserT st r ParseError (a -&gt; b)
+-&gt; ParserT st r ParseError a -&gt; ParserT st r ParseError b
+forall (f :: * -&gt; *) a b. Applicative f =&gt; f (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-operator hs-var">&lt;*&gt;</span></span><span> </span><span class="annot"><span class="annottext">ParserT st r ParseError d
+forall (st :: ZeroBitType) r. Parser st r d
+forall a (st :: ZeroBitType) r. Unpack a =&gt; Parser st r a
+</span><a href="M.Pack.Internal.Types.html#unpack"><span class="hs-identifier hs-var">unpack</span></a></span><span> </span><span class="annot"><span class="annottext">ParserT st r ParseError (e -&gt; (a, b, c, d, e))
+-&gt; ParserT st r ParseError e
+-&gt; ParserT st r ParseError (a, b, c, d, e)
+forall a b.
+ParserT st r ParseError (a -&gt; b)
+-&gt; ParserT st r ParseError a -&gt; ParserT st r ParseError b
+forall (f :: * -&gt; *) a b. Applicative f =&gt; f (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-operator hs-var">&lt;*&gt;</span></span><span> </span><span class="annot"><span class="annottext">ParserT st r ParseError e
+forall (st :: ZeroBitType) r. Parser st r e
+forall a (st :: ZeroBitType) r. Unpack a =&gt; Parser st r a
+</span><a href="M.Pack.Internal.Types.html#unpack"><span class="hs-identifier hs-var">unpack</span></a></span><span>
+</span><span id="line-221"></span><span>  </span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#unpack"><span class="hs-pragma hs-type">unpack</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-222"></span></pre></body></html>

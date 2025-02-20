@@ -1,0 +1,1045 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span id="local-6989586621680385574"><span id="local-6989586621680385575"><span id="local-6989586621680385576"><span id="local-6989586621680385577"></span></span></span></span><span class="hs-comment">-- |</span><span>
+</span><span id="line-2"></span><span class="hs-comment">-- Module: M.IO.Internal.Datagram</span><span>
+</span><span id="line-3"></span><span class="hs-comment">-- Description: Packet parsing and building internals</span><span>
+</span><span id="line-4"></span><span class="hs-comment">-- Copyright: (c) axionbuster, 2025</span><span>
+</span><span id="line-5"></span><span class="hs-comment">-- License: BSD-3-Clause</span><span>
+</span><span id="line-6"></span><span class="hs-comment">--</span><span>
+</span><span id="line-7"></span><span class="hs-comment">-- Internal module for handling low-level packet parsing and building,</span><span>
+</span><span id="line-8"></span><span class="hs-comment">-- including uninterpreted packets and stream transformations.</span><span>
+</span><span id="line-9"></span><span class="hs-keyword">module</span><span> </span><span class="annot"><a href="M.IO.Internal.Datagram.html"><span class="hs-identifier">M.IO.Internal.Datagram</span></a></span><span>
+</span><span id="line-10"></span><span>  </span><span class="hs-special">(</span><span> </span><span class="annot"><span class="hs-comment">-- * Types</span></span><span>
+</span><span id="line-11"></span><span>    </span><span class="annot"><a href="M.IO.Internal.Datagram.html#Uninterpreted"><span class="hs-identifier">Uninterpreted</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span>
+</span><span id="line-12"></span><span>    </span><span class="annot"><a href="M.IO.Internal.Datagram.html#EOF"><span class="hs-identifier">EOF</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span>
+</span><span id="line-13"></span><span>
+</span><span id="line-14"></span><span>    </span><span class="annot"><span class="hs-comment">-- * Streams</span></span><span>
+</span><span id="line-15"></span><span>    </span><span class="annot"><a href="M.IO.Internal.Datagram.html#makepacketstreami"><span class="hs-identifier">makepacketstreami</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-16"></span><span>    </span><span class="annot"><a href="M.IO.Internal.Datagram.html#makepacketstreamo"><span class="hs-identifier">makepacketstreamo</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-17"></span><span>    </span><span class="annot"><a href="M.IO.Internal.Datagram.html#makedecrypting"><span class="hs-identifier">makedecrypting</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-18"></span><span>    </span><span class="annot"><a href="M.IO.Internal.Datagram.html#makeencrypting"><span class="hs-identifier">makeencrypting</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-19"></span><span>  </span><span class="hs-special">)</span><span>
+</span><span id="line-20"></span><span class="hs-keyword">where</span><span>
+</span><span id="line-21"></span><span>
+</span><span id="line-22"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Codec.Compression.Zlib</span></span><span>
+</span><span id="line-23"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Control.Concurrent.STM</span></span><span>
+</span><span id="line-24"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Control.DeepSeq</span></span><span>
+</span><span id="line-25"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Control.Exception</span></span><span> </span><span class="hs-keyword">hiding</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">throw</span></span><span class="hs-special">)</span><span>
+</span><span id="line-26"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Control.Monad.IO.Class</span></span><span>
+</span><span id="line-27"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.ByteString</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">ByteString</span></span><span class="hs-special">)</span><span>
+</span><span id="line-28"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.ByteString</span></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">B</span></span><span>
+</span><span id="line-29"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.ByteString.Builder</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">Builder</span></span><span class="hs-special">)</span><span>
+</span><span id="line-30"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.ByteString.Builder</span></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">BB</span></span><span>
+</span><span id="line-31"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.ByteString.Lazy</span></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">BL</span></span><span>
+</span><span id="line-32"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Data</span></span><span>
+</span><span id="line-33"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Hashable</span></span><span>
+</span><span id="line-34"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Maybe</span></span><span>
+</span><span id="line-35"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Word</span></span><span>
+</span><span id="line-36"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">FlatParse.Stateful</span></span><span>
+</span><span id="line-37"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">GHC.Generics</span></span><span>
+</span><span id="line-38"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Language.Haskell.TH.Syntax</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">Lift</span></span><span class="hs-special">)</span><span>
+</span><span id="line-39"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="M.IO.Internal.Read.html"><span class="hs-identifier">M.IO.Internal.Read</span></a></span><span>
+</span><span id="line-40"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="M.IO.Internal.Zlib.html"><span class="hs-identifier">M.IO.Internal.Zlib</span></a></span><span>
+</span><span id="line-41"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="M.Pack.html"><span class="hs-identifier">M.Pack</span></a></span><span> </span><span class="hs-keyword">hiding</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="M.Pack.Internal.Types.html#Parser"><span class="hs-identifier">Parser</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-42"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">System.IO.Streams</span></span><span>
+</span><span id="line-43"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">System.Timeout</span></span><span>
+</span><span id="line-44"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Text.Printf</span></span><span>
+</span><span id="line-45"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Prelude</span></span><span> </span><span class="hs-keyword">hiding</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">read</span></span><span class="hs-special">)</span><span>
+</span><span id="line-46"></span><span>
+</span><span id="line-47"></span><span class="annot"><span class="hs-comment">-- | uninterpreted packet</span></span><span>
+</span><span id="line-48"></span><span class="hs-keyword">data</span><span> </span><span id="Uninterpreted"><span class="annot"><a href="M.IO.Internal.Datagram.html#Uninterpreted"><span class="hs-identifier hs-var">Uninterpreted</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="Uninterpreted"><span class="annot"><a href="M.IO.Internal.Datagram.html#Uninterpreted"><span class="hs-identifier hs-var">Uninterpreted</span></a></span></span><span>
+</span><span id="line-49"></span><span>  </span><span class="hs-special">{</span><span> </span><span id="pkcode"><span class="annot"><span class="annottext">Uninterpreted -&gt; Word8
+</span><a href="M.IO.Internal.Datagram.html#pkcode"><span class="hs-identifier hs-var hs-var">pkcode</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-glyph">!</span><span class="annot"><span class="hs-identifier hs-type">Word8</span></span><span class="hs-special">,</span><span>
+</span><span id="line-50"></span><span>    </span><span id="pkdata"><span class="annot"><span class="annottext">Uninterpreted -&gt; ByteString
+</span><a href="M.IO.Internal.Datagram.html#pkdata"><span class="hs-identifier hs-var hs-var">pkdata</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-glyph">!</span><span class="annot"><span class="hs-identifier hs-type">ByteString</span></span><span>
+</span><span id="line-51"></span><span>  </span><span class="hs-special">}</span><span>
+</span><span id="line-52"></span><span>  </span><span class="hs-keyword">deriving</span><span> </span><span class="hs-special">(</span><span id="local-6989586621680385637"><span id="local-6989586621680385643"><span class="annot"><span class="annottext">Uninterpreted -&gt; Uninterpreted -&gt; Bool
+(Uninterpreted -&gt; Uninterpreted -&gt; Bool)
+-&gt; (Uninterpreted -&gt; Uninterpreted -&gt; Bool) -&gt; Eq Uninterpreted
+forall a. (a -&gt; a -&gt; Bool) -&gt; (a -&gt; a -&gt; Bool) -&gt; Eq a
+$c== :: Uninterpreted -&gt; Uninterpreted -&gt; Bool
+== :: Uninterpreted -&gt; Uninterpreted -&gt; Bool
+$c/= :: Uninterpreted -&gt; Uninterpreted -&gt; Bool
+/= :: Uninterpreted -&gt; Uninterpreted -&gt; Bool
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Eq</span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680385650"><span id="local-6989586621680385656"><span id="local-6989586621680385660"><span id="local-6989586621680385664"><span id="local-6989586621680385667"><span id="local-6989586621680385670"><span id="local-6989586621680385673"><span class="annot"><span class="annottext">Eq Uninterpreted
+Eq Uninterpreted =&gt;
+(Uninterpreted -&gt; Uninterpreted -&gt; Ordering)
+-&gt; (Uninterpreted -&gt; Uninterpreted -&gt; Bool)
+-&gt; (Uninterpreted -&gt; Uninterpreted -&gt; Bool)
+-&gt; (Uninterpreted -&gt; Uninterpreted -&gt; Bool)
+-&gt; (Uninterpreted -&gt; Uninterpreted -&gt; Bool)
+-&gt; (Uninterpreted -&gt; Uninterpreted -&gt; Uninterpreted)
+-&gt; (Uninterpreted -&gt; Uninterpreted -&gt; Uninterpreted)
+-&gt; Ord Uninterpreted
+Uninterpreted -&gt; Uninterpreted -&gt; Bool
+Uninterpreted -&gt; Uninterpreted -&gt; Ordering
+Uninterpreted -&gt; Uninterpreted -&gt; Uninterpreted
+forall a.
+Eq a =&gt;
+(a -&gt; a -&gt; Ordering)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; Ord a
+$ccompare :: Uninterpreted -&gt; Uninterpreted -&gt; Ordering
+compare :: Uninterpreted -&gt; Uninterpreted -&gt; Ordering
+$c&lt; :: Uninterpreted -&gt; Uninterpreted -&gt; Bool
+&lt; :: Uninterpreted -&gt; Uninterpreted -&gt; Bool
+$c&lt;= :: Uninterpreted -&gt; Uninterpreted -&gt; Bool
+&lt;= :: Uninterpreted -&gt; Uninterpreted -&gt; Bool
+$c&gt; :: Uninterpreted -&gt; Uninterpreted -&gt; Bool
+&gt; :: Uninterpreted -&gt; Uninterpreted -&gt; Bool
+$c&gt;= :: Uninterpreted -&gt; Uninterpreted -&gt; Bool
+&gt;= :: Uninterpreted -&gt; Uninterpreted -&gt; Bool
+$cmax :: Uninterpreted -&gt; Uninterpreted -&gt; Uninterpreted
+max :: Uninterpreted -&gt; Uninterpreted -&gt; Uninterpreted
+$cmin :: Uninterpreted -&gt; Uninterpreted -&gt; Uninterpreted
+min :: Uninterpreted -&gt; Uninterpreted -&gt; Uninterpreted
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Ord</span></span></span></span></span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680385683"><span id="local-6989586621680385691"><span class="annot"><span class="annottext">Eq Uninterpreted
+Eq Uninterpreted =&gt;
+(Int -&gt; Uninterpreted -&gt; Int)
+-&gt; (Uninterpreted -&gt; Int) -&gt; Hashable Uninterpreted
+Int -&gt; Uninterpreted -&gt; Int
+Uninterpreted -&gt; Int
+forall a. Eq a =&gt; (Int -&gt; a -&gt; Int) -&gt; (a -&gt; Int) -&gt; Hashable a
+$chashWithSalt :: Int -&gt; Uninterpreted -&gt; Int
+hashWithSalt :: Int -&gt; Uninterpreted -&gt; Int
+$chash :: Uninterpreted -&gt; Int
+hash :: Uninterpreted -&gt; Int
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Hashable</span></span></span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Typeable</span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680385708"><span id="local-6989586621680385710"><span class="annot"><span class="annottext">(forall x. Uninterpreted -&gt; Rep Uninterpreted x)
+-&gt; (forall x. Rep Uninterpreted x -&gt; Uninterpreted)
+-&gt; Generic Uninterpreted
+forall x. Rep Uninterpreted x -&gt; Uninterpreted
+forall x. Uninterpreted -&gt; Rep Uninterpreted x
+forall a.
+(forall x. a -&gt; Rep a x) -&gt; (forall x. Rep a x -&gt; a) -&gt; Generic a
+$cfrom :: forall x. Uninterpreted -&gt; Rep Uninterpreted x
+from :: forall x. Uninterpreted -&gt; Rep Uninterpreted x
+$cto :: forall x. Rep Uninterpreted x -&gt; Uninterpreted
+to :: forall x. Rep Uninterpreted x -&gt; Uninterpreted
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Generic</span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680385717"><span id="local-6989586621680385723"><span id="local-6989586621680385727"><span id="local-6989586621680385729"><span id="local-6989586621680385731"><span id="local-6989586621680385737"><span id="local-6989586621680385742"><span id="local-6989586621680385745"><span id="local-6989586621680385748"><span id="local-6989586621680385751"><span id="local-6989586621680385754"><span id="local-6989586621680385757"><span id="local-6989586621680385762"><span id="local-6989586621680385767"><span class="annot"><span class="annottext">Typeable Uninterpreted
+Typeable Uninterpreted =&gt;
+(forall (c :: * -&gt; *).
+ (forall d b. Data d =&gt; c (d -&gt; b) -&gt; d -&gt; c b)
+ -&gt; (forall g. g -&gt; c g) -&gt; Uninterpreted -&gt; c Uninterpreted)
+-&gt; (forall (c :: * -&gt; *).
+    (forall b r. Data b =&gt; c (b -&gt; r) -&gt; c r)
+    -&gt; (forall r. r -&gt; c r) -&gt; Constr -&gt; c Uninterpreted)
+-&gt; (Uninterpreted -&gt; Constr)
+-&gt; (Uninterpreted -&gt; DataType)
+-&gt; (forall (t :: * -&gt; *) (c :: * -&gt; *).
+    Typeable t =&gt;
+    (forall d. Data d =&gt; c (t d)) -&gt; Maybe (c Uninterpreted))
+-&gt; (forall (t :: * -&gt; * -&gt; *) (c :: * -&gt; *).
+    Typeable t =&gt;
+    (forall d e. (Data d, Data e) =&gt; c (t d e))
+    -&gt; Maybe (c Uninterpreted))
+-&gt; ((forall b. Data b =&gt; b -&gt; b) -&gt; Uninterpreted -&gt; Uninterpreted)
+-&gt; (forall r r'.
+    (r -&gt; r' -&gt; r)
+    -&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; Uninterpreted -&gt; r)
+-&gt; (forall r r'.
+    (r' -&gt; r -&gt; r)
+    -&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; Uninterpreted -&gt; r)
+-&gt; (forall u. (forall d. Data d =&gt; d -&gt; u) -&gt; Uninterpreted -&gt; [u])
+-&gt; (forall u.
+    Int -&gt; (forall d. Data d =&gt; d -&gt; u) -&gt; Uninterpreted -&gt; u)
+-&gt; (forall (m :: * -&gt; *).
+    Monad m =&gt;
+    (forall d. Data d =&gt; d -&gt; m d) -&gt; Uninterpreted -&gt; m Uninterpreted)
+-&gt; (forall (m :: * -&gt; *).
+    MonadPlus m =&gt;
+    (forall d. Data d =&gt; d -&gt; m d) -&gt; Uninterpreted -&gt; m Uninterpreted)
+-&gt; (forall (m :: * -&gt; *).
+    MonadPlus m =&gt;
+    (forall d. Data d =&gt; d -&gt; m d) -&gt; Uninterpreted -&gt; m Uninterpreted)
+-&gt; Data Uninterpreted
+Uninterpreted -&gt; Constr
+Uninterpreted -&gt; DataType
+(forall b. Data b =&gt; b -&gt; b) -&gt; Uninterpreted -&gt; Uninterpreted
+forall a.
+Typeable a =&gt;
+(forall (c :: * -&gt; *).
+ (forall d b. Data d =&gt; c (d -&gt; b) -&gt; d -&gt; c b)
+ -&gt; (forall g. g -&gt; c g) -&gt; a -&gt; c a)
+-&gt; (forall (c :: * -&gt; *).
+    (forall b r. Data b =&gt; c (b -&gt; r) -&gt; c r)
+    -&gt; (forall r. r -&gt; c r) -&gt; Constr -&gt; c a)
+-&gt; (a -&gt; Constr)
+-&gt; (a -&gt; DataType)
+-&gt; (forall (t :: * -&gt; *) (c :: * -&gt; *).
+    Typeable t =&gt;
+    (forall d. Data d =&gt; c (t d)) -&gt; Maybe (c a))
+-&gt; (forall (t :: * -&gt; * -&gt; *) (c :: * -&gt; *).
+    Typeable t =&gt;
+    (forall d e. (Data d, Data e) =&gt; c (t d e)) -&gt; Maybe (c a))
+-&gt; ((forall b. Data b =&gt; b -&gt; b) -&gt; a -&gt; a)
+-&gt; (forall r r'.
+    (r -&gt; r' -&gt; r) -&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; a -&gt; r)
+-&gt; (forall r r'.
+    (r' -&gt; r -&gt; r) -&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; a -&gt; r)
+-&gt; (forall u. (forall d. Data d =&gt; d -&gt; u) -&gt; a -&gt; [u])
+-&gt; (forall u. Int -&gt; (forall d. Data d =&gt; d -&gt; u) -&gt; a -&gt; u)
+-&gt; (forall (m :: * -&gt; *).
+    Monad m =&gt;
+    (forall d. Data d =&gt; d -&gt; m d) -&gt; a -&gt; m a)
+-&gt; (forall (m :: * -&gt; *).
+    MonadPlus m =&gt;
+    (forall d. Data d =&gt; d -&gt; m d) -&gt; a -&gt; m a)
+-&gt; (forall (m :: * -&gt; *).
+    MonadPlus m =&gt;
+    (forall d. Data d =&gt; d -&gt; m d) -&gt; a -&gt; m a)
+-&gt; Data a
+forall u. Int -&gt; (forall d. Data d =&gt; d -&gt; u) -&gt; Uninterpreted -&gt; u
+forall u. (forall d. Data d =&gt; d -&gt; u) -&gt; Uninterpreted -&gt; [u]
+forall r r'.
+(r -&gt; r' -&gt; r)
+-&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; Uninterpreted -&gt; r
+forall r r'.
+(r' -&gt; r -&gt; r)
+-&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; Uninterpreted -&gt; r
+forall (m :: * -&gt; *).
+Monad m =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; Uninterpreted -&gt; m Uninterpreted
+forall (m :: * -&gt; *).
+MonadPlus m =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; Uninterpreted -&gt; m Uninterpreted
+forall (c :: * -&gt; *).
+(forall b r. Data b =&gt; c (b -&gt; r) -&gt; c r)
+-&gt; (forall r. r -&gt; c r) -&gt; Constr -&gt; c Uninterpreted
+forall (c :: * -&gt; *).
+(forall d b. Data d =&gt; c (d -&gt; b) -&gt; d -&gt; c b)
+-&gt; (forall g. g -&gt; c g) -&gt; Uninterpreted -&gt; c Uninterpreted
+forall (t :: * -&gt; *) (c :: * -&gt; *).
+Typeable t =&gt;
+(forall d. Data d =&gt; c (t d)) -&gt; Maybe (c Uninterpreted)
+forall (t :: * -&gt; * -&gt; *) (c :: * -&gt; *).
+Typeable t =&gt;
+(forall d e. (Data d, Data e) =&gt; c (t d e))
+-&gt; Maybe (c Uninterpreted)
+$cgfoldl :: forall (c :: * -&gt; *).
+(forall d b. Data d =&gt; c (d -&gt; b) -&gt; d -&gt; c b)
+-&gt; (forall g. g -&gt; c g) -&gt; Uninterpreted -&gt; c Uninterpreted
+gfoldl :: forall (c :: * -&gt; *).
+(forall d b. Data d =&gt; c (d -&gt; b) -&gt; d -&gt; c b)
+-&gt; (forall g. g -&gt; c g) -&gt; Uninterpreted -&gt; c Uninterpreted
+$cgunfold :: forall (c :: * -&gt; *).
+(forall b r. Data b =&gt; c (b -&gt; r) -&gt; c r)
+-&gt; (forall r. r -&gt; c r) -&gt; Constr -&gt; c Uninterpreted
+gunfold :: forall (c :: * -&gt; *).
+(forall b r. Data b =&gt; c (b -&gt; r) -&gt; c r)
+-&gt; (forall r. r -&gt; c r) -&gt; Constr -&gt; c Uninterpreted
+$ctoConstr :: Uninterpreted -&gt; Constr
+toConstr :: Uninterpreted -&gt; Constr
+$cdataTypeOf :: Uninterpreted -&gt; DataType
+dataTypeOf :: Uninterpreted -&gt; DataType
+$cdataCast1 :: forall (t :: * -&gt; *) (c :: * -&gt; *).
+Typeable t =&gt;
+(forall d. Data d =&gt; c (t d)) -&gt; Maybe (c Uninterpreted)
+dataCast1 :: forall (t :: * -&gt; *) (c :: * -&gt; *).
+Typeable t =&gt;
+(forall d. Data d =&gt; c (t d)) -&gt; Maybe (c Uninterpreted)
+$cdataCast2 :: forall (t :: * -&gt; * -&gt; *) (c :: * -&gt; *).
+Typeable t =&gt;
+(forall d e. (Data d, Data e) =&gt; c (t d e))
+-&gt; Maybe (c Uninterpreted)
+dataCast2 :: forall (t :: * -&gt; * -&gt; *) (c :: * -&gt; *).
+Typeable t =&gt;
+(forall d e. (Data d, Data e) =&gt; c (t d e))
+-&gt; Maybe (c Uninterpreted)
+$cgmapT :: (forall b. Data b =&gt; b -&gt; b) -&gt; Uninterpreted -&gt; Uninterpreted
+gmapT :: (forall b. Data b =&gt; b -&gt; b) -&gt; Uninterpreted -&gt; Uninterpreted
+$cgmapQl :: forall r r'.
+(r -&gt; r' -&gt; r)
+-&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; Uninterpreted -&gt; r
+gmapQl :: forall r r'.
+(r -&gt; r' -&gt; r)
+-&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; Uninterpreted -&gt; r
+$cgmapQr :: forall r r'.
+(r' -&gt; r -&gt; r)
+-&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; Uninterpreted -&gt; r
+gmapQr :: forall r r'.
+(r' -&gt; r -&gt; r)
+-&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; Uninterpreted -&gt; r
+$cgmapQ :: forall u. (forall d. Data d =&gt; d -&gt; u) -&gt; Uninterpreted -&gt; [u]
+gmapQ :: forall u. (forall d. Data d =&gt; d -&gt; u) -&gt; Uninterpreted -&gt; [u]
+$cgmapQi :: forall u. Int -&gt; (forall d. Data d =&gt; d -&gt; u) -&gt; Uninterpreted -&gt; u
+gmapQi :: forall u. Int -&gt; (forall d. Data d =&gt; d -&gt; u) -&gt; Uninterpreted -&gt; u
+$cgmapM :: forall (m :: * -&gt; *).
+Monad m =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; Uninterpreted -&gt; m Uninterpreted
+gmapM :: forall (m :: * -&gt; *).
+Monad m =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; Uninterpreted -&gt; m Uninterpreted
+$cgmapMp :: forall (m :: * -&gt; *).
+MonadPlus m =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; Uninterpreted -&gt; m Uninterpreted
+gmapMp :: forall (m :: * -&gt; *).
+MonadPlus m =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; Uninterpreted -&gt; m Uninterpreted
+$cgmapMo :: forall (m :: * -&gt; *).
+MonadPlus m =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; Uninterpreted -&gt; m Uninterpreted
+gmapMo :: forall (m :: * -&gt; *).
+MonadPlus m =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; Uninterpreted -&gt; m Uninterpreted
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Data</span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680385777"><span id="local-6989586621680385787"><span class="annot"><span class="annottext">(forall (m :: * -&gt; *). Quote m =&gt; Uninterpreted -&gt; m Exp)
+-&gt; (forall (m :: * -&gt; *).
+    Quote m =&gt;
+    Uninterpreted -&gt; Code m Uninterpreted)
+-&gt; Lift Uninterpreted
+forall t.
+(forall (m :: * -&gt; *). Quote m =&gt; t -&gt; m Exp)
+-&gt; (forall (m :: * -&gt; *). Quote m =&gt; t -&gt; Code m t) -&gt; Lift t
+forall (m :: * -&gt; *). Quote m =&gt; Uninterpreted -&gt; m Exp
+forall (m :: * -&gt; *).
+Quote m =&gt;
+Uninterpreted -&gt; Code m Uninterpreted
+$clift :: forall (m :: * -&gt; *). Quote m =&gt; Uninterpreted -&gt; m Exp
+lift :: forall (m :: * -&gt; *). Quote m =&gt; Uninterpreted -&gt; m Exp
+$cliftTyped :: forall (m :: * -&gt; *).
+Quote m =&gt;
+Uninterpreted -&gt; Code m Uninterpreted
+liftTyped :: forall (m :: * -&gt; *).
+Quote m =&gt;
+Uninterpreted -&gt; Code m Uninterpreted
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Lift</span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680385797"><span class="annot"><span class="annottext">Uninterpreted -&gt; ()
+(Uninterpreted -&gt; ()) -&gt; NFData Uninterpreted
+forall a. (a -&gt; ()) -&gt; NFData a
+$crnf :: Uninterpreted -&gt; ()
+rnf :: Uninterpreted -&gt; ()
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var">NFData</span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-53"></span><span>
+</span><span id="line-54"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621680385818"><span id="local-6989586621680385823"><span class="annot"><span class="hs-identifier hs-type">Show</span></span><span> </span><span class="annot"><a href="M.IO.Internal.Datagram.html#Uninterpreted"><span class="hs-identifier hs-type">Uninterpreted</span></a></span></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-55"></span><span>  </span><span id="local-6989586621680385837"><span class="annot"><span class="annottext">show :: Uninterpreted -&gt; String
+</span><a href="#local-6989586621680385837"><span class="hs-identifier hs-var hs-var hs-var">show</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="M.IO.Internal.Datagram.html#Uninterpreted"><span class="hs-identifier hs-type">Uninterpreted</span></a></span><span> </span><span id="local-6989586621680385839"><span class="annot"><span class="annottext">Word8
+</span><a href="#local-6989586621680385839"><span class="hs-identifier hs-var">c</span></a></span></span><span> </span><span id="local-6989586621680385840"><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621680385840"><span class="hs-identifier hs-var">d</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">String -&gt; Word8 -&gt; Int -&gt; String
+forall r. PrintfType r =&gt; String -&gt; r
+</span><span class="hs-identifier hs-var">printf</span></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;Uninterpreted %d &lt;%d bytes&gt;&quot;</span></span><span> </span><span class="annot"><span class="annottext">Word8
+</span><a href="#local-6989586621680385839"><span class="hs-identifier hs-var">c</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">ByteString -&gt; Int
+</span><span class="hs-identifier hs-var">B.length</span></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621680385840"><span class="hs-identifier hs-var">d</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-56"></span><span>
+</span><span id="line-57"></span><span class="annot"><span class="hs-comment">-- | end of input</span></span><span>
+</span><span id="line-58"></span><span class="hs-keyword">data</span><span> </span><span id="EOF"><span class="annot"><a href="M.IO.Internal.Datagram.html#EOF"><span class="hs-identifier hs-var">EOF</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="EOF"><span class="annot"><a href="M.IO.Internal.Datagram.html#EOF"><span class="hs-identifier hs-var">EOF</span></a></span></span><span> </span><span class="hs-keyword">deriving</span><span> </span><span class="hs-special">(</span><span id="local-6989586621680385845"><span id="local-6989586621680385847"><span id="local-6989586621680385851"><span class="annot"><span class="annottext">Int -&gt; EOF -&gt; String -&gt; String
+[EOF] -&gt; String -&gt; String
+EOF -&gt; String
+(Int -&gt; EOF -&gt; String -&gt; String)
+-&gt; (EOF -&gt; String) -&gt; ([EOF] -&gt; String -&gt; String) -&gt; Show EOF
+forall a.
+(Int -&gt; a -&gt; String -&gt; String)
+-&gt; (a -&gt; String) -&gt; ([a] -&gt; String -&gt; String) -&gt; Show a
+$cshowsPrec :: Int -&gt; EOF -&gt; String -&gt; String
+showsPrec :: Int -&gt; EOF -&gt; String -&gt; String
+$cshow :: EOF -&gt; String
+show :: EOF -&gt; String
+$cshowList :: [EOF] -&gt; String -&gt; String
+showList :: [EOF] -&gt; String -&gt; String
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Show</span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680385855"><span id="local-6989586621680385859"><span id="local-6989586621680385862"><span id="local-6989586621680385867"><span class="annot"><span class="annottext">ReadPrec [EOF]
+ReadPrec EOF
+Int -&gt; ReadS EOF
+ReadS [EOF]
+(Int -&gt; ReadS EOF)
+-&gt; ReadS [EOF] -&gt; ReadPrec EOF -&gt; ReadPrec [EOF] -&gt; Read EOF
+forall a.
+(Int -&gt; ReadS a)
+-&gt; ReadS [a] -&gt; ReadPrec a -&gt; ReadPrec [a] -&gt; Read a
+$creadsPrec :: Int -&gt; ReadS EOF
+readsPrec :: Int -&gt; ReadS EOF
+$creadList :: ReadS [EOF]
+readList :: ReadS [EOF]
+$creadPrec :: ReadPrec EOF
+readPrec :: ReadPrec EOF
+$creadListPrec :: ReadPrec [EOF]
+readListPrec :: ReadPrec [EOF]
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Read</span></span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680385874"><span id="local-6989586621680385876"><span class="annot"><span class="annottext">(forall x. EOF -&gt; Rep EOF x)
+-&gt; (forall x. Rep EOF x -&gt; EOF) -&gt; Generic EOF
+forall x. Rep EOF x -&gt; EOF
+forall x. EOF -&gt; Rep EOF x
+forall a.
+(forall x. a -&gt; Rep a x) -&gt; (forall x. Rep a x -&gt; a) -&gt; Generic a
+$cfrom :: forall x. EOF -&gt; Rep EOF x
+from :: forall x. EOF -&gt; Rep EOF x
+$cto :: forall x. Rep EOF x -&gt; EOF
+to :: forall x. Rep EOF x -&gt; EOF
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Generic</span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680385881"><span id="local-6989586621680385883"><span id="local-6989586621680385885"><span id="local-6989586621680385887"><span id="local-6989586621680385889"><span id="local-6989586621680385895"><span id="local-6989586621680385900"><span id="local-6989586621680385903"><span id="local-6989586621680385906"><span id="local-6989586621680385909"><span id="local-6989586621680385912"><span id="local-6989586621680385915"><span id="local-6989586621680385920"><span id="local-6989586621680385925"><span class="annot"><span class="annottext">Typeable EOF
+Typeable EOF =&gt;
+(forall (c :: * -&gt; *).
+ (forall d b. Data d =&gt; c (d -&gt; b) -&gt; d -&gt; c b)
+ -&gt; (forall g. g -&gt; c g) -&gt; EOF -&gt; c EOF)
+-&gt; (forall (c :: * -&gt; *).
+    (forall b r. Data b =&gt; c (b -&gt; r) -&gt; c r)
+    -&gt; (forall r. r -&gt; c r) -&gt; Constr -&gt; c EOF)
+-&gt; (EOF -&gt; Constr)
+-&gt; (EOF -&gt; DataType)
+-&gt; (forall (t :: * -&gt; *) (c :: * -&gt; *).
+    Typeable t =&gt;
+    (forall d. Data d =&gt; c (t d)) -&gt; Maybe (c EOF))
+-&gt; (forall (t :: * -&gt; * -&gt; *) (c :: * -&gt; *).
+    Typeable t =&gt;
+    (forall d e. (Data d, Data e) =&gt; c (t d e)) -&gt; Maybe (c EOF))
+-&gt; ((forall b. Data b =&gt; b -&gt; b) -&gt; EOF -&gt; EOF)
+-&gt; (forall r r'.
+    (r -&gt; r' -&gt; r) -&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; EOF -&gt; r)
+-&gt; (forall r r'.
+    (r' -&gt; r -&gt; r) -&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; EOF -&gt; r)
+-&gt; (forall u. (forall d. Data d =&gt; d -&gt; u) -&gt; EOF -&gt; [u])
+-&gt; (forall u. Int -&gt; (forall d. Data d =&gt; d -&gt; u) -&gt; EOF -&gt; u)
+-&gt; (forall (m :: * -&gt; *).
+    Monad m =&gt;
+    (forall d. Data d =&gt; d -&gt; m d) -&gt; EOF -&gt; m EOF)
+-&gt; (forall (m :: * -&gt; *).
+    MonadPlus m =&gt;
+    (forall d. Data d =&gt; d -&gt; m d) -&gt; EOF -&gt; m EOF)
+-&gt; (forall (m :: * -&gt; *).
+    MonadPlus m =&gt;
+    (forall d. Data d =&gt; d -&gt; m d) -&gt; EOF -&gt; m EOF)
+-&gt; Data EOF
+EOF -&gt; Constr
+EOF -&gt; DataType
+(forall b. Data b =&gt; b -&gt; b) -&gt; EOF -&gt; EOF
+forall a.
+Typeable a =&gt;
+(forall (c :: * -&gt; *).
+ (forall d b. Data d =&gt; c (d -&gt; b) -&gt; d -&gt; c b)
+ -&gt; (forall g. g -&gt; c g) -&gt; a -&gt; c a)
+-&gt; (forall (c :: * -&gt; *).
+    (forall b r. Data b =&gt; c (b -&gt; r) -&gt; c r)
+    -&gt; (forall r. r -&gt; c r) -&gt; Constr -&gt; c a)
+-&gt; (a -&gt; Constr)
+-&gt; (a -&gt; DataType)
+-&gt; (forall (t :: * -&gt; *) (c :: * -&gt; *).
+    Typeable t =&gt;
+    (forall d. Data d =&gt; c (t d)) -&gt; Maybe (c a))
+-&gt; (forall (t :: * -&gt; * -&gt; *) (c :: * -&gt; *).
+    Typeable t =&gt;
+    (forall d e. (Data d, Data e) =&gt; c (t d e)) -&gt; Maybe (c a))
+-&gt; ((forall b. Data b =&gt; b -&gt; b) -&gt; a -&gt; a)
+-&gt; (forall r r'.
+    (r -&gt; r' -&gt; r) -&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; a -&gt; r)
+-&gt; (forall r r'.
+    (r' -&gt; r -&gt; r) -&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; a -&gt; r)
+-&gt; (forall u. (forall d. Data d =&gt; d -&gt; u) -&gt; a -&gt; [u])
+-&gt; (forall u. Int -&gt; (forall d. Data d =&gt; d -&gt; u) -&gt; a -&gt; u)
+-&gt; (forall (m :: * -&gt; *).
+    Monad m =&gt;
+    (forall d. Data d =&gt; d -&gt; m d) -&gt; a -&gt; m a)
+-&gt; (forall (m :: * -&gt; *).
+    MonadPlus m =&gt;
+    (forall d. Data d =&gt; d -&gt; m d) -&gt; a -&gt; m a)
+-&gt; (forall (m :: * -&gt; *).
+    MonadPlus m =&gt;
+    (forall d. Data d =&gt; d -&gt; m d) -&gt; a -&gt; m a)
+-&gt; Data a
+forall u. Int -&gt; (forall d. Data d =&gt; d -&gt; u) -&gt; EOF -&gt; u
+forall u. (forall d. Data d =&gt; d -&gt; u) -&gt; EOF -&gt; [u]
+forall r r'.
+(r -&gt; r' -&gt; r) -&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; EOF -&gt; r
+forall r r'.
+(r' -&gt; r -&gt; r) -&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; EOF -&gt; r
+forall (m :: * -&gt; *).
+Monad m =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; EOF -&gt; m EOF
+forall (m :: * -&gt; *).
+MonadPlus m =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; EOF -&gt; m EOF
+forall (c :: * -&gt; *).
+(forall b r. Data b =&gt; c (b -&gt; r) -&gt; c r)
+-&gt; (forall r. r -&gt; c r) -&gt; Constr -&gt; c EOF
+forall (c :: * -&gt; *).
+(forall d b. Data d =&gt; c (d -&gt; b) -&gt; d -&gt; c b)
+-&gt; (forall g. g -&gt; c g) -&gt; EOF -&gt; c EOF
+forall (t :: * -&gt; *) (c :: * -&gt; *).
+Typeable t =&gt;
+(forall d. Data d =&gt; c (t d)) -&gt; Maybe (c EOF)
+forall (t :: * -&gt; * -&gt; *) (c :: * -&gt; *).
+Typeable t =&gt;
+(forall d e. (Data d, Data e) =&gt; c (t d e)) -&gt; Maybe (c EOF)
+$cgfoldl :: forall (c :: * -&gt; *).
+(forall d b. Data d =&gt; c (d -&gt; b) -&gt; d -&gt; c b)
+-&gt; (forall g. g -&gt; c g) -&gt; EOF -&gt; c EOF
+gfoldl :: forall (c :: * -&gt; *).
+(forall d b. Data d =&gt; c (d -&gt; b) -&gt; d -&gt; c b)
+-&gt; (forall g. g -&gt; c g) -&gt; EOF -&gt; c EOF
+$cgunfold :: forall (c :: * -&gt; *).
+(forall b r. Data b =&gt; c (b -&gt; r) -&gt; c r)
+-&gt; (forall r. r -&gt; c r) -&gt; Constr -&gt; c EOF
+gunfold :: forall (c :: * -&gt; *).
+(forall b r. Data b =&gt; c (b -&gt; r) -&gt; c r)
+-&gt; (forall r. r -&gt; c r) -&gt; Constr -&gt; c EOF
+$ctoConstr :: EOF -&gt; Constr
+toConstr :: EOF -&gt; Constr
+$cdataTypeOf :: EOF -&gt; DataType
+dataTypeOf :: EOF -&gt; DataType
+$cdataCast1 :: forall (t :: * -&gt; *) (c :: * -&gt; *).
+Typeable t =&gt;
+(forall d. Data d =&gt; c (t d)) -&gt; Maybe (c EOF)
+dataCast1 :: forall (t :: * -&gt; *) (c :: * -&gt; *).
+Typeable t =&gt;
+(forall d. Data d =&gt; c (t d)) -&gt; Maybe (c EOF)
+$cdataCast2 :: forall (t :: * -&gt; * -&gt; *) (c :: * -&gt; *).
+Typeable t =&gt;
+(forall d e. (Data d, Data e) =&gt; c (t d e)) -&gt; Maybe (c EOF)
+dataCast2 :: forall (t :: * -&gt; * -&gt; *) (c :: * -&gt; *).
+Typeable t =&gt;
+(forall d e. (Data d, Data e) =&gt; c (t d e)) -&gt; Maybe (c EOF)
+$cgmapT :: (forall b. Data b =&gt; b -&gt; b) -&gt; EOF -&gt; EOF
+gmapT :: (forall b. Data b =&gt; b -&gt; b) -&gt; EOF -&gt; EOF
+$cgmapQl :: forall r r'.
+(r -&gt; r' -&gt; r) -&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; EOF -&gt; r
+gmapQl :: forall r r'.
+(r -&gt; r' -&gt; r) -&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; EOF -&gt; r
+$cgmapQr :: forall r r'.
+(r' -&gt; r -&gt; r) -&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; EOF -&gt; r
+gmapQr :: forall r r'.
+(r' -&gt; r -&gt; r) -&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; EOF -&gt; r
+$cgmapQ :: forall u. (forall d. Data d =&gt; d -&gt; u) -&gt; EOF -&gt; [u]
+gmapQ :: forall u. (forall d. Data d =&gt; d -&gt; u) -&gt; EOF -&gt; [u]
+$cgmapQi :: forall u. Int -&gt; (forall d. Data d =&gt; d -&gt; u) -&gt; EOF -&gt; u
+gmapQi :: forall u. Int -&gt; (forall d. Data d =&gt; d -&gt; u) -&gt; EOF -&gt; u
+$cgmapM :: forall (m :: * -&gt; *).
+Monad m =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; EOF -&gt; m EOF
+gmapM :: forall (m :: * -&gt; *).
+Monad m =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; EOF -&gt; m EOF
+$cgmapMp :: forall (m :: * -&gt; *).
+MonadPlus m =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; EOF -&gt; m EOF
+gmapMp :: forall (m :: * -&gt; *).
+MonadPlus m =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; EOF -&gt; m EOF
+$cgmapMo :: forall (m :: * -&gt; *).
+MonadPlus m =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; EOF -&gt; m EOF
+gmapMo :: forall (m :: * -&gt; *).
+MonadPlus m =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; EOF -&gt; m EOF
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Data</span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Typeable</span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680385930"><span id="local-6989586621680385934"><span class="annot"><span class="annottext">(forall (m :: * -&gt; *). Quote m =&gt; EOF -&gt; m Exp)
+-&gt; (forall (m :: * -&gt; *). Quote m =&gt; EOF -&gt; Code m EOF) -&gt; Lift EOF
+forall t.
+(forall (m :: * -&gt; *). Quote m =&gt; t -&gt; m Exp)
+-&gt; (forall (m :: * -&gt; *). Quote m =&gt; t -&gt; Code m t) -&gt; Lift t
+forall (m :: * -&gt; *). Quote m =&gt; EOF -&gt; m Exp
+forall (m :: * -&gt; *). Quote m =&gt; EOF -&gt; Code m EOF
+$clift :: forall (m :: * -&gt; *). Quote m =&gt; EOF -&gt; m Exp
+lift :: forall (m :: * -&gt; *). Quote m =&gt; EOF -&gt; m Exp
+$cliftTyped :: forall (m :: * -&gt; *). Quote m =&gt; EOF -&gt; Code m EOF
+liftTyped :: forall (m :: * -&gt; *). Quote m =&gt; EOF -&gt; Code m EOF
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Lift</span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680385943"><span id="local-6989586621680385946"><span id="local-6989586621680385949"><span id="local-6989586621680385952"><span class="annot"><span class="annottext">Show EOF
+Typeable EOF
+(Typeable EOF, Show EOF) =&gt;
+(EOF -&gt; SomeException)
+-&gt; (SomeException -&gt; Maybe EOF)
+-&gt; (EOF -&gt; String)
+-&gt; (EOF -&gt; Bool)
+-&gt; Exception EOF
+SomeException -&gt; Maybe EOF
+EOF -&gt; Bool
+EOF -&gt; String
+EOF -&gt; SomeException
+forall e.
+(Typeable e, Show e) =&gt;
+(e -&gt; SomeException)
+-&gt; (SomeException -&gt; Maybe e)
+-&gt; (e -&gt; String)
+-&gt; (e -&gt; Bool)
+-&gt; Exception e
+$ctoException :: EOF -&gt; SomeException
+toException :: EOF -&gt; SomeException
+$cfromException :: SomeException -&gt; Maybe EOF
+fromException :: SomeException -&gt; Maybe EOF
+$cdisplayException :: EOF -&gt; String
+displayException :: EOF -&gt; String
+$cbacktraceDesired :: EOF -&gt; Bool
+backtraceDesired :: EOF -&gt; Bool
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Exception</span></span></span></span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-59"></span><span>
+</span><span id="line-60"></span><span class="annot"><span class="hs-comment">-- | make a stream of uninterpreted packets</span></span><span>
+</span><span id="line-61"></span><span class="annot"><a href="M.IO.Internal.Datagram.html#makepacketstreami"><span class="hs-identifier hs-type">makepacketstreami</span></a></span><span> </span><span class="hs-glyph">::</span><span>
+</span><span id="line-62"></span><span>  </span><span class="hs-comment">-- | compression threshold reference (negative = off,</span><span>
+</span><span id="line-63"></span><span>  </span><span class="hs-comment">-- non-negative = on with threshold)</span><span>
+</span><span id="line-64"></span><span>  </span><span class="annot"><span class="hs-identifier hs-type">TVar</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Int</span></span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-65"></span><span>  </span><span class="annot"><span class="hs-comment">-- | input stream</span></span><span>
+</span><span id="line-66"></span><span>  </span><span class="annot"><span class="hs-identifier hs-type">InputStream</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">ByteString</span></span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-67"></span><span>  </span><span class="annot"><span class="hs-comment">-- | stream of uninterpreted packets</span></span><span>
+</span><span id="line-68"></span><span>  </span><span class="annot"><span class="hs-identifier hs-type">IO</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">InputStream</span></span><span> </span><span class="annot"><a href="M.IO.Internal.Datagram.html#Uninterpreted"><span class="hs-identifier hs-type">Uninterpreted</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-69"></span><span id="makepacketstreami"><span class="annot"><span class="annottext">makepacketstreami :: TVar Int
+-&gt; InputStream ByteString -&gt; IO (InputStream Uninterpreted)
+</span><a href="M.IO.Internal.Datagram.html#makepacketstreami"><span class="hs-identifier hs-var hs-var">makepacketstreami</span></a></span></span><span> </span><span id="local-6989586621680385955"><span class="annot"><span class="annottext">TVar Int
+</span><a href="#local-6989586621680385955"><span class="hs-identifier hs-var">c</span></a></span></span><span> </span><span id="local-6989586621680385956"><span class="annot"><span class="annottext">InputStream ByteString
+</span><a href="#local-6989586621680385956"><span class="hs-identifier hs-var">s</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-70"></span><span>  </span><span class="annot"><span class="annottext">IO (Maybe Uninterpreted) -&gt; IO (InputStream Uninterpreted)
+forall a. IO (Maybe a) -&gt; IO (InputStream a)
+</span><span class="hs-identifier hs-var">makeInputStream</span></span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-71"></span><span>    </span><span id="local-6989586621680385958"><span class="annot"><a href="#local-6989586621680385958"><span class="hs-identifier hs-var">threshold</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">TVar Int -&gt; IO Int
+forall a. TVar a -&gt; IO a
+</span><span class="hs-identifier hs-var">readTVarIO</span></span><span> </span><span class="annot"><span class="annottext">TVar Int
+</span><a href="#local-6989586621680385955"><span class="hs-identifier hs-var">c</span></a></span><span>
+</span><span id="line-72"></span><span>    </span><span class="annot"><span class="hs-identifier hs-type">Just</span></span><span> </span><span class="annot"><span class="hs-operator hs-type">&lt;$&gt;</span></span><span> </span><span class="annot"><a href="#local-6989586621680385961"><span class="hs-identifier hs-type">takepacket</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680385958"><span class="hs-identifier hs-type">threshold</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680385956"><span class="hs-identifier hs-type">s</span></a></span><span>
+</span><span id="line-73"></span><span>  </span><span class="hs-keyword">where</span><span>
+</span><span id="line-74"></span><span>    </span><span id="local-6989586621680385961"><span class="annot"><span class="annottext">takepacket :: Int -&gt; InputStream ByteString -&gt; IO Uninterpreted
+</span><a href="#local-6989586621680385961"><span class="hs-identifier hs-var hs-var">takepacket</span></a></span></span><span> </span><span id="local-6989586621680385962"><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621680385962"><span class="hs-identifier hs-var">threshold</span></a></span></span><span> </span><span id="local-6989586621680385963"><span class="annot"><span class="annottext">InputStream ByteString
+</span><a href="#local-6989586621680385963"><span class="hs-identifier hs-var">b</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-75"></span><span>      </span><span id="local-6989586621680385964"><span class="annot"><a href="#local-6989586621680385964"><span class="hs-identifier hs-var">t</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">forall e a.
+Exception e =&gt;
+InputStream ByteString -&gt; ParserIO () e a -&gt; IO a
+</span><a href="M.IO.Internal.Read.html#parseio0"><span class="hs-identifier hs-var">parseio0</span></a></span><span> </span><span class="hs-glyph">@</span><span class="annot"><a href="M.Pack.Internal.Types.html#ParseError"><span class="hs-identifier hs-type">ParseError</span></a></span><span> </span><span class="annot"><span class="annottext">InputStream ByteString
+</span><a href="#local-6989586621680385963"><span class="hs-identifier hs-var">b</span></a></span><span> </span><span class="annot"><span class="annottext">ParserIO () ParseError Int
+forall {st :: ZeroBitType} {r}. ParserT st r ParseError Int
+</span><a href="#local-6989586621680385966"><span class="hs-identifier hs-var">checkedlength</span></a></span><span>
+</span><span id="line-76"></span><span>      </span><span id="local-6989586621680385967"><span class="annot"><a href="#local-6989586621680385967"><span class="hs-identifier hs-var">u</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="hs-identifier hs-type">catch</span></span><span>
+</span><span id="line-77"></span><span>        </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">fmap</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">fromJust</span></span><span> </span><span class="annot"><span class="hs-operator hs-type">$</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">timeout</span></span><span> </span><span class="annot"><span class="hs-number">5_000_000</span></span><span> </span><span class="annot"><span class="hs-operator hs-type">$</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">readExactly</span></span><span> </span><span class="annot"><a href="#local-6989586621680385964"><span class="hs-identifier hs-type">t</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680385963"><span class="hs-identifier hs-type">b</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-78"></span><span>        </span><span class="hs-glyph">\</span><span class="hs-special">(</span><span id="local-6989586621680385972"><span class="annot"><span class="annottext">SomeException
+</span><a href="#local-6989586621680385972"><span class="hs-identifier hs-var">e</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">SomeException</span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">SomeException -&gt; IO ByteString
+forall e a. (HasCallStack, Exception e) =&gt; e -&gt; IO a
+</span><span class="hs-identifier hs-var">throwIO</span></span><span> </span><span class="annot"><span class="annottext">SomeException
+</span><a href="#local-6989586621680385972"><span class="hs-identifier hs-var">e</span></a></span><span>
+</span><span id="line-79"></span><span>      </span><span class="hs-keyword">let</span><span> </span><span id="local-6989586621680385974"><span class="annot"><a href="#local-6989586621680385974"><span class="hs-identifier hs-var hs-var">p</span></a></span></span><span>
+</span><span id="line-80"></span><span>            </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621680385962"><span class="hs-identifier hs-var">threshold</span></a></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Bool
+forall a. Ord a =&gt; a -&gt; a -&gt; Bool
+</span><span class="hs-operator hs-var">&gt;=</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">0</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">ParserT IOMode () ParseError Uninterpreted
+</span><a href="#local-6989586621680385975"><span class="hs-identifier hs-var">parsepostcomp</span></a></span><span>
+</span><span id="line-81"></span><span>            </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="annottext">Bool
+</span><span class="hs-identifier hs-var">otherwise</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">ParserT IOMode () ParseError Uninterpreted
+forall {st :: ZeroBitType} {r} {e}. ParserT st r e Uninterpreted
+</span><a href="#local-6989586621680385976"><span class="hs-identifier hs-var">parseprecomp</span></a></span><span>
+</span><span id="line-82"></span><span>      </span><span class="annot"><span class="hs-identifier hs-type">runParserIO</span></span><span> </span><span class="annot"><a href="#local-6989586621680385974"><span class="hs-identifier hs-type">p</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span> </span><span class="annot"><span class="hs-number">0</span></span><span> </span><span class="annot"><a href="#local-6989586621680385967"><span class="hs-identifier hs-type">u</span></a></span><span> </span><span class="annot"><span class="hs-operator hs-type">&gt;&gt;=</span></span><span> </span><span class="hs-glyph">\</span><span class="hs-glyph">case</span><span>
+</span><span id="line-83"></span><span>        </span><span class="annot"><span class="hs-identifier hs-type">OK</span></span><span> </span><span id="local-6989586621680385979"><span class="annot"><span class="annottext">Uninterpreted
+</span><a href="#local-6989586621680385979"><span class="hs-identifier hs-var">a</span></a></span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-identifier">_</span></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><span class="hs-identifier">_</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Uninterpreted -&gt; IO Uninterpreted
+forall a. a -&gt; IO a
+forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><span class="hs-identifier hs-var">pure</span></span><span> </span><span class="annot"><span class="annottext">Uninterpreted
+</span><a href="#local-6989586621680385979"><span class="hs-identifier hs-var">a</span></a></span><span>
+</span><span id="line-84"></span><span>        </span><span class="annot"><span class="annottext">Result ParseError Uninterpreted
+</span><span class="hs-identifier hs-var">Fail</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">String -&gt; IO Uninterpreted
+forall a. HasCallStack =&gt; String -&gt; a
+</span><span class="hs-identifier hs-var">error</span></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;takepacket: parse failed&quot;</span></span><span>
+</span><span id="line-85"></span><span>        </span><span class="annot"><span class="hs-identifier hs-type">Err</span></span><span> </span><span id="local-6989586621680385983"><span class="annot"><span class="annottext">ParseError
+</span><a href="#local-6989586621680385983"><span class="hs-identifier hs-var">e</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">ParseError -&gt; IO Uninterpreted
+forall e a. (HasCallStack, Exception e) =&gt; e -&gt; IO a
+</span><span class="hs-identifier hs-var">throwIO</span></span><span> </span><span class="annot"><span class="annottext">ParseError
+</span><a href="#local-6989586621680385983"><span class="hs-identifier hs-var">e</span></a></span><span>
+</span><span id="line-86"></span><span>      </span><span class="hs-keyword">where</span><span>
+</span><span id="line-87"></span><span>        </span><span id="local-6989586621680385966"><span class="annot"><span class="annottext">checkedlength :: ParserT st r ParseError Int
+</span><a href="#local-6989586621680385966"><span class="hs-identifier hs-var hs-var">checkedlength</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-88"></span><span>          </span><span id="local-6989586621680386002"><span class="annot"><a href="#local-6989586621680386002"><span class="hs-identifier hs-var">l</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">forall a (st :: ZeroBitType) r. Integral a =&gt; Parser st r a
+</span><a href="M.Pack.Internal.Num.html#unpackleb32"><span class="hs-identifier hs-var">unpackleb32</span></a></span><span> </span><span class="hs-glyph">@</span><span class="annot"><span class="hs-identifier hs-type">Int</span></span><span>
+</span><span id="line-89"></span><span>          </span><span class="hs-keyword">if</span><span> </span><span class="annot"><a href="#local-6989586621680386002"><span class="hs-identifier hs-type">l</span></a></span><span> </span><span class="annot"><span class="hs-operator hs-type">&lt;</span></span><span> </span><span class="annot"><span class="hs-number">0</span></span><span> </span><span class="annot"><span class="hs-operator hs-type">||</span></span><span> </span><span class="annot"><a href="#local-6989586621680386002"><span class="hs-identifier hs-type">l</span></a></span><span> </span><span class="annot"><span class="hs-operator hs-type">&gt;=</span></span><span> </span><span class="annot"><span class="hs-number">0x400000</span></span><span>
+</span><span id="line-90"></span><span>            </span><span class="hs-keyword">then</span><span> </span><span class="annot"><a href="#local-6989586621680386005"><span class="hs-identifier hs-type">throw</span></a></span><span> </span><span class="annot"><span class="hs-operator hs-type">$</span></span><span> </span><span class="annot"><span class="hs-string">&quot;takepacket: invalid length: &quot;</span></span><span> </span><span class="annot"><span class="hs-operator hs-type">&lt;&gt;</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">show</span></span><span> </span><span class="annot"><a href="#local-6989586621680386002"><span class="hs-identifier hs-type">l</span></a></span><span> </span><span class="annot"><span class="hs-operator hs-type">&lt;&gt;</span></span><span> </span><span class="annot"><span class="hs-string">&quot; bytes&quot;</span></span><span>
+</span><span id="line-91"></span><span>            </span><span class="hs-keyword">else</span><span> </span><span class="annot"><span class="hs-identifier hs-type">pure</span></span><span> </span><span class="annot"><a href="#local-6989586621680386002"><span class="hs-identifier hs-type">l</span></a></span><span>
+</span><span id="line-92"></span><span>    </span><span id="local-6989586621680386005"><span class="annot"><span class="annottext">throw :: String -&gt; ParserT st r ParseError a
+</span><a href="#local-6989586621680386005"><span class="hs-identifier hs-var hs-var">throw</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">ParseError -&gt; ParserT st r ParseError a
+forall e (st :: ZeroBitType) r a. e -&gt; ParserT st r e a
+</span><span class="hs-identifier hs-var">err</span></span><span> </span><span class="annot"><span class="annottext">(ParseError -&gt; ParserT st r ParseError a)
+-&gt; (String -&gt; ParseError) -&gt; String -&gt; ParserT st r ParseError a
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">String -&gt; ParseError
+</span><a href="M.Pack.Internal.Types.html#ParseError"><span class="hs-identifier hs-var">ParseError</span></a></span><span>
+</span><span id="line-93"></span><span>    </span><span id="local-6989586621680385976"><span class="annot"><span class="annottext">parseprecomp :: ParserT st r e Uninterpreted
+</span><a href="#local-6989586621680385976"><span class="hs-identifier hs-var hs-var">parseprecomp</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(Word8 -&gt; ByteString -&gt; Uninterpreted)
+-&gt; ParserT st r e Word8
+-&gt; ParserT st r e ByteString
+-&gt; ParserT st r e Uninterpreted
+forall a b c.
+(a -&gt; b -&gt; c)
+-&gt; ParserT st r e a -&gt; ParserT st r e b -&gt; ParserT st r e c
+forall (f :: * -&gt; *) a b c.
+Applicative f =&gt;
+(a -&gt; b -&gt; c) -&gt; f a -&gt; f b -&gt; f c
+</span><span class="hs-identifier hs-var">liftA2</span></span><span> </span><span class="annot"><span class="annottext">Word8 -&gt; ByteString -&gt; Uninterpreted
+</span><a href="M.IO.Internal.Datagram.html#Uninterpreted"><span class="hs-identifier hs-var">Uninterpreted</span></a></span><span> </span><span class="annot"><span class="annottext">ParserT st r e Word8
+forall (st :: ZeroBitType) r e. ParserT st r e Word8
+</span><span class="hs-identifier hs-var">anyWord8</span></span><span> </span><span class="annot"><span class="annottext">ParserT st r e ByteString
+forall (st :: ZeroBitType) r e. ParserT st r e ByteString
+</span><span class="hs-identifier hs-var">takeRest</span></span><span>
+</span><span id="line-94"></span><span>    </span><span id="local-6989586621680385975"><span class="annot"><span class="annottext">parsepostcomp :: ParserT IOMode () ParseError Uninterpreted
+</span><a href="#local-6989586621680385975"><span class="hs-identifier hs-var hs-var">parsepostcomp</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">ParserT IOMode () ParseError Uninterpreted
+forall {st :: ZeroBitType} {r} {e}. ParserT st r e Uninterpreted
+</span><a href="#local-6989586621680386013"><span class="hs-identifier hs-var">parser2</span></a></span><span> </span><span class="annot"><span class="annottext">ParserT IOMode () ParseError Uninterpreted
+-&gt; ParserT IOMode () ParseError Uninterpreted
+-&gt; ParserT IOMode () ParseError Uninterpreted
+forall (st :: ZeroBitType) r e a.
+ParserT st r e a -&gt; ParserT st r e a -&gt; ParserT st r e a
+</span><span class="hs-operator hs-var">&lt;|&gt;</span></span><span> </span><span class="annot"><span class="annottext">ParserT IOMode () ParseError Uninterpreted
+</span><a href="#local-6989586621680386015"><span class="hs-identifier hs-var">parser3</span></a></span><span> </span><span class="annot"><span class="annottext">ParserT IOMode () ParseError Uninterpreted
+-&gt; ParserT IOMode () ParseError Uninterpreted
+-&gt; ParserT IOMode () ParseError Uninterpreted
+forall (st :: ZeroBitType) r e a.
+ParserT st r e a -&gt; ParserT st r e a -&gt; ParserT st r e a
+</span><span class="hs-operator hs-var">&lt;|&gt;</span></span><span> </span><span class="annot"><span class="annottext">String -&gt; ParserT IOMode () ParseError Uninterpreted
+forall {st :: ZeroBitType} {r} {a}.
+String -&gt; ParserT st r ParseError a
+</span><a href="#local-6989586621680386005"><span class="hs-identifier hs-var">throw</span></a></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;parsepostcomp: no match&quot;</span></span><span>
+</span><span id="line-95"></span><span>    </span><span id="local-6989586621680386013"><span class="annot"><span class="annottext">parser2 :: ParserT st r e Uninterpreted
+</span><a href="#local-6989586621680386013"><span class="hs-identifier hs-var hs-var">parser2</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Word8 -&gt; ParserT st r e ()
+forall (st :: ZeroBitType) r e. Word8 -&gt; ParserT st r e ()
+</span><span class="hs-identifier hs-var">word8</span></span><span> </span><span class="annot"><span class="annottext">Word8
+</span><span class="hs-number">0</span></span><span> </span><span class="annot"><span class="annottext">ParserT st r e ()
+-&gt; ParserT st r e Uninterpreted -&gt; ParserT st r e Uninterpreted
+forall a b.
+ParserT st r e a -&gt; ParserT st r e b -&gt; ParserT st r e b
+forall (f :: * -&gt; *) a b. Applicative f =&gt; f a -&gt; f b -&gt; f b
+</span><span class="hs-operator hs-var">*&gt;</span></span><span> </span><span class="annot"><span class="annottext">ParserT st r e Uninterpreted
+forall {st :: ZeroBitType} {r} {e}. ParserT st r e Uninterpreted
+</span><a href="#local-6989586621680385976"><span class="hs-identifier hs-var">parseprecomp</span></a></span><span>
+</span><span id="line-96"></span><span>    </span><span id="local-6989586621680386015"><span class="annot"><span class="annottext">parser3 :: ParserT IOMode () ParseError Uninterpreted
+</span><a href="#local-6989586621680386015"><span class="hs-identifier hs-var hs-var">parser3</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-97"></span><span>      </span><span class="hs-comment">-- uncompressed length, declared</span><span>
+</span><span id="line-98"></span><span>      </span><span id="local-6989586621680386042"><span class="annot"><a href="#local-6989586621680386042"><span class="hs-identifier hs-var">l</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">forall a (st :: ZeroBitType) r. Integral a =&gt; Parser st r a
+</span><a href="M.Pack.Internal.Num.html#unpackleb32"><span class="hs-identifier hs-var">unpackleb32</span></a></span><span> </span><span class="hs-glyph">@</span><span class="annot"><span class="hs-identifier hs-type">Int</span></span><span> </span><span class="annot"><span class="annottext">ParserIO () ParseError Int
+-&gt; (Int -&gt; ParserIO () ParseError Int)
+-&gt; ParserIO () ParseError Int
+forall a b.
+ParserT IOMode () ParseError a
+-&gt; (a -&gt; ParserT IOMode () ParseError b)
+-&gt; ParserT IOMode () ParseError b
+forall (m :: * -&gt; *) a b. Monad m =&gt; m a -&gt; (a -&gt; m b) -&gt; m b
+</span><span class="hs-operator hs-var">&gt;&gt;=</span></span><span> </span><span class="annot"><span class="annottext">Int -&gt; ParserIO () ParseError Int
+forall {a} {st :: ZeroBitType} {r}.
+(Ord a, Num a) =&gt;
+a -&gt; ParserT st r ParseError a
+</span><a href="#local-6989586621680386043"><span class="hs-identifier hs-var">checkuncomplen</span></a></span><span>
+</span><span id="line-99"></span><span>      </span><span id="local-6989586621680386044"><span class="annot"><a href="#local-6989586621680386044"><span class="hs-identifier hs-var">d</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="hs-identifier hs-type">takeRest</span></span><span> </span><span class="annot"><span class="hs-operator hs-type">&gt;&gt;=</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">liftIO</span></span><span> </span><span class="annot"><span class="hs-operator hs-type">.</span></span><span> </span><span class="annot"><a href="M.IO.Internal.Zlib.html#safedecomp"><span class="hs-identifier hs-type">safedecomp</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680386042"><span class="hs-identifier hs-type">l</span></a></span><span>
+</span><span id="line-100"></span><span>      </span><span class="annot"><span class="hs-identifier hs-type">liftIO</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">runParserIO</span></span><span> </span><span class="annot"><a href="#local-6989586621680385976"><span class="hs-identifier hs-type">parseprecomp</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span> </span><span class="annot"><span class="hs-number">0</span></span><span> </span><span class="annot"><a href="#local-6989586621680386044"><span class="hs-identifier hs-type">d</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="hs-operator hs-type">&gt;&gt;=</span></span><span> </span><span class="hs-glyph">\</span><span class="hs-glyph">case</span><span>
+</span><span id="line-101"></span><span>        </span><span class="annot"><span class="hs-identifier hs-type">OK</span></span><span> </span><span id="local-6989586621680386047"><span class="annot"><span class="annottext">Uninterpreted
+</span><a href="#local-6989586621680386047"><span class="hs-identifier hs-var">a</span></a></span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-identifier">_</span></span><span> </span><span id="local-6989586621680386048"><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621680386048"><span class="hs-identifier hs-var">b</span></a></span></span><span> </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="annottext">ByteString -&gt; Bool
+</span><span class="hs-identifier hs-var">B.null</span></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621680386048"><span class="hs-identifier hs-var">b</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Uninterpreted -&gt; ParserT IOMode () ParseError Uninterpreted
+forall a. a -&gt; ParserT IOMode () ParseError a
+forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><span class="hs-identifier hs-var">pure</span></span><span> </span><span class="annot"><span class="annottext">Uninterpreted
+</span><a href="#local-6989586621680386047"><span class="hs-identifier hs-var">a</span></a></span><span>
+</span><span id="line-102"></span><span>        </span><span class="annot"><span class="hs-identifier hs-type">OK</span></span><span> </span><span class="annot"><span class="annottext">Uninterpreted
+</span><span class="hs-identifier">_</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-identifier">_</span></span><span> </span><span id="local-6989586621680386050"><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621680386050"><span class="hs-identifier hs-var">b</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-103"></span><span>          </span><span class="annot"><span class="annottext">String -&gt; ParserT IOMode () ParseError Uninterpreted
+forall {st :: ZeroBitType} {r} {a}.
+String -&gt; ParserT st r ParseError a
+</span><a href="#local-6989586621680386005"><span class="hs-identifier hs-var">throw</span></a></span><span> </span><span class="annot"><span class="annottext">(String -&gt; ParserT IOMode () ParseError Uninterpreted)
+-&gt; String -&gt; ParserT IOMode () ParseError Uninterpreted
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">String -&gt; Int -&gt; String
+forall r. PrintfType r =&gt; String -&gt; r
+</span><span class="hs-identifier hs-var">printf</span></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;parser3: trailing data: %d bytes left&quot;</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">ByteString -&gt; Int
+</span><span class="hs-identifier hs-var">B.length</span></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621680386050"><span class="hs-identifier hs-var">b</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-104"></span><span>        </span><span class="annot"><span class="annottext">Result Any Uninterpreted
+</span><span class="hs-identifier hs-var">Fail</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">String -&gt; ParserT IOMode () ParseError Uninterpreted
+forall {st :: ZeroBitType} {r} {a}.
+String -&gt; ParserT st r ParseError a
+</span><a href="#local-6989586621680386005"><span class="hs-identifier hs-var">throw</span></a></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;parser3: parseprecomp failed&quot;</span></span><span>
+</span><span id="line-105"></span><span>        </span><span class="annot"><span class="hs-identifier hs-type">Err</span></span><span> </span><span class="annot"><span class="annottext">Any
+</span><span class="hs-identifier">_</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">String -&gt; ParserT IOMode () ParseError Uninterpreted
+forall a. HasCallStack =&gt; String -&gt; a
+</span><span class="hs-identifier hs-var">error</span></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;parser3: impossible&quot;</span></span><span>
+</span><span id="line-106"></span><span>      </span><span class="hs-keyword">where</span><span>
+</span><span id="line-107"></span><span>        </span><span id="local-6989586621680386043"><span class="annot"><span class="annottext">checkuncomplen :: a -&gt; ParserT st r ParseError a
+</span><a href="#local-6989586621680386043"><span class="hs-identifier hs-var hs-var">checkuncomplen</span></a></span></span><span> </span><span id="local-6989586621680386061"><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621680386061"><span class="hs-identifier hs-var">l</span></a></span></span><span>
+</span><span id="line-108"></span><span>          </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621680386061"><span class="hs-identifier hs-var">l</span></a></span><span> </span><span class="annot"><span class="annottext">a -&gt; a -&gt; Bool
+forall a. Ord a =&gt; a -&gt; a -&gt; Bool
+</span><span class="hs-operator hs-var">&lt;</span></span><span> </span><span class="annot"><span class="annottext">a
+</span><span class="hs-number">0</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">String -&gt; ParserT st r ParseError a
+forall {st :: ZeroBitType} {r} {a}.
+String -&gt; ParserT st r ParseError a
+</span><a href="#local-6989586621680386005"><span class="hs-identifier hs-var">throw</span></a></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;parser3: negative length&quot;</span></span><span>
+</span><span id="line-109"></span><span>          </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621680386061"><span class="hs-identifier hs-var">l</span></a></span><span> </span><span class="annot"><span class="annottext">a -&gt; a -&gt; Bool
+forall a. Ord a =&gt; a -&gt; a -&gt; Bool
+</span><span class="hs-operator hs-var">&gt;</span></span><span> </span><span class="annot"><span class="annottext">a
+</span><span class="hs-number">0x800000</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">String -&gt; ParserT st r ParseError a
+forall {st :: ZeroBitType} {r} {a}.
+String -&gt; ParserT st r ParseError a
+</span><a href="#local-6989586621680386005"><span class="hs-identifier hs-var">throw</span></a></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;parser3: length too large&quot;</span></span><span>
+</span><span id="line-110"></span><span>          </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="annottext">Bool
+</span><span class="hs-identifier hs-var">otherwise</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">a -&gt; ParserT st r ParseError a
+forall a. a -&gt; ParserT st r ParseError a
+forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><span class="hs-identifier hs-var">pure</span></span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621680386061"><span class="hs-identifier hs-var">l</span></a></span><span>
+</span><span id="line-111"></span><span>
+</span><span id="line-112"></span><span class="hs-comment">-- encoding</span><span>
+</span><span id="line-113"></span><span>
+</span><span id="line-114"></span><span class="hs-comment">-- size-tracked builder</span><span>
+</span><span id="line-115"></span><span class="hs-keyword">data</span><span> </span><span id="Building"><span class="annot"><a href="M.IO.Internal.Datagram.html#Building"><span class="hs-identifier hs-var">Building</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="B"><span class="annot"><a href="M.IO.Internal.Datagram.html#B"><span class="hs-identifier hs-var">B</span></a></span></span><span> </span><span class="hs-glyph">!</span><span class="annot"><span class="hs-identifier hs-type">Int</span></span><span> </span><span class="hs-glyph">!</span><span class="annot"><span class="hs-identifier hs-type">Builder</span></span><span> </span><span class="hs-comment">-- size, builder</span><span>
+</span><span id="line-116"></span><span>
+</span><span id="line-117"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621680386065"><span id="local-6989586621680386069"><span class="annot"><span class="hs-identifier hs-type">Semigroup</span></span><span> </span><span class="annot"><a href="M.IO.Internal.Datagram.html#Building"><span class="hs-identifier hs-type">Building</span></a></span></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-118"></span><span>  </span><span class="annot"><a href="M.IO.Internal.Datagram.html#B"><span class="hs-identifier hs-type">B</span></a></span><span> </span><span id="local-6989586621680386077"><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621680386077"><span class="hs-identifier hs-var">a</span></a></span></span><span> </span><span id="local-6989586621680386078"><span class="annot"><span class="annottext">Builder
+</span><a href="#local-6989586621680386078"><span class="hs-identifier hs-var">b</span></a></span></span><span> </span><span id="local-6989586621680386079"><span class="annot"><span class="annottext">&lt;&gt; :: Building -&gt; Building -&gt; Building
+</span><span class="hs-operator hs-var hs-var hs-var">&lt;&gt;</span></span></span><span> </span><span class="annot"><a href="M.IO.Internal.Datagram.html#B"><span class="hs-identifier hs-type">B</span></a></span><span> </span><span id="local-6989586621680386080"><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621680386080"><span class="hs-identifier hs-var">c</span></a></span></span><span> </span><span id="local-6989586621680386081"><span class="annot"><span class="annottext">Builder
+</span><a href="#local-6989586621680386081"><span class="hs-identifier hs-var">d</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int -&gt; Builder -&gt; Building
+</span><a href="M.IO.Internal.Datagram.html#B"><span class="hs-identifier hs-var">B</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621680386077"><span class="hs-identifier hs-var">a</span></a></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Int
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">+</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621680386080"><span class="hs-identifier hs-var">c</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Builder
+</span><a href="#local-6989586621680386078"><span class="hs-identifier hs-var">b</span></a></span><span> </span><span class="annot"><span class="annottext">Builder -&gt; Builder -&gt; Builder
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">&lt;&gt;</span></span><span> </span><span class="annot"><span class="annottext">Builder
+</span><a href="#local-6989586621680386081"><span class="hs-identifier hs-var">d</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-119"></span><span>  </span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="hs-pragma">(</span><span class="hs-pragma">&lt;&gt;</span><span class="hs-pragma">)</span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-120"></span><span>
+</span><span id="line-121"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621680386087"><span id="local-6989586621680386091"><span class="annot"><span class="hs-identifier hs-type">Monoid</span></span><span> </span><span class="annot"><a href="M.IO.Internal.Datagram.html#Building"><span class="hs-identifier hs-type">Building</span></a></span></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-122"></span><span>  </span><span id="local-6989586621680386096"><span class="annot"><span class="annottext">mempty :: Building
+</span><span class="hs-identifier hs-var hs-var hs-var">mempty</span></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int -&gt; Builder -&gt; Building
+</span><a href="M.IO.Internal.Datagram.html#B"><span class="hs-identifier hs-var">B</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">0</span></span><span> </span><span class="annot"><span class="annottext">Builder
+forall a. Monoid a =&gt; a
+</span><span class="hs-identifier hs-var">mempty</span></span><span>
+</span><span id="line-123"></span><span>  </span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><span class="hs-pragma hs-type">mempty</span></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-124"></span><span>
+</span><span id="line-125"></span><span class="annot"><span class="hs-comment">-- | make an output stream of uninterpreted packets</span></span><span>
+</span><span id="line-126"></span><span class="annot"><a href="M.IO.Internal.Datagram.html#makepacketstreamo"><span class="hs-identifier hs-type">makepacketstreamo</span></a></span><span> </span><span class="hs-glyph">::</span><span>
+</span><span id="line-127"></span><span>  </span><span class="annot"><span class="hs-identifier hs-type">TVar</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Int</span></span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-128"></span><span>  </span><span class="annot"><span class="hs-identifier hs-type">OutputStream</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">ByteString</span></span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-129"></span><span>  </span><span class="annot"><span class="hs-identifier hs-type">IO</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">OutputStream</span></span><span> </span><span class="annot"><a href="M.IO.Internal.Datagram.html#Uninterpreted"><span class="hs-identifier hs-type">Uninterpreted</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-130"></span><span id="makepacketstreamo"><span class="annot"><span class="annottext">makepacketstreamo :: TVar Int
+-&gt; OutputStream ByteString -&gt; IO (OutputStream Uninterpreted)
+</span><a href="M.IO.Internal.Datagram.html#makepacketstreamo"><span class="hs-identifier hs-var hs-var">makepacketstreamo</span></a></span></span><span> </span><span id="local-6989586621680386097"><span class="annot"><span class="annottext">TVar Int
+</span><a href="#local-6989586621680386097"><span class="hs-identifier hs-var">c</span></a></span></span><span> </span><span id="local-6989586621680386098"><span class="annot"><span class="annottext">OutputStream ByteString
+</span><a href="#local-6989586621680386098"><span class="hs-identifier hs-var">s</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-131"></span><span>  </span><span class="annot"><span class="annottext">(Maybe Uninterpreted -&gt; IO ()) -&gt; IO (OutputStream Uninterpreted)
+forall a. (Maybe a -&gt; IO ()) -&gt; IO (OutputStream a)
+</span><span class="hs-identifier hs-var">makeOutputStream</span></span><span> </span><span class="hs-glyph">\</span><span class="hs-glyph">case</span><span>
+</span><span id="line-132"></span><span>    </span><span class="annot"><span class="annottext">Maybe Uninterpreted
+</span><span class="hs-identifier hs-var">Nothing</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">EOF -&gt; IO ()
+forall e a. (HasCallStack, Exception e) =&gt; e -&gt; IO a
+</span><span class="hs-identifier hs-var">throwIO</span></span><span> </span><span class="annot"><span class="annottext">EOF
+</span><a href="M.IO.Internal.Datagram.html#EOF"><span class="hs-identifier hs-var">EOF</span></a></span><span>
+</span><span id="line-133"></span><span>    </span><span class="annot"><span class="hs-identifier hs-type">Just</span></span><span> </span><span id="local-6989586621680386100"><span class="annot"><span class="annottext">Uninterpreted
+</span><a href="#local-6989586621680386100"><span class="hs-identifier hs-var">u</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-134"></span><span>      </span><span id="local-6989586621680386101"><span class="annot"><a href="#local-6989586621680386101"><span class="hs-identifier hs-var">threshold</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">TVar Int -&gt; IO Int
+forall a. TVar a -&gt; IO a
+</span><span class="hs-identifier hs-var">readTVarIO</span></span><span> </span><span class="annot"><span class="annottext">TVar Int
+</span><a href="#local-6989586621680386097"><span class="hs-identifier hs-var">c</span></a></span><span>
+</span><span id="line-135"></span><span>      </span><span class="annot"><span class="hs-identifier hs-type">write</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">Just</span></span><span> </span><span class="annot"><span class="hs-operator hs-type">$</span></span><span> </span><span class="annot"><a href="#local-6989586621680386103"><span class="hs-identifier hs-type">reify</span></a></span><span> </span><span class="annot"><span class="hs-operator hs-type">$</span></span><span> </span><span class="annot"><a href="#local-6989586621680386104"><span class="hs-identifier hs-type">encode</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680386101"><span class="hs-identifier hs-type">threshold</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680386100"><span class="hs-identifier hs-type">u</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><a href="#local-6989586621680386098"><span class="hs-identifier hs-type">s</span></a></span><span>
+</span><span id="line-136"></span><span>  </span><span class="hs-keyword">where</span><span>
+</span><span id="line-137"></span><span>    </span><span id="local-6989586621680386103"><span class="annot"><span class="annottext">reify :: Builder -&gt; ByteString
+</span><a href="#local-6989586621680386103"><span class="hs-identifier hs-var hs-var">reify</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">LazyByteString -&gt; ByteString
+</span><span class="hs-identifier hs-var">B.toStrict</span></span><span> </span><span class="annot"><span class="annottext">(LazyByteString -&gt; ByteString)
+-&gt; (Builder -&gt; LazyByteString) -&gt; Builder -&gt; ByteString
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">Builder -&gt; LazyByteString
+</span><span class="hs-identifier hs-var">BB.toLazyByteString</span></span><span>
+</span><span id="line-138"></span><span>    </span><span class="hs-comment">-- notes on &quot;INLINE&quot;: inline thought to be good for sharing</span><span>
+</span><span id="line-139"></span><span>    </span><span class="hs-comment">-- esp. the compression part (to avoid compressing the same data twice)</span><span>
+</span><span id="line-140"></span><span>    </span><span class="hs-comment">-- (remains to be checked)</span><span>
+</span><span id="line-141"></span><span>    </span><span id="local-6989586621680386104"><span class="annot"><span class="annottext">encode :: Int -&gt; Uninterpreted -&gt; Builder
+</span><a href="#local-6989586621680386104"><span class="hs-identifier hs-var hs-var">encode</span></a></span></span><span> </span><span id="local-6989586621680386109"><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621680386109"><span class="hs-identifier hs-var">d</span></a></span></span><span> </span><span id="local-6989586621680386110"><span class="annot"><span class="annottext">Uninterpreted
+</span><a href="#local-6989586621680386110"><span class="hs-identifier hs-var">u</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-142"></span><span>      </span><span class="hs-keyword">let</span><span> </span><span class="annot"><a href="M.IO.Internal.Datagram.html#B"><span class="hs-identifier hs-type">B</span></a></span><span> </span><span id="local-6989586621680386111"><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621680386111"><span class="hs-identifier hs-var">n</span></a></span></span><span> </span><span id="local-6989586621680386112"><span class="annot"><span class="annottext">Builder
+</span><a href="#local-6989586621680386112"><span class="hs-identifier hs-var">b</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int -&gt; Uninterpreted -&gt; Building
+</span><a href="#local-6989586621680386113"><span class="hs-identifier hs-var">encodez</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621680386109"><span class="hs-identifier hs-var">d</span></a></span><span> </span><span class="annot"><span class="annottext">Uninterpreted
+</span><a href="#local-6989586621680386110"><span class="hs-identifier hs-var">u</span></a></span><span>
+</span><span id="line-143"></span><span>       </span><span class="hs-keyword">in</span><span> </span><span class="annot"><span class="annottext">Int -&gt; Builder
+forall a. Integral a =&gt; a -&gt; Builder
+</span><a href="M.Pack.Internal.Num.html#packleb32"><span class="hs-identifier hs-var">packleb32</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621680386111"><span class="hs-identifier hs-var">n</span></a></span><span> </span><span class="annot"><span class="annottext">Builder -&gt; Builder -&gt; Builder
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">&lt;&gt;</span></span><span> </span><span class="annot"><span class="annottext">Builder
+</span><a href="#local-6989586621680386112"><span class="hs-identifier hs-var">b</span></a></span><span>
+</span><span id="line-144"></span><span>    </span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="#local-6989586621680386104"><span class="hs-pragma hs-type">encode</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-145"></span><span>    </span><span id="local-6989586621680386113"><span class="annot"><span class="annottext">encodez :: Int -&gt; Uninterpreted -&gt; Building
+</span><a href="#local-6989586621680386113"><span class="hs-identifier hs-var hs-var">encodez</span></a></span></span><span> </span><span id="local-6989586621680386121"><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621680386121"><span class="hs-identifier hs-var">threshold</span></a></span></span><span> </span><span id="local-6989586621680386122"><span class="annot"><span class="annottext">u :: Uninterpreted
+</span><a href="#local-6989586621680386122"><span class="hs-identifier hs-var">u</span></a></span></span><span class="hs-glyph">@</span><span class="hs-special">(</span><span class="annot"><a href="M.IO.Internal.Datagram.html#Uninterpreted"><span class="hs-identifier hs-type">Uninterpreted</span></a></span><span> </span><span id="local-6989586621680386123"><span class="annot"><span class="annottext">Word8
+</span><a href="#local-6989586621680386123"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span id="local-6989586621680386124"><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621680386124"><span class="hs-identifier hs-var">d</span></a></span></span><span class="hs-special">)</span><span>
+</span><span id="line-146"></span><span>      </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621680386121"><span class="hs-identifier hs-var">threshold</span></a></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Bool
+forall a. Ord a =&gt; a -&gt; a -&gt; Bool
+</span><span class="hs-operator hs-var">&lt;</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">0</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Uninterpreted -&gt; Building
+</span><a href="#local-6989586621680386125"><span class="hs-identifier hs-var">encodeplain</span></a></span><span> </span><span class="annot"><span class="annottext">Uninterpreted
+</span><a href="#local-6989586621680386122"><span class="hs-identifier hs-var">u</span></a></span><span>
+</span><span id="line-147"></span><span>      </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="annottext">ByteString -&gt; Int
+</span><span class="hs-identifier hs-var">B.length</span></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621680386124"><span class="hs-identifier hs-var">d</span></a></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Bool
+forall a. Ord a =&gt; a -&gt; a -&gt; Bool
+</span><span class="hs-operator hs-var">&lt;</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621680386121"><span class="hs-identifier hs-var">threshold</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Uninterpreted -&gt; Building
+</span><a href="#local-6989586621680386126"><span class="hs-identifier hs-var">encodeu</span></a></span><span> </span><span class="annot"><span class="annottext">Uninterpreted
+</span><a href="#local-6989586621680386122"><span class="hs-identifier hs-var">u</span></a></span><span>
+</span><span id="line-148"></span><span>      </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="annottext">Bool
+</span><span class="hs-identifier hs-var">otherwise</span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-149"></span><span>          </span><span class="annot"><span class="annottext">Builder -&gt; Building
+</span><a href="#local-6989586621680386127"><span class="hs-identifier hs-var">mkb</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int -&gt; Builder
+forall a. Integral a =&gt; a -&gt; Builder
+</span><a href="M.Pack.Internal.Num.html#packleb32"><span class="hs-identifier hs-var">packleb32</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">ByteString -&gt; Int
+</span><span class="hs-identifier hs-var">B.length</span></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621680386124"><span class="hs-identifier hs-var">d</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-150"></span><span>            </span><span class="annot"><span class="annottext">Building -&gt; Building -&gt; Building
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">&lt;&gt;</span></span><span> </span><span class="annot"><span class="annottext">Builder -&gt; Building
+</span><a href="#local-6989586621680386127"><span class="hs-identifier hs-var">mkb</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Word8 -&gt; Builder
+</span><span class="hs-identifier hs-var">BB.word8</span></span><span> </span><span class="annot"><span class="annottext">Word8
+</span><a href="#local-6989586621680386123"><span class="hs-identifier hs-var">f</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-151"></span><span>            </span><span class="annot"><span class="annottext">Building -&gt; Building -&gt; Building
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">&lt;&gt;</span></span><span> </span><span class="annot"><span class="annottext">Builder -&gt; Building
+</span><a href="#local-6989586621680386127"><span class="hs-identifier hs-var">mkb</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">LazyByteString -&gt; Builder
+</span><span class="hs-identifier hs-var">BB.lazyByteString</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">LazyByteString -&gt; LazyByteString
+</span><span class="hs-identifier hs-var">compress</span></span><span> </span><span class="annot"><span class="annottext">(LazyByteString -&gt; LazyByteString)
+-&gt; LazyByteString -&gt; LazyByteString
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">ByteString -&gt; LazyByteString
+</span><span class="hs-identifier hs-var">B.fromStrict</span></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621680386124"><span class="hs-identifier hs-var">d</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-152"></span><span>    </span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="#local-6989586621680386113"><span class="hs-pragma hs-type">encodez</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-153"></span><span>    </span><span id="local-6989586621680386126"><span class="annot"><span class="annottext">encodeu :: Uninterpreted -&gt; Building
+</span><a href="#local-6989586621680386126"><span class="hs-identifier hs-var hs-var">encodeu</span></a></span></span><span> </span><span id="local-6989586621680386134"><span class="annot"><span class="annottext">Uninterpreted
+</span><a href="#local-6989586621680386134"><span class="hs-identifier hs-var">u</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Builder -&gt; Building
+</span><a href="#local-6989586621680386127"><span class="hs-identifier hs-var">mkb</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Word8 -&gt; Builder
+</span><span class="hs-identifier hs-var">BB.word8</span></span><span> </span><span class="annot"><span class="annottext">Word8
+</span><span class="hs-number">0</span></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Building -&gt; Building -&gt; Building
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">&lt;&gt;</span></span><span> </span><span class="annot"><span class="annottext">Uninterpreted -&gt; Building
+</span><a href="#local-6989586621680386125"><span class="hs-identifier hs-var">encodeplain</span></a></span><span> </span><span class="annot"><span class="annottext">Uninterpreted
+</span><a href="#local-6989586621680386134"><span class="hs-identifier hs-var">u</span></a></span><span>
+</span><span id="line-154"></span><span>    </span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="#local-6989586621680386126"><span class="hs-pragma hs-type">encodeu</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-155"></span><span>    </span><span id="local-6989586621680386125"><span class="annot"><span class="annottext">encodeplain :: Uninterpreted -&gt; Building
+</span><a href="#local-6989586621680386125"><span class="hs-identifier hs-var hs-var">encodeplain</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="M.IO.Internal.Datagram.html#Uninterpreted"><span class="hs-identifier hs-type">Uninterpreted</span></a></span><span> </span><span id="local-6989586621680386136"><span class="annot"><span class="annottext">Word8
+</span><a href="#local-6989586621680386136"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span id="local-6989586621680386137"><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621680386137"><span class="hs-identifier hs-var">d</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Builder -&gt; Building
+</span><a href="#local-6989586621680386127"><span class="hs-identifier hs-var">mkb</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Word8 -&gt; Builder
+</span><span class="hs-identifier hs-var">BB.word8</span></span><span> </span><span class="annot"><span class="annottext">Word8
+</span><a href="#local-6989586621680386136"><span class="hs-identifier hs-var">f</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Building -&gt; Building -&gt; Building
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">&lt;&gt;</span></span><span> </span><span class="annot"><span class="annottext">Builder -&gt; Building
+</span><a href="#local-6989586621680386127"><span class="hs-identifier hs-var">mkb</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">ByteString -&gt; Builder
+</span><span class="hs-identifier hs-var">BB.byteString</span></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621680386137"><span class="hs-identifier hs-var">d</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-156"></span><span>    </span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="#local-6989586621680386125"><span class="hs-pragma hs-type">encodeplain</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-157"></span><span>    </span><span id="local-6989586621680386127"><span class="annot"><span class="annottext">mkb :: Builder -&gt; Building
+</span><a href="#local-6989586621680386127"><span class="hs-identifier hs-var hs-var">mkb</span></a></span></span><span> </span><span id="local-6989586621680386142"><span class="annot"><span class="annottext">Builder
+</span><a href="#local-6989586621680386142"><span class="hs-identifier hs-var">b</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int -&gt; Builder -&gt; Building
+</span><a href="M.IO.Internal.Datagram.html#B"><span class="hs-identifier hs-var">B</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int64 -&gt; Int
+forall a b. (Integral a, Num b) =&gt; a -&gt; b
+</span><span class="hs-identifier hs-var">fromIntegral</span></span><span> </span><span class="annot"><span class="annottext">(Int64 -&gt; Int) -&gt; Int64 -&gt; Int
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">LazyByteString -&gt; Int64
+</span><span class="hs-identifier hs-var">BL.length</span></span><span> </span><span class="annot"><span class="annottext">(LazyByteString -&gt; Int64) -&gt; LazyByteString -&gt; Int64
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">Builder -&gt; LazyByteString
+</span><span class="hs-identifier hs-var">BB.toLazyByteString</span></span><span> </span><span class="annot"><span class="annottext">Builder
+</span><a href="#local-6989586621680386142"><span class="hs-identifier hs-var">b</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Builder
+</span><a href="#local-6989586621680386142"><span class="hs-identifier hs-var">b</span></a></span><span>
+</span><span id="line-158"></span><span>    </span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="#local-6989586621680386127"><span class="hs-pragma hs-type">mkb</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-159"></span><span>
+</span><span id="line-160"></span><span class="annot"><span class="hs-comment">-- | register an octet streaming decryptor to an input stream</span></span><span>
+</span><span id="line-161"></span><span class="annot"><a href="M.IO.Internal.Datagram.html#makedecrypting"><span class="hs-identifier hs-type">makedecrypting</span></a></span><span> </span><span class="hs-glyph">::</span><span>
+</span><span id="line-162"></span><span>  </span><span class="annot"><span class="hs-comment">-- | decryptor</span></span><span>
+</span><span id="line-163"></span><span>  </span><span class="annot"><span class="hs-identifier hs-type">TVar</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">ByteString</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">IO</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">ByteString</span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-164"></span><span>  </span><span class="annot"><span class="hs-comment">-- | input stream</span></span><span>
+</span><span id="line-165"></span><span>  </span><span class="annot"><span class="hs-identifier hs-type">InputStream</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">ByteString</span></span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-166"></span><span>  </span><span class="annot"><span class="hs-comment">-- | new input stream</span></span><span>
+</span><span id="line-167"></span><span>  </span><span class="annot"><span class="hs-identifier hs-type">IO</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">InputStream</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">ByteString</span></span><span class="hs-special">)</span><span>
+</span><span id="line-168"></span><span id="makedecrypting"><span class="annot"><span class="annottext">makedecrypting :: TVar (ByteString -&gt; IO ByteString)
+-&gt; InputStream ByteString -&gt; IO (InputStream ByteString)
+</span><a href="M.IO.Internal.Datagram.html#makedecrypting"><span class="hs-identifier hs-var hs-var">makedecrypting</span></a></span></span><span> </span><span id="local-6989586621680386144"><span class="annot"><span class="annottext">TVar (ByteString -&gt; IO ByteString)
+</span><a href="#local-6989586621680386144"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span id="local-6989586621680386145"><span class="annot"><span class="annottext">InputStream ByteString
+</span><a href="#local-6989586621680386145"><span class="hs-identifier hs-var">s</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">IO (Maybe ByteString) -&gt; IO (InputStream ByteString)
+forall a. IO (Maybe a) -&gt; IO (InputStream a)
+</span><span class="hs-identifier hs-var">makeInputStream</span></span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-169"></span><span>  </span><span class="annot"><span class="annottext">InputStream ByteString -&gt; IO (Maybe ByteString)
+forall a. InputStream a -&gt; IO (Maybe a)
+</span><span class="hs-identifier hs-var">read</span></span><span> </span><span class="annot"><span class="annottext">InputStream ByteString
+</span><a href="#local-6989586621680386145"><span class="hs-identifier hs-var">s</span></a></span><span> </span><span class="annot"><span class="annottext">IO (Maybe ByteString)
+-&gt; (Maybe ByteString -&gt; IO (Maybe ByteString))
+-&gt; IO (Maybe ByteString)
+forall a b. IO a -&gt; (a -&gt; IO b) -&gt; IO b
+forall (m :: * -&gt; *) a b. Monad m =&gt; m a -&gt; (a -&gt; m b) -&gt; m b
+</span><span class="hs-operator hs-var">&gt;&gt;=</span></span><span> </span><span class="hs-glyph">\</span><span class="hs-glyph">case</span><span>
+</span><span id="line-170"></span><span>    </span><span class="annot"><span class="annottext">Maybe ByteString
+</span><span class="hs-identifier hs-var">Nothing</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Maybe ByteString -&gt; IO (Maybe ByteString)
+forall a. a -&gt; IO a
+forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><span class="hs-identifier hs-var">pure</span></span><span> </span><span class="annot"><span class="annottext">Maybe ByteString
+forall a. Maybe a
+</span><span class="hs-identifier hs-var">Nothing</span></span><span>
+</span><span id="line-171"></span><span>    </span><span class="annot"><span class="hs-identifier hs-type">Just</span></span><span> </span><span id="local-6989586621680386147"><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621680386147"><span class="hs-identifier hs-var">b</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">TVar (ByteString -&gt; IO ByteString)
+-&gt; IO (ByteString -&gt; IO ByteString)
+forall a. TVar a -&gt; IO a
+</span><span class="hs-identifier hs-var">readTVarIO</span></span><span> </span><span class="annot"><span class="annottext">TVar (ByteString -&gt; IO ByteString)
+</span><a href="#local-6989586621680386144"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="annot"><span class="annottext">IO (ByteString -&gt; IO ByteString)
+-&gt; ((ByteString -&gt; IO ByteString) -&gt; IO (Maybe ByteString))
+-&gt; IO (Maybe ByteString)
+forall a b. IO a -&gt; (a -&gt; IO b) -&gt; IO b
+forall (m :: * -&gt; *) a b. Monad m =&gt; m a -&gt; (a -&gt; m b) -&gt; m b
+</span><span class="hs-operator hs-var">&gt;&gt;=</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">ByteString -&gt; Maybe ByteString
+forall a. a -&gt; Maybe a
+</span><span class="hs-identifier hs-var">Just</span></span><span> </span><span class="annot"><span class="annottext">(ByteString -&gt; Maybe ByteString)
+-&gt; IO ByteString -&gt; IO (Maybe ByteString)
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-operator hs-var">&lt;$&gt;</span></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">(IO ByteString -&gt; IO (Maybe ByteString))
+-&gt; ((ByteString -&gt; IO ByteString) -&gt; IO ByteString)
+-&gt; (ByteString -&gt; IO ByteString)
+-&gt; IO (Maybe ByteString)
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">(ByteString -&gt; IO ByteString) -&gt; ByteString -&gt; IO ByteString
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621680386147"><span class="hs-identifier hs-var">b</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-172"></span><span>
+</span><span id="line-173"></span><span class="annot"><span class="hs-comment">-- | register an octet stremaing encryptor to an output stream</span></span><span>
+</span><span id="line-174"></span><span class="annot"><a href="M.IO.Internal.Datagram.html#makeencrypting"><span class="hs-identifier hs-type">makeencrypting</span></a></span><span> </span><span class="hs-glyph">::</span><span>
+</span><span id="line-175"></span><span>  </span><span class="annot"><span class="hs-comment">-- | encryptor</span></span><span>
+</span><span id="line-176"></span><span>  </span><span class="annot"><span class="hs-identifier hs-type">TVar</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">ByteString</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">IO</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">ByteString</span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-177"></span><span>  </span><span class="annot"><span class="hs-comment">-- | output stream</span></span><span>
+</span><span id="line-178"></span><span>  </span><span class="annot"><span class="hs-identifier hs-type">OutputStream</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">ByteString</span></span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-179"></span><span>  </span><span class="annot"><span class="hs-comment">-- | new output stream</span></span><span>
+</span><span id="line-180"></span><span>  </span><span class="annot"><span class="hs-identifier hs-type">IO</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">OutputStream</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">ByteString</span></span><span class="hs-special">)</span><span>
+</span><span id="line-181"></span><span id="makeencrypting"><span class="annot"><span class="annottext">makeencrypting :: TVar (ByteString -&gt; IO ByteString)
+-&gt; OutputStream ByteString -&gt; IO (OutputStream ByteString)
+</span><a href="M.IO.Internal.Datagram.html#makeencrypting"><span class="hs-identifier hs-var hs-var">makeencrypting</span></a></span></span><span> </span><span id="local-6989586621680386148"><span class="annot"><span class="annottext">TVar (ByteString -&gt; IO ByteString)
+</span><a href="#local-6989586621680386148"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span id="local-6989586621680386149"><span class="annot"><span class="annottext">OutputStream ByteString
+</span><a href="#local-6989586621680386149"><span class="hs-identifier hs-var">s</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(Maybe ByteString -&gt; IO ()) -&gt; IO (OutputStream ByteString)
+forall a. (Maybe a -&gt; IO ()) -&gt; IO (OutputStream a)
+</span><span class="hs-identifier hs-var">makeOutputStream</span></span><span> </span><span class="hs-glyph">\</span><span class="hs-glyph">case</span><span>
+</span><span id="line-182"></span><span>  </span><span class="annot"><span class="annottext">Maybe ByteString
+</span><span class="hs-identifier hs-var">Nothing</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">() -&gt; IO ()
+forall a. a -&gt; IO a
+forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><span class="hs-identifier hs-var">pure</span></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span>
+</span><span id="line-183"></span><span>  </span><span class="annot"><span class="hs-identifier hs-type">Just</span></span><span> </span><span id="local-6989586621680386150"><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621680386150"><span class="hs-identifier hs-var">b</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-184"></span><span>    </span><span id="local-6989586621680386151"><span class="annot"><a href="#local-6989586621680386151"><span class="hs-identifier hs-var">g</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">TVar (ByteString -&gt; IO ByteString)
+-&gt; IO (ByteString -&gt; IO ByteString)
+forall a. TVar a -&gt; IO a
+</span><span class="hs-identifier hs-var">readTVarIO</span></span><span> </span><span class="annot"><span class="annottext">TVar (ByteString -&gt; IO ByteString)
+</span><a href="#local-6989586621680386148"><span class="hs-identifier hs-var">f</span></a></span><span>
+</span><span id="line-185"></span><span>    </span><span class="annot"><a href="#local-6989586621680386151"><span class="hs-identifier hs-type">g</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680386150"><span class="hs-identifier hs-type">b</span></a></span><span> </span><span class="annot"><span class="hs-operator hs-type">&gt;&gt;=</span></span><span> </span><span class="hs-glyph">\</span><span id="local-6989586621680386152"><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621680386152"><span class="hs-identifier hs-var">c</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Maybe ByteString -&gt; OutputStream ByteString -&gt; IO ()
+forall a. Maybe a -&gt; OutputStream a -&gt; IO ()
+</span><span class="hs-identifier hs-var">write</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">ByteString -&gt; Maybe ByteString
+forall a. a -&gt; Maybe a
+</span><span class="hs-identifier hs-var">Just</span></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621680386152"><span class="hs-identifier hs-var">c</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">OutputStream ByteString
+</span><a href="#local-6989586621680386149"><span class="hs-identifier hs-var">s</span></a></span><span>
+</span><span id="line-186"></span></pre></body></html>

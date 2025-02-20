@@ -1,0 +1,673 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span id="local-6989586621680373788"><span id="local-6989586621680373789"></span></span><span class="hs-comment">-- |</span><span>
+</span><span id="line-2"></span><span class="hs-comment">-- Module: M.LEB</span><span>
+</span><span id="line-3"></span><span class="hs-comment">-- Description: LEB128 encoding support for integers</span><span>
+</span><span id="line-4"></span><span class="hs-comment">-- Copyright: (c) axionbuster, 2025</span><span>
+</span><span id="line-5"></span><span class="hs-comment">-- License: BSD-3-Clause</span><span>
+</span><span id="line-6"></span><span class="hs-comment">--</span><span>
+</span><span id="line-7"></span><span class="hs-comment">-- Implements LEB128 (Little-Endian Base 128) variable-length encoding</span><span>
+</span><span id="line-8"></span><span class="hs-comment">-- for arbitrary finite-bit integers, used in the Minecraft protocol.</span><span>
+</span><span id="line-9"></span><span class="hs-keyword">module</span><span> </span><span class="annot"><a href="M.LEB.html"><span class="hs-identifier">M.LEB</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="M.LEB.html#LEB"><span class="hs-identifier">LEB</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span> </span><span class="annot"><a href="M.LEB.html#VarInt"><span class="hs-identifier">VarInt</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="M.LEB.html#VarLong"><span class="hs-identifier">VarLong</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="M.LEB.html#decodeleb"><span class="hs-identifier">decodeleb</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="M.LEB.html#encodeleb"><span class="hs-identifier">encodeleb</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-10"></span><span>
+</span><span id="line-11"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Control.DeepSeq</span></span><span>
+</span><span id="line-12"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Control.Monad.Fix</span></span><span>
+</span><span id="line-13"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Bits</span></span><span>
+</span><span id="line-14"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.ByteString.Builder</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">Builder</span></span><span class="hs-special">)</span><span>
+</span><span id="line-15"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.ByteString.Builder</span></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">BB</span></span><span>
+</span><span id="line-16"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Data</span></span><span>
+</span><span id="line-17"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Function</span></span><span>
+</span><span id="line-18"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Hashable</span></span><span>
+</span><span id="line-19"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Int</span></span><span>
+</span><span id="line-20"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Word</span></span><span>
+</span><span id="line-21"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">GHC.Generics</span></span><span> </span><span class="hs-keyword">hiding</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">S</span></span><span class="hs-special">)</span><span>
+</span><span id="line-22"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Language.Haskell.TH.Syntax</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">Lift</span></span><span class="hs-special">)</span><span>
+</span><span id="line-23"></span><span>
+</span><span id="line-24"></span><span class="hs-comment">-- | a LEB128 (unsigned) encoded integer. the integer itself may or</span><span>
+</span><span id="line-25"></span><span class="hs-comment">-- may not be signed</span><span>
+</span><span id="line-26"></span><span class="hs-keyword">newtype</span><span> </span><span id="LEB"><span class="annot"><a href="M.LEB.html#LEB"><span class="hs-identifier hs-var">LEB</span></a></span></span><span> </span><span id="local-6989586621680373655"><span class="annot"><a href="#local-6989586621680373655"><span class="hs-identifier hs-type">a</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="LEB"><span class="annot"><a href="M.LEB.html#LEB"><span class="hs-identifier hs-var">LEB</span></a></span></span><span> </span><span class="hs-special">{</span><span id="getleb"><span class="annot"><span class="annottext">forall a. LEB a -&gt; a
+</span><a href="M.LEB.html#getleb"><span class="hs-identifier hs-var hs-var">getleb</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="#local-6989586621680373655"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">}</span><span>
+</span><span id="line-27"></span><span>  </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">newtype</span></span><span>
+</span><span id="line-28"></span><span>    </span><span class="hs-special">(</span><span> </span><span id="local-6989586621680373812"><span id="local-6989586621680373816"><span id="local-6989586621680373820"><span class="annot"><span class="annottext">Int -&gt; LEB a -&gt; String -&gt; String
+[LEB a] -&gt; String -&gt; String
+LEB a -&gt; String
+(Int -&gt; LEB a -&gt; String -&gt; String)
+-&gt; (LEB a -&gt; String)
+-&gt; ([LEB a] -&gt; String -&gt; String)
+-&gt; Show (LEB a)
+forall a. Show a =&gt; Int -&gt; LEB a -&gt; String -&gt; String
+forall a. Show a =&gt; [LEB a] -&gt; String -&gt; String
+forall a. Show a =&gt; LEB a -&gt; String
+forall a.
+(Int -&gt; a -&gt; String -&gt; String)
+-&gt; (a -&gt; String) -&gt; ([a] -&gt; String -&gt; String) -&gt; Show a
+$cshowsPrec :: forall a. Show a =&gt; Int -&gt; LEB a -&gt; String -&gt; String
+showsPrec :: Int -&gt; LEB a -&gt; String -&gt; String
+$cshow :: forall a. Show a =&gt; LEB a -&gt; String
+show :: LEB a -&gt; String
+$cshowList :: forall a. Show a =&gt; [LEB a] -&gt; String -&gt; String
+showList :: [LEB a] -&gt; String -&gt; String
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Show</span></span></span></span></span><span class="hs-special">,</span><span>
+</span><span id="line-29"></span><span>      </span><span id="local-6989586621680373830"><span id="local-6989586621680373834"><span id="local-6989586621680373838"><span id="local-6989586621680373842"><span class="annot"><span class="annottext">ReadPrec [LEB a]
+ReadPrec (LEB a)
+Int -&gt; ReadS (LEB a)
+ReadS [LEB a]
+(Int -&gt; ReadS (LEB a))
+-&gt; ReadS [LEB a]
+-&gt; ReadPrec (LEB a)
+-&gt; ReadPrec [LEB a]
+-&gt; Read (LEB a)
+forall a. Read a =&gt; ReadPrec [LEB a]
+forall a. Read a =&gt; ReadPrec (LEB a)
+forall a. Read a =&gt; Int -&gt; ReadS (LEB a)
+forall a. Read a =&gt; ReadS [LEB a]
+forall a.
+(Int -&gt; ReadS a)
+-&gt; ReadS [a] -&gt; ReadPrec a -&gt; ReadPrec [a] -&gt; Read a
+$creadsPrec :: forall a. Read a =&gt; Int -&gt; ReadS (LEB a)
+readsPrec :: Int -&gt; ReadS (LEB a)
+$creadList :: forall a. Read a =&gt; ReadS [LEB a]
+readList :: ReadS [LEB a]
+$creadPrec :: forall a. Read a =&gt; ReadPrec (LEB a)
+readPrec :: ReadPrec (LEB a)
+$creadListPrec :: forall a. Read a =&gt; ReadPrec [LEB a]
+readListPrec :: ReadPrec [LEB a]
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Read</span></span></span></span></span></span><span class="hs-special">,</span><span>
+</span><span id="line-30"></span><span>      </span><span id="local-6989586621680373853"><span id="local-6989586621680373857"><span class="annot"><span class="annottext">LEB a -&gt; LEB a -&gt; Bool
+(LEB a -&gt; LEB a -&gt; Bool) -&gt; (LEB a -&gt; LEB a -&gt; Bool) -&gt; Eq (LEB a)
+forall a. Eq a =&gt; LEB a -&gt; LEB a -&gt; Bool
+forall a. (a -&gt; a -&gt; Bool) -&gt; (a -&gt; a -&gt; Bool) -&gt; Eq a
+$c== :: forall a. Eq a =&gt; LEB a -&gt; LEB a -&gt; Bool
+== :: LEB a -&gt; LEB a -&gt; Bool
+$c/= :: forall a. Eq a =&gt; LEB a -&gt; LEB a -&gt; Bool
+/= :: LEB a -&gt; LEB a -&gt; Bool
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Eq</span></span></span></span><span class="hs-special">,</span><span>
+</span><span id="line-31"></span><span>      </span><span id="local-6989586621680373868"><span id="local-6989586621680373872"><span id="local-6989586621680373876"><span id="local-6989586621680373880"><span id="local-6989586621680373884"><span id="local-6989586621680373888"><span id="local-6989586621680373892"><span class="annot"><span class="annottext">Eq (LEB a)
+Eq (LEB a) =&gt;
+(LEB a -&gt; LEB a -&gt; Ordering)
+-&gt; (LEB a -&gt; LEB a -&gt; Bool)
+-&gt; (LEB a -&gt; LEB a -&gt; Bool)
+-&gt; (LEB a -&gt; LEB a -&gt; Bool)
+-&gt; (LEB a -&gt; LEB a -&gt; Bool)
+-&gt; (LEB a -&gt; LEB a -&gt; LEB a)
+-&gt; (LEB a -&gt; LEB a -&gt; LEB a)
+-&gt; Ord (LEB a)
+LEB a -&gt; LEB a -&gt; Bool
+LEB a -&gt; LEB a -&gt; Ordering
+LEB a -&gt; LEB a -&gt; LEB a
+forall a.
+Eq a =&gt;
+(a -&gt; a -&gt; Ordering)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; Ord a
+forall a. Ord a =&gt; Eq (LEB a)
+forall a. Ord a =&gt; LEB a -&gt; LEB a -&gt; Bool
+forall a. Ord a =&gt; LEB a -&gt; LEB a -&gt; Ordering
+forall a. Ord a =&gt; LEB a -&gt; LEB a -&gt; LEB a
+$ccompare :: forall a. Ord a =&gt; LEB a -&gt; LEB a -&gt; Ordering
+compare :: LEB a -&gt; LEB a -&gt; Ordering
+$c&lt; :: forall a. Ord a =&gt; LEB a -&gt; LEB a -&gt; Bool
+&lt; :: LEB a -&gt; LEB a -&gt; Bool
+$c&lt;= :: forall a. Ord a =&gt; LEB a -&gt; LEB a -&gt; Bool
+&lt;= :: LEB a -&gt; LEB a -&gt; Bool
+$c&gt; :: forall a. Ord a =&gt; LEB a -&gt; LEB a -&gt; Bool
+&gt; :: LEB a -&gt; LEB a -&gt; Bool
+$c&gt;= :: forall a. Ord a =&gt; LEB a -&gt; LEB a -&gt; Bool
+&gt;= :: LEB a -&gt; LEB a -&gt; Bool
+$cmax :: forall a. Ord a =&gt; LEB a -&gt; LEB a -&gt; LEB a
+max :: LEB a -&gt; LEB a -&gt; LEB a
+$cmin :: forall a. Ord a =&gt; LEB a -&gt; LEB a -&gt; LEB a
+min :: LEB a -&gt; LEB a -&gt; LEB a
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Ord</span></span></span></span></span></span></span></span></span><span class="hs-special">,</span><span>
+</span><span id="line-32"></span><span>      </span><span id="local-6989586621680373906"><span id="local-6989586621680373910"><span id="local-6989586621680373914"><span id="local-6989586621680373918"><span id="local-6989586621680373922"><span id="local-6989586621680373926"><span id="local-6989586621680373930"><span id="local-6989586621680373934"><span class="annot"><span class="annottext">Int -&gt; LEB a
+LEB a -&gt; Int
+LEB a -&gt; [LEB a]
+LEB a -&gt; LEB a
+LEB a -&gt; LEB a -&gt; [LEB a]
+LEB a -&gt; LEB a -&gt; LEB a -&gt; [LEB a]
+(LEB a -&gt; LEB a)
+-&gt; (LEB a -&gt; LEB a)
+-&gt; (Int -&gt; LEB a)
+-&gt; (LEB a -&gt; Int)
+-&gt; (LEB a -&gt; [LEB a])
+-&gt; (LEB a -&gt; LEB a -&gt; [LEB a])
+-&gt; (LEB a -&gt; LEB a -&gt; [LEB a])
+-&gt; (LEB a -&gt; LEB a -&gt; LEB a -&gt; [LEB a])
+-&gt; Enum (LEB a)
+forall a. Enum a =&gt; Int -&gt; LEB a
+forall a. Enum a =&gt; LEB a -&gt; Int
+forall a. Enum a =&gt; LEB a -&gt; [LEB a]
+forall a. Enum a =&gt; LEB a -&gt; LEB a
+forall a. Enum a =&gt; LEB a -&gt; LEB a -&gt; [LEB a]
+forall a. Enum a =&gt; LEB a -&gt; LEB a -&gt; LEB a -&gt; [LEB a]
+forall a.
+(a -&gt; a)
+-&gt; (a -&gt; a)
+-&gt; (Int -&gt; a)
+-&gt; (a -&gt; Int)
+-&gt; (a -&gt; [a])
+-&gt; (a -&gt; a -&gt; [a])
+-&gt; (a -&gt; a -&gt; [a])
+-&gt; (a -&gt; a -&gt; a -&gt; [a])
+-&gt; Enum a
+$csucc :: forall a. Enum a =&gt; LEB a -&gt; LEB a
+succ :: LEB a -&gt; LEB a
+$cpred :: forall a. Enum a =&gt; LEB a -&gt; LEB a
+pred :: LEB a -&gt; LEB a
+$ctoEnum :: forall a. Enum a =&gt; Int -&gt; LEB a
+toEnum :: Int -&gt; LEB a
+$cfromEnum :: forall a. Enum a =&gt; LEB a -&gt; Int
+fromEnum :: LEB a -&gt; Int
+$cenumFrom :: forall a. Enum a =&gt; LEB a -&gt; [LEB a]
+enumFrom :: LEB a -&gt; [LEB a]
+$cenumFromThen :: forall a. Enum a =&gt; LEB a -&gt; LEB a -&gt; [LEB a]
+enumFromThen :: LEB a -&gt; LEB a -&gt; [LEB a]
+$cenumFromTo :: forall a. Enum a =&gt; LEB a -&gt; LEB a -&gt; [LEB a]
+enumFromTo :: LEB a -&gt; LEB a -&gt; [LEB a]
+$cenumFromThenTo :: forall a. Enum a =&gt; LEB a -&gt; LEB a -&gt; LEB a -&gt; [LEB a]
+enumFromThenTo :: LEB a -&gt; LEB a -&gt; LEB a -&gt; [LEB a]
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Enum</span></span></span></span></span></span></span></span></span></span><span class="hs-special">,</span><span>
+</span><span id="line-33"></span><span>      </span><span id="local-6989586621680373945"><span id="local-6989586621680373949"><span class="annot"><span class="annottext">LEB a
+LEB a -&gt; LEB a -&gt; Bounded (LEB a)
+forall a. a -&gt; a -&gt; Bounded a
+forall a. Bounded a =&gt; LEB a
+$cminBound :: forall a. Bounded a =&gt; LEB a
+minBound :: LEB a
+$cmaxBound :: forall a. Bounded a =&gt; LEB a
+maxBound :: LEB a
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Bounded</span></span></span></span><span class="hs-special">,</span><span>
+</span><span id="line-34"></span><span>      </span><span id="local-6989586621680373958"><span id="local-6989586621680373962"><span id="local-6989586621680373966"><span id="local-6989586621680373970"><span id="local-6989586621680373974"><span id="local-6989586621680373978"><span id="local-6989586621680373982"><span class="annot"><span class="annottext">Integer -&gt; LEB a
+LEB a -&gt; LEB a
+LEB a -&gt; LEB a -&gt; LEB a
+(LEB a -&gt; LEB a -&gt; LEB a)
+-&gt; (LEB a -&gt; LEB a -&gt; LEB a)
+-&gt; (LEB a -&gt; LEB a -&gt; LEB a)
+-&gt; (LEB a -&gt; LEB a)
+-&gt; (LEB a -&gt; LEB a)
+-&gt; (LEB a -&gt; LEB a)
+-&gt; (Integer -&gt; LEB a)
+-&gt; Num (LEB a)
+forall a. Num a =&gt; Integer -&gt; LEB a
+forall a. Num a =&gt; LEB a -&gt; LEB a
+forall a. Num a =&gt; LEB a -&gt; LEB a -&gt; LEB a
+forall a.
+(a -&gt; a -&gt; a)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; (a -&gt; a)
+-&gt; (a -&gt; a)
+-&gt; (a -&gt; a)
+-&gt; (Integer -&gt; a)
+-&gt; Num a
+$c+ :: forall a. Num a =&gt; LEB a -&gt; LEB a -&gt; LEB a
++ :: LEB a -&gt; LEB a -&gt; LEB a
+$c- :: forall a. Num a =&gt; LEB a -&gt; LEB a -&gt; LEB a
+- :: LEB a -&gt; LEB a -&gt; LEB a
+$c* :: forall a. Num a =&gt; LEB a -&gt; LEB a -&gt; LEB a
+* :: LEB a -&gt; LEB a -&gt; LEB a
+$cnegate :: forall a. Num a =&gt; LEB a -&gt; LEB a
+negate :: LEB a -&gt; LEB a
+$cabs :: forall a. Num a =&gt; LEB a -&gt; LEB a
+abs :: LEB a -&gt; LEB a
+$csignum :: forall a. Num a =&gt; LEB a -&gt; LEB a
+signum :: LEB a -&gt; LEB a
+$cfromInteger :: forall a. Num a =&gt; Integer -&gt; LEB a
+fromInteger :: Integer -&gt; LEB a
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Num</span></span></span></span></span></span></span></span></span><span class="hs-special">,</span><span>
+</span><span id="line-35"></span><span>      </span><span id="local-6989586621680373999"><span class="annot"><span class="annottext">Num (LEB a)
+Ord (LEB a)
+(Num (LEB a), Ord (LEB a)) =&gt; (LEB a -&gt; Rational) -&gt; Real (LEB a)
+LEB a -&gt; Rational
+forall a. (Num a, Ord a) =&gt; (a -&gt; Rational) -&gt; Real a
+forall a. Real a =&gt; Num (LEB a)
+forall a. Real a =&gt; Ord (LEB a)
+forall a. Real a =&gt; LEB a -&gt; Rational
+$ctoRational :: forall a. Real a =&gt; LEB a -&gt; Rational
+toRational :: LEB a -&gt; Rational
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Real</span></span></span><span class="hs-special">,</span><span>
+</span><span id="line-36"></span><span>      </span><span id="local-6989586621680374014"><span id="local-6989586621680374018"><span id="local-6989586621680374022"><span id="local-6989586621680374026"><span id="local-6989586621680374030"><span id="local-6989586621680374034"><span id="local-6989586621680374038"><span class="annot"><span class="annottext">Enum (LEB a)
+Real (LEB a)
+(Real (LEB a), Enum (LEB a)) =&gt;
+(LEB a -&gt; LEB a -&gt; LEB a)
+-&gt; (LEB a -&gt; LEB a -&gt; LEB a)
+-&gt; (LEB a -&gt; LEB a -&gt; LEB a)
+-&gt; (LEB a -&gt; LEB a -&gt; LEB a)
+-&gt; (LEB a -&gt; LEB a -&gt; (LEB a, LEB a))
+-&gt; (LEB a -&gt; LEB a -&gt; (LEB a, LEB a))
+-&gt; (LEB a -&gt; Integer)
+-&gt; Integral (LEB a)
+LEB a -&gt; Integer
+LEB a -&gt; LEB a -&gt; (LEB a, LEB a)
+LEB a -&gt; LEB a -&gt; LEB a
+forall a. Integral a =&gt; Enum (LEB a)
+forall a. Integral a =&gt; Real (LEB a)
+forall a. Integral a =&gt; LEB a -&gt; Integer
+forall a. Integral a =&gt; LEB a -&gt; LEB a -&gt; (LEB a, LEB a)
+forall a. Integral a =&gt; LEB a -&gt; LEB a -&gt; LEB a
+forall a.
+(Real a, Enum a) =&gt;
+(a -&gt; a -&gt; a)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; (a -&gt; a -&gt; (a, a))
+-&gt; (a -&gt; a -&gt; (a, a))
+-&gt; (a -&gt; Integer)
+-&gt; Integral a
+$cquot :: forall a. Integral a =&gt; LEB a -&gt; LEB a -&gt; LEB a
+quot :: LEB a -&gt; LEB a -&gt; LEB a
+$crem :: forall a. Integral a =&gt; LEB a -&gt; LEB a -&gt; LEB a
+rem :: LEB a -&gt; LEB a -&gt; LEB a
+$cdiv :: forall a. Integral a =&gt; LEB a -&gt; LEB a -&gt; LEB a
+div :: LEB a -&gt; LEB a -&gt; LEB a
+$cmod :: forall a. Integral a =&gt; LEB a -&gt; LEB a -&gt; LEB a
+mod :: LEB a -&gt; LEB a -&gt; LEB a
+$cquotRem :: forall a. Integral a =&gt; LEB a -&gt; LEB a -&gt; (LEB a, LEB a)
+quotRem :: LEB a -&gt; LEB a -&gt; (LEB a, LEB a)
+$cdivMod :: forall a. Integral a =&gt; LEB a -&gt; LEB a -&gt; (LEB a, LEB a)
+divMod :: LEB a -&gt; LEB a -&gt; (LEB a, LEB a)
+$ctoInteger :: forall a. Integral a =&gt; LEB a -&gt; Integer
+toInteger :: LEB a -&gt; Integer
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Integral</span></span></span></span></span></span></span></span></span><span class="hs-special">,</span><span>
+</span><span id="line-37"></span><span>      </span><span id="local-6989586621680374056"><span id="local-6989586621680374060"><span class="annot"><span class="annottext">Eq (LEB a)
+Eq (LEB a) =&gt;
+(Int -&gt; LEB a -&gt; Int) -&gt; (LEB a -&gt; Int) -&gt; Hashable (LEB a)
+Int -&gt; LEB a -&gt; Int
+LEB a -&gt; Int
+forall a. Eq a =&gt; (Int -&gt; a -&gt; Int) -&gt; (a -&gt; Int) -&gt; Hashable a
+forall a. Hashable a =&gt; Eq (LEB a)
+forall a. Hashable a =&gt; Int -&gt; LEB a -&gt; Int
+forall a. Hashable a =&gt; LEB a -&gt; Int
+$chashWithSalt :: forall a. Hashable a =&gt; Int -&gt; LEB a -&gt; Int
+hashWithSalt :: Int -&gt; LEB a -&gt; Int
+$chash :: forall a. Hashable a =&gt; LEB a -&gt; Int
+hash :: LEB a -&gt; Int
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Hashable</span></span></span></span><span>
+</span><span id="line-38"></span><span>    </span><span class="hs-special">)</span><span>
+</span><span id="line-39"></span><span>  </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">stock</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621680374069"><span id="local-6989586621680374071"><span class="annot"><span class="annottext">(forall x. LEB a -&gt; Rep (LEB a) x)
+-&gt; (forall x. Rep (LEB a) x -&gt; LEB a) -&gt; Generic (LEB a)
+forall x. Rep (LEB a) x -&gt; LEB a
+forall x. LEB a -&gt; Rep (LEB a) x
+forall a.
+(forall x. a -&gt; Rep a x) -&gt; (forall x. Rep a x -&gt; a) -&gt; Generic a
+forall a x. Rep (LEB a) x -&gt; LEB a
+forall a x. LEB a -&gt; Rep (LEB a) x
+$cfrom :: forall a x. LEB a -&gt; Rep (LEB a) x
+from :: forall x. LEB a -&gt; Rep (LEB a) x
+$cto :: forall a x. Rep (LEB a) x -&gt; LEB a
+to :: forall x. Rep (LEB a) x -&gt; LEB a
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Generic</span></span></span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Typeable</span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680374082"><span id="local-6989586621680374085"><span id="local-6989586621680374088"><span id="local-6989586621680374090"><span id="local-6989586621680374092"><span id="local-6989586621680374098"><span id="local-6989586621680374104"><span id="local-6989586621680374107"><span id="local-6989586621680374110"><span id="local-6989586621680374113"><span id="local-6989586621680374116"><span id="local-6989586621680374119"><span id="local-6989586621680374124"><span id="local-6989586621680374129"><span class="annot"><span class="annottext">Typeable (LEB a)
+Typeable (LEB a) =&gt;
+(forall (c :: * -&gt; *).
+ (forall d b. Data d =&gt; c (d -&gt; b) -&gt; d -&gt; c b)
+ -&gt; (forall g. g -&gt; c g) -&gt; LEB a -&gt; c (LEB a))
+-&gt; (forall (c :: * -&gt; *).
+    (forall b r. Data b =&gt; c (b -&gt; r) -&gt; c r)
+    -&gt; (forall r. r -&gt; c r) -&gt; Constr -&gt; c (LEB a))
+-&gt; (LEB a -&gt; Constr)
+-&gt; (LEB a -&gt; DataType)
+-&gt; (forall (t :: * -&gt; *) (c :: * -&gt; *).
+    Typeable t =&gt;
+    (forall d. Data d =&gt; c (t d)) -&gt; Maybe (c (LEB a)))
+-&gt; (forall (t :: * -&gt; * -&gt; *) (c :: * -&gt; *).
+    Typeable t =&gt;
+    (forall d e. (Data d, Data e) =&gt; c (t d e)) -&gt; Maybe (c (LEB a)))
+-&gt; ((forall b. Data b =&gt; b -&gt; b) -&gt; LEB a -&gt; LEB a)
+-&gt; (forall r r'.
+    (r -&gt; r' -&gt; r) -&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; LEB a -&gt; r)
+-&gt; (forall r r'.
+    (r' -&gt; r -&gt; r) -&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; LEB a -&gt; r)
+-&gt; (forall u. (forall d. Data d =&gt; d -&gt; u) -&gt; LEB a -&gt; [u])
+-&gt; (forall u. Int -&gt; (forall d. Data d =&gt; d -&gt; u) -&gt; LEB a -&gt; u)
+-&gt; (forall (m :: * -&gt; *).
+    Monad m =&gt;
+    (forall d. Data d =&gt; d -&gt; m d) -&gt; LEB a -&gt; m (LEB a))
+-&gt; (forall (m :: * -&gt; *).
+    MonadPlus m =&gt;
+    (forall d. Data d =&gt; d -&gt; m d) -&gt; LEB a -&gt; m (LEB a))
+-&gt; (forall (m :: * -&gt; *).
+    MonadPlus m =&gt;
+    (forall d. Data d =&gt; d -&gt; m d) -&gt; LEB a -&gt; m (LEB a))
+-&gt; Data (LEB a)
+LEB a -&gt; Constr
+LEB a -&gt; DataType
+(forall b. Data b =&gt; b -&gt; b) -&gt; LEB a -&gt; LEB a
+forall a. Data a =&gt; Typeable (LEB a)
+forall a. Data a =&gt; LEB a -&gt; Constr
+forall a. Data a =&gt; LEB a -&gt; DataType
+forall a. Data a =&gt; (forall b. Data b =&gt; b -&gt; b) -&gt; LEB a -&gt; LEB a
+forall a u.
+Data a =&gt;
+Int -&gt; (forall d. Data d =&gt; d -&gt; u) -&gt; LEB a -&gt; u
+forall a u. Data a =&gt; (forall d. Data d =&gt; d -&gt; u) -&gt; LEB a -&gt; [u]
+forall a r r'.
+Data a =&gt;
+(r -&gt; r' -&gt; r) -&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; LEB a -&gt; r
+forall a r r'.
+Data a =&gt;
+(r' -&gt; r -&gt; r) -&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; LEB a -&gt; r
+forall a (m :: * -&gt; *).
+(Data a, Monad m) =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; LEB a -&gt; m (LEB a)
+forall a (m :: * -&gt; *).
+(Data a, MonadPlus m) =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; LEB a -&gt; m (LEB a)
+forall a (c :: * -&gt; *).
+Data a =&gt;
+(forall b r. Data b =&gt; c (b -&gt; r) -&gt; c r)
+-&gt; (forall r. r -&gt; c r) -&gt; Constr -&gt; c (LEB a)
+forall a (c :: * -&gt; *).
+Data a =&gt;
+(forall d b. Data d =&gt; c (d -&gt; b) -&gt; d -&gt; c b)
+-&gt; (forall g. g -&gt; c g) -&gt; LEB a -&gt; c (LEB a)
+forall a (t :: * -&gt; *) (c :: * -&gt; *).
+(Data a, Typeable t) =&gt;
+(forall d. Data d =&gt; c (t d)) -&gt; Maybe (c (LEB a))
+forall a (t :: * -&gt; * -&gt; *) (c :: * -&gt; *).
+(Data a, Typeable t) =&gt;
+(forall d e. (Data d, Data e) =&gt; c (t d e)) -&gt; Maybe (c (LEB a))
+forall a.
+Typeable a =&gt;
+(forall (c :: * -&gt; *).
+ (forall d b. Data d =&gt; c (d -&gt; b) -&gt; d -&gt; c b)
+ -&gt; (forall g. g -&gt; c g) -&gt; a -&gt; c a)
+-&gt; (forall (c :: * -&gt; *).
+    (forall b r. Data b =&gt; c (b -&gt; r) -&gt; c r)
+    -&gt; (forall r. r -&gt; c r) -&gt; Constr -&gt; c a)
+-&gt; (a -&gt; Constr)
+-&gt; (a -&gt; DataType)
+-&gt; (forall (t :: * -&gt; *) (c :: * -&gt; *).
+    Typeable t =&gt;
+    (forall d. Data d =&gt; c (t d)) -&gt; Maybe (c a))
+-&gt; (forall (t :: * -&gt; * -&gt; *) (c :: * -&gt; *).
+    Typeable t =&gt;
+    (forall d e. (Data d, Data e) =&gt; c (t d e)) -&gt; Maybe (c a))
+-&gt; ((forall b. Data b =&gt; b -&gt; b) -&gt; a -&gt; a)
+-&gt; (forall r r'.
+    (r -&gt; r' -&gt; r) -&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; a -&gt; r)
+-&gt; (forall r r'.
+    (r' -&gt; r -&gt; r) -&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; a -&gt; r)
+-&gt; (forall u. (forall d. Data d =&gt; d -&gt; u) -&gt; a -&gt; [u])
+-&gt; (forall u. Int -&gt; (forall d. Data d =&gt; d -&gt; u) -&gt; a -&gt; u)
+-&gt; (forall (m :: * -&gt; *).
+    Monad m =&gt;
+    (forall d. Data d =&gt; d -&gt; m d) -&gt; a -&gt; m a)
+-&gt; (forall (m :: * -&gt; *).
+    MonadPlus m =&gt;
+    (forall d. Data d =&gt; d -&gt; m d) -&gt; a -&gt; m a)
+-&gt; (forall (m :: * -&gt; *).
+    MonadPlus m =&gt;
+    (forall d. Data d =&gt; d -&gt; m d) -&gt; a -&gt; m a)
+-&gt; Data a
+forall u. Int -&gt; (forall d. Data d =&gt; d -&gt; u) -&gt; LEB a -&gt; u
+forall u. (forall d. Data d =&gt; d -&gt; u) -&gt; LEB a -&gt; [u]
+forall r r'.
+(r -&gt; r' -&gt; r) -&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; LEB a -&gt; r
+forall r r'.
+(r' -&gt; r -&gt; r) -&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; LEB a -&gt; r
+forall (m :: * -&gt; *).
+Monad m =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; LEB a -&gt; m (LEB a)
+forall (m :: * -&gt; *).
+MonadPlus m =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; LEB a -&gt; m (LEB a)
+forall (c :: * -&gt; *).
+(forall b r. Data b =&gt; c (b -&gt; r) -&gt; c r)
+-&gt; (forall r. r -&gt; c r) -&gt; Constr -&gt; c (LEB a)
+forall (c :: * -&gt; *).
+(forall d b. Data d =&gt; c (d -&gt; b) -&gt; d -&gt; c b)
+-&gt; (forall g. g -&gt; c g) -&gt; LEB a -&gt; c (LEB a)
+forall (t :: * -&gt; *) (c :: * -&gt; *).
+Typeable t =&gt;
+(forall d. Data d =&gt; c (t d)) -&gt; Maybe (c (LEB a))
+forall (t :: * -&gt; * -&gt; *) (c :: * -&gt; *).
+Typeable t =&gt;
+(forall d e. (Data d, Data e) =&gt; c (t d e)) -&gt; Maybe (c (LEB a))
+$cgfoldl :: forall a (c :: * -&gt; *).
+Data a =&gt;
+(forall d b. Data d =&gt; c (d -&gt; b) -&gt; d -&gt; c b)
+-&gt; (forall g. g -&gt; c g) -&gt; LEB a -&gt; c (LEB a)
+gfoldl :: forall (c :: * -&gt; *).
+(forall d b. Data d =&gt; c (d -&gt; b) -&gt; d -&gt; c b)
+-&gt; (forall g. g -&gt; c g) -&gt; LEB a -&gt; c (LEB a)
+$cgunfold :: forall a (c :: * -&gt; *).
+Data a =&gt;
+(forall b r. Data b =&gt; c (b -&gt; r) -&gt; c r)
+-&gt; (forall r. r -&gt; c r) -&gt; Constr -&gt; c (LEB a)
+gunfold :: forall (c :: * -&gt; *).
+(forall b r. Data b =&gt; c (b -&gt; r) -&gt; c r)
+-&gt; (forall r. r -&gt; c r) -&gt; Constr -&gt; c (LEB a)
+$ctoConstr :: forall a. Data a =&gt; LEB a -&gt; Constr
+toConstr :: LEB a -&gt; Constr
+$cdataTypeOf :: forall a. Data a =&gt; LEB a -&gt; DataType
+dataTypeOf :: LEB a -&gt; DataType
+$cdataCast1 :: forall a (t :: * -&gt; *) (c :: * -&gt; *).
+(Data a, Typeable t) =&gt;
+(forall d. Data d =&gt; c (t d)) -&gt; Maybe (c (LEB a))
+dataCast1 :: forall (t :: * -&gt; *) (c :: * -&gt; *).
+Typeable t =&gt;
+(forall d. Data d =&gt; c (t d)) -&gt; Maybe (c (LEB a))
+$cdataCast2 :: forall a (t :: * -&gt; * -&gt; *) (c :: * -&gt; *).
+(Data a, Typeable t) =&gt;
+(forall d e. (Data d, Data e) =&gt; c (t d e)) -&gt; Maybe (c (LEB a))
+dataCast2 :: forall (t :: * -&gt; * -&gt; *) (c :: * -&gt; *).
+Typeable t =&gt;
+(forall d e. (Data d, Data e) =&gt; c (t d e)) -&gt; Maybe (c (LEB a))
+$cgmapT :: forall a. Data a =&gt; (forall b. Data b =&gt; b -&gt; b) -&gt; LEB a -&gt; LEB a
+gmapT :: (forall b. Data b =&gt; b -&gt; b) -&gt; LEB a -&gt; LEB a
+$cgmapQl :: forall a r r'.
+Data a =&gt;
+(r -&gt; r' -&gt; r) -&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; LEB a -&gt; r
+gmapQl :: forall r r'.
+(r -&gt; r' -&gt; r) -&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; LEB a -&gt; r
+$cgmapQr :: forall a r r'.
+Data a =&gt;
+(r' -&gt; r -&gt; r) -&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; LEB a -&gt; r
+gmapQr :: forall r r'.
+(r' -&gt; r -&gt; r) -&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; LEB a -&gt; r
+$cgmapQ :: forall a u. Data a =&gt; (forall d. Data d =&gt; d -&gt; u) -&gt; LEB a -&gt; [u]
+gmapQ :: forall u. (forall d. Data d =&gt; d -&gt; u) -&gt; LEB a -&gt; [u]
+$cgmapQi :: forall a u.
+Data a =&gt;
+Int -&gt; (forall d. Data d =&gt; d -&gt; u) -&gt; LEB a -&gt; u
+gmapQi :: forall u. Int -&gt; (forall d. Data d =&gt; d -&gt; u) -&gt; LEB a -&gt; u
+$cgmapM :: forall a (m :: * -&gt; *).
+(Data a, Monad m) =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; LEB a -&gt; m (LEB a)
+gmapM :: forall (m :: * -&gt; *).
+Monad m =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; LEB a -&gt; m (LEB a)
+$cgmapMp :: forall a (m :: * -&gt; *).
+(Data a, MonadPlus m) =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; LEB a -&gt; m (LEB a)
+gmapMp :: forall (m :: * -&gt; *).
+MonadPlus m =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; LEB a -&gt; m (LEB a)
+$cgmapMo :: forall a (m :: * -&gt; *).
+(Data a, MonadPlus m) =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; LEB a -&gt; m (LEB a)
+gmapMo :: forall (m :: * -&gt; *).
+MonadPlus m =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; LEB a -&gt; m (LEB a)
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Data</span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680374141"><span id="local-6989586621680374143"><span class="annot"><span class="annottext">(forall a b. (a -&gt; b) -&gt; LEB a -&gt; LEB b)
+-&gt; (forall a b. a -&gt; LEB b -&gt; LEB a) -&gt; Functor LEB
+forall a b. a -&gt; LEB b -&gt; LEB a
+forall a b. (a -&gt; b) -&gt; LEB a -&gt; LEB b
+forall (f :: * -&gt; *).
+(forall a b. (a -&gt; b) -&gt; f a -&gt; f b)
+-&gt; (forall a b. a -&gt; f b -&gt; f a) -&gt; Functor f
+$cfmap :: forall a b. (a -&gt; b) -&gt; LEB a -&gt; LEB b
+fmap :: forall a b. (a -&gt; b) -&gt; LEB a -&gt; LEB b
+$c&lt;$ :: forall a b. a -&gt; LEB b -&gt; LEB a
+&lt;$ :: forall a b. a -&gt; LEB b -&gt; LEB a
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Functor</span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680374149"><span id="local-6989586621680374155"><span class="annot"><span class="annottext">(forall (m :: * -&gt; *). Quote m =&gt; LEB a -&gt; m Exp)
+-&gt; (forall (m :: * -&gt; *). Quote m =&gt; LEB a -&gt; Code m (LEB a))
+-&gt; Lift (LEB a)
+forall a (m :: * -&gt; *). (Lift a, Quote m) =&gt; LEB a -&gt; m Exp
+forall a (m :: * -&gt; *).
+(Lift a, Quote m) =&gt;
+LEB a -&gt; Code m (LEB a)
+forall t.
+(forall (m :: * -&gt; *). Quote m =&gt; t -&gt; m Exp)
+-&gt; (forall (m :: * -&gt; *). Quote m =&gt; t -&gt; Code m t) -&gt; Lift t
+forall (m :: * -&gt; *). Quote m =&gt; LEB a -&gt; m Exp
+forall (m :: * -&gt; *). Quote m =&gt; LEB a -&gt; Code m (LEB a)
+$clift :: forall a (m :: * -&gt; *). (Lift a, Quote m) =&gt; LEB a -&gt; m Exp
+lift :: forall (m :: * -&gt; *). Quote m =&gt; LEB a -&gt; m Exp
+$cliftTyped :: forall a (m :: * -&gt; *).
+(Lift a, Quote m) =&gt;
+LEB a -&gt; Code m (LEB a)
+liftTyped :: forall (m :: * -&gt; *). Quote m =&gt; LEB a -&gt; Code m (LEB a)
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Lift</span></span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-40"></span><span>  </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">anyclass</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621680374164"><span class="annot"><span class="annottext">LEB a -&gt; ()
+(LEB a -&gt; ()) -&gt; NFData (LEB a)
+forall a. NFData a =&gt; LEB a -&gt; ()
+forall a. (a -&gt; ()) -&gt; NFData a
+$crnf :: forall a. NFData a =&gt; LEB a -&gt; ()
+rnf :: LEB a -&gt; ()
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var">NFData</span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-41"></span><span>
+</span><span id="line-42"></span><span class="annot"><span class="hs-comment">-- | VarInt</span></span><span>
+</span><span id="line-43"></span><span class="hs-keyword">type</span><span> </span><span id="VarInt"><span class="annot"><a href="M.LEB.html#VarInt"><span class="hs-identifier hs-var">VarInt</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><a href="M.LEB.html#LEB"><span class="hs-identifier hs-type">LEB</span></a></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Int32</span></span><span>
+</span><span id="line-44"></span><span>
+</span><span id="line-45"></span><span class="annot"><span class="hs-comment">-- | VarLong</span></span><span>
+</span><span id="line-46"></span><span class="hs-keyword">type</span><span> </span><span id="VarLong"><span class="annot"><a href="M.LEB.html#VarLong"><span class="hs-identifier hs-var">VarLong</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><a href="M.LEB.html#LEB"><span class="hs-identifier hs-type">LEB</span></a></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Int64</span></span><span>
+</span><span id="line-47"></span><span>
+</span><span id="line-48"></span><span class="hs-comment">-- internal state</span><span>
+</span><span id="line-49"></span><span class="hs-keyword">data</span><span> </span><span id="S"><span class="annot"><a href="M.LEB.html#S"><span class="hs-identifier hs-var">S</span></a></span></span><span> </span><span id="local-6989586621680373771"><span class="annot"><a href="#local-6989586621680373771"><span class="hs-identifier hs-type">a</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="S"><span class="annot"><a href="M.LEB.html#S"><span class="hs-identifier hs-var">S</span></a></span></span><span> </span><span class="hs-glyph">!</span><span class="annot"><span class="hs-identifier hs-type">Int</span></span><span> </span><span class="hs-glyph">!</span><span class="annot"><a href="#local-6989586621680373771"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-comment">-- shift, accumulator</span><span>
+</span><span id="line-50"></span><span>
+</span><span id="line-51"></span><span class="hs-comment">-- | decode an unsigned LEB128 encoded integer</span><span>
+</span><span id="line-52"></span><span class="hs-comment">--</span><span>
+</span><span id="line-53"></span><span class="hs-comment">-- the actual integer may or may not be signed; the encoding itself is</span><span>
+</span><span id="line-54"></span><span class="hs-comment">-- \&quot;unsigned\&quot;</span><span>
+</span><span id="line-55"></span><span class="annot"><a href="M.LEB.html#decodeleb"><span class="hs-identifier hs-type">decodeleb</span></a></span><span> </span><span class="hs-glyph">::</span><span>
+</span><span id="line-56"></span><span>  </span><span class="hs-keyword">forall</span><span> </span><span id="local-6989586621680373762"><span class="annot"><a href="#local-6989586621680373762"><span class="hs-identifier hs-type">m</span></a></span></span><span> </span><span id="local-6989586621680373763"><span class="annot"><a href="#local-6989586621680373763"><span class="hs-identifier hs-type">a</span></a></span></span><span class="hs-operator">.</span><span>
+</span><span id="line-57"></span><span>  </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">Monad</span></span><span> </span><span class="annot"><a href="#local-6989586621680373762"><span class="hs-identifier hs-type">m</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier hs-type">FiniteBits</span></span><span> </span><span class="annot"><a href="#local-6989586621680373763"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Num</span></span><span> </span><span class="annot"><a href="#local-6989586621680373763"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=&gt;</span><span>
+</span><span id="line-58"></span><span>  </span><span class="annot"><span class="hs-comment">-- | accept any 'Word8' value</span></span><span>
+</span><span id="line-59"></span><span>  </span><span class="annot"><a href="#local-6989586621680373762"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Word8</span></span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-60"></span><span>  </span><span class="annot"><span class="hs-comment">-- | LEB128 encoded integer</span></span><span>
+</span><span id="line-61"></span><span>  </span><span class="annot"><a href="#local-6989586621680373762"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="M.LEB.html#LEB"><span class="hs-identifier hs-type">LEB</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680373763"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-62"></span><span id="decodeleb"><span class="annot"><span class="annottext">decodeleb :: forall (m :: * -&gt; *) a.
+(Monad m, FiniteBits a, Num a) =&gt;
+m Word8 -&gt; m (LEB a)
+</span><a href="M.LEB.html#decodeleb"><span class="hs-identifier hs-var hs-var">decodeleb</span></a></span></span><span> </span><span id="local-6989586621680374204"><span class="annot"><span class="annottext">m Word8
+</span><a href="#local-6989586621680374204"><span class="hs-identifier hs-var">word8</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-63"></span><span>  </span><span class="annot"><span class="annottext">Int -&gt; a -&gt; S a
+forall a. Int -&gt; a -&gt; S a
+</span><a href="M.LEB.html#S"><span class="hs-identifier hs-var">S</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">0</span></span><span> </span><span class="annot"><span class="annottext">a
+</span><span class="hs-number">0</span></span><span> </span><span class="annot"><span class="annottext">S a -&gt; (S a -&gt; m (LEB a)) -&gt; m (LEB a)
+forall a b. a -&gt; (a -&gt; b) -&gt; b
+</span><span class="hs-operator hs-var">&amp;</span></span><span> </span><span class="annot"><span class="annottext">((S a -&gt; m (LEB a)) -&gt; S a -&gt; m (LEB a)) -&gt; S a -&gt; m (LEB a)
+forall a. (a -&gt; a) -&gt; a
+</span><span class="hs-identifier hs-var">fix</span></span><span> </span><span class="hs-glyph">\</span><span id="local-6989586621680374207"><span class="annot"><span class="annottext">S a -&gt; m (LEB a)
+</span><a href="#local-6989586621680374207"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-glyph">\</span><span class="hs-glyph">case</span><span>
+</span><span id="line-64"></span><span>    </span><span class="annot"><a href="M.LEB.html#S"><span class="hs-identifier hs-type">S</span></a></span><span> </span><span id="local-6989586621680374208"><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621680374208"><span class="hs-identifier hs-var">s</span></a></span></span><span> </span><span id="local-6989586621680374209"><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621680374209"><span class="hs-identifier hs-var">n</span></a></span></span><span> </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621680374208"><span class="hs-identifier hs-var">s</span></a></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Bool
+forall a. Ord a =&gt; a -&gt; a -&gt; Bool
+</span><span class="hs-operator hs-var">&gt;=</span></span><span> </span><span class="annot"><span class="annottext">a -&gt; Int
+forall b. FiniteBits b =&gt; b -&gt; Int
+</span><span class="hs-identifier hs-var">finiteBitSize</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">a
+forall a. HasCallStack =&gt; a
+</span><span class="hs-identifier hs-var">undefined</span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="#local-6989586621680373763"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">LEB a -&gt; m (LEB a)
+forall a. a -&gt; m a
+forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><span class="hs-identifier hs-var">pure</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">a -&gt; LEB a
+forall a. a -&gt; LEB a
+</span><a href="M.LEB.html#LEB"><span class="hs-identifier hs-var">LEB</span></a></span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621680374209"><span class="hs-identifier hs-var">n</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-65"></span><span>    </span><span class="annot"><a href="M.LEB.html#S"><span class="hs-identifier hs-type">S</span></a></span><span> </span><span id="local-6989586621680374212"><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621680374212"><span class="hs-identifier hs-var">s</span></a></span></span><span> </span><span id="local-6989586621680374213"><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621680374213"><span class="hs-identifier hs-var">n</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-66"></span><span>      </span><span id="local-6989586621680374214"><span class="annot"><a href="#local-6989586621680374214"><span class="hs-identifier hs-var">c</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">m Word8
+</span><a href="#local-6989586621680374204"><span class="hs-identifier hs-var">word8</span></a></span><span>
+</span><span id="line-67"></span><span>      </span><span class="hs-keyword">let</span><span> </span><span id="local-6989586621680374215"><span class="annot"><a href="#local-6989586621680374215"><span class="hs-identifier hs-var hs-var">d</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621680374213"><span class="hs-identifier hs-var">n</span></a></span><span> </span><span class="annot"><span class="annottext">a -&gt; a -&gt; a
+forall a. Bits a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">.|.</span></span><span> </span><span class="annot"><span class="annottext">a -&gt; Int -&gt; a
+forall a. Bits a =&gt; a -&gt; Int -&gt; a
+</span><span class="hs-identifier hs-var">shift</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">a -&gt; Int -&gt; a
+forall a. Bits a =&gt; a -&gt; Int -&gt; a
+</span><span class="hs-identifier hs-var">clearBit</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Word8 -&gt; a
+forall a b. (Integral a, Num b) =&gt; a -&gt; b
+</span><span class="hs-identifier hs-var">fromIntegral</span></span><span> </span><span class="annot"><span class="annottext">Word8
+</span><a href="#local-6989586621680374214"><span class="hs-identifier hs-var">c</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">7</span></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621680374212"><span class="hs-identifier hs-var">s</span></a></span><span>
+</span><span id="line-68"></span><span>      </span><span class="hs-keyword">if</span><span> </span><span class="annot"><span class="hs-identifier hs-type">testBit</span></span><span> </span><span class="annot"><a href="#local-6989586621680374214"><span class="hs-identifier hs-type">c</span></a></span><span> </span><span class="annot"><span class="hs-number">7</span></span><span>
+</span><span id="line-69"></span><span>        </span><span class="hs-keyword">then</span><span> </span><span class="annot"><a href="#local-6989586621680374207"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="M.LEB.html#S"><span class="hs-identifier hs-type">S</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621680374212"><span class="hs-identifier hs-type">s</span></a></span><span> </span><span class="annot"><span class="hs-operator hs-type">+</span></span><span> </span><span class="annot"><span class="hs-number">7</span></span><span class="hs-special">)</span><span> </span><span class="annot"><a href="#local-6989586621680374215"><span class="hs-identifier hs-type">d</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-70"></span><span>        </span><span class="hs-keyword">else</span><span> </span><span class="annot"><span class="hs-identifier hs-type">pure</span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="M.LEB.html#LEB"><span class="hs-identifier hs-type">LEB</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680374215"><span class="hs-identifier hs-type">d</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-71"></span><span class="hs-pragma">{-# INLINEABLE</span><span> </span><span class="annot"><a href="M.LEB.html#decodeleb"><span class="hs-pragma hs-type">decodeleb</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-72"></span><span>
+</span><span id="line-73"></span><span class="annot"><span class="hs-comment">-- | encode an LEB128 encoded integer into a 'Builder'</span></span><span>
+</span><span id="line-74"></span><span id="local-6989586621680373783"><span class="annot"><a href="M.LEB.html#encodeleb"><span class="hs-identifier hs-type">encodeleb</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">FiniteBits</span></span><span> </span><span class="annot"><a href="#local-6989586621680373783"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Integral</span></span><span> </span><span class="annot"><a href="#local-6989586621680373783"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="M.LEB.html#LEB"><span class="hs-identifier hs-type">LEB</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680373783"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Builder</span></span></span><span>
+</span><span id="line-75"></span><span id="encodeleb"><span class="annot"><span class="annottext">encodeleb :: forall a. (FiniteBits a, Integral a) =&gt; LEB a -&gt; Builder
+</span><a href="M.LEB.html#encodeleb"><span class="hs-identifier hs-var hs-var">encodeleb</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="M.LEB.html#LEB"><span class="hs-identifier hs-type">LEB</span></a></span><span> </span><span id="local-6989586621680374247"><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621680374247"><span class="hs-identifier hs-var">n</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-76"></span><span>  </span><span class="hs-keyword">let</span><span> </span><span id="local-6989586621680374254"><span class="annot"><span class="annottext">m :: a
+</span><a href="#local-6989586621680374254"><span class="hs-identifier hs-var hs-var">m</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">a -&gt; a
+forall a. Bits a =&gt; a -&gt; a
+</span><span class="hs-identifier hs-var">complement</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">a
+</span><span class="hs-number">0x7f</span></span><span> </span><span class="annot"><span class="annottext">a -&gt; Int -&gt; a
+forall a. Bits a =&gt; a -&gt; Int -&gt; a
+</span><span class="hs-operator hs-var">`rotate`</span></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">-</span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">7</span></span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-77"></span><span>      </span><span id="local-6989586621680374257"><span class="annot"><span class="annottext">l :: Word8
+</span><a href="#local-6989586621680374257"><span class="hs-identifier hs-var hs-var">l</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Word8 -&gt; Int -&gt; Word8
+forall a. Bits a =&gt; a -&gt; Int -&gt; a
+</span><span class="hs-identifier hs-var">clearBit</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">a -&gt; Word8
+forall a b. (Integral a, Num b) =&gt; a -&gt; b
+</span><span class="hs-identifier hs-var">fromIntegral</span></span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621680374247"><span class="hs-identifier hs-var">n</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">7</span></span><span>
+</span><span id="line-78"></span><span>      </span><span id="local-6989586621680374258"><span class="annot"><span class="annottext">r :: a
+</span><a href="#local-6989586621680374258"><span class="hs-identifier hs-var hs-var">r</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">a -&gt; Int -&gt; a
+forall a. Bits a =&gt; a -&gt; Int -&gt; a
+</span><span class="hs-identifier hs-var">shift</span></span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621680374247"><span class="hs-identifier hs-var">n</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">-</span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">7</span></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">a -&gt; a -&gt; a
+forall a. Bits a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">.&amp;.</span></span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621680374254"><span class="hs-identifier hs-var">m</span></a></span><span> </span><span class="hs-comment">-- force unsigned shift</span><span>
+</span><span id="line-79"></span><span>      </span><span class="hs-special">(</span><span id="local-6989586621680374260"><span class="annot"><span class="annottext">Word8
+</span><a href="#local-6989586621680374260"><span class="hs-identifier hs-var">o</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680374261"><span class="annot"><span class="annottext">Builder
+</span><a href="#local-6989586621680374261"><span class="hs-identifier hs-var">next</span></a></span></span><span class="hs-special">)</span><span>
+</span><span id="line-80"></span><span>        </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621680374247"><span class="hs-identifier hs-var">n</span></a></span><span> </span><span class="annot"><span class="annottext">a -&gt; a -&gt; a
+forall a. Bits a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">.&amp;.</span></span><span> </span><span class="annot"><span class="annottext">a -&gt; a
+forall a. Bits a =&gt; a -&gt; a
+</span><span class="hs-identifier hs-var">complement</span></span><span> </span><span class="annot"><span class="annottext">a
+</span><span class="hs-number">0x7f</span></span><span> </span><span class="annot"><span class="annottext">a -&gt; a -&gt; Bool
+forall a. Eq a =&gt; a -&gt; a -&gt; Bool
+</span><span class="hs-operator hs-var">/=</span></span><span> </span><span class="annot"><span class="annottext">a
+</span><span class="hs-number">0</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Word8 -&gt; Int -&gt; Word8
+forall a. Bits a =&gt; a -&gt; Int -&gt; a
+</span><span class="hs-identifier hs-var">setBit</span></span><span> </span><span class="annot"><span class="annottext">Word8
+</span><a href="#local-6989586621680374257"><span class="hs-identifier hs-var">l</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">7</span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">LEB a -&gt; Builder
+forall a. (FiniteBits a, Integral a) =&gt; LEB a -&gt; Builder
+</span><a href="M.LEB.html#encodeleb"><span class="hs-identifier hs-var">encodeleb</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">a -&gt; LEB a
+forall a. a -&gt; LEB a
+</span><a href="M.LEB.html#LEB"><span class="hs-identifier hs-var">LEB</span></a></span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621680374258"><span class="hs-identifier hs-var">r</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-81"></span><span>        </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="annottext">Bool
+</span><span class="hs-identifier hs-var">otherwise</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Word8
+</span><a href="#local-6989586621680374257"><span class="hs-identifier hs-var">l</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Builder
+forall a. Monoid a =&gt; a
+</span><span class="hs-identifier hs-var">mempty</span></span><span class="hs-special">)</span><span>
+</span><span id="line-82"></span><span>   </span><span class="hs-keyword">in</span><span> </span><span class="annot"><span class="annottext">Word8 -&gt; Builder
+</span><span class="hs-identifier hs-var">BB.word8</span></span><span> </span><span class="annot"><span class="annottext">Word8
+</span><a href="#local-6989586621680374260"><span class="hs-identifier hs-var">o</span></a></span><span> </span><span class="annot"><span class="annottext">Builder -&gt; Builder -&gt; Builder
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">&lt;&gt;</span></span><span> </span><span class="annot"><span class="annottext">Builder
+</span><a href="#local-6989586621680374261"><span class="hs-identifier hs-var">next</span></a></span><span>
+</span><span id="line-83"></span><span class="hs-pragma">{-# INLINEABLE</span><span> </span><span class="annot"><a href="M.LEB.html#encodeleb"><span class="hs-pragma hs-type">encodeleb</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-84"></span><span class="hs-pragma">{-# SPECIALIZE</span><span> </span><span class="annot"><a href="M.LEB.html#encodeleb"><span class="hs-pragma hs-type">encodeleb</span></a></span><span> </span><span class="hs-pragma">::</span><span> </span><span class="annot"><a href="M.LEB.html#LEB"><span class="hs-pragma hs-type">LEB</span></a></span><span> </span><span class="annot"><span class="hs-pragma hs-type">Int32</span></span><span> </span><span class="hs-pragma">-&gt;</span><span> </span><span class="annot"><span class="hs-pragma hs-type">Builder</span></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-85"></span><span class="hs-pragma">{-# SPECIALIZE</span><span> </span><span class="annot"><a href="M.LEB.html#encodeleb"><span class="hs-pragma hs-type">encodeleb</span></a></span><span> </span><span class="hs-pragma">::</span><span> </span><span class="annot"><a href="M.LEB.html#LEB"><span class="hs-pragma hs-type">LEB</span></a></span><span> </span><span class="annot"><span class="hs-pragma hs-type">Int64</span></span><span> </span><span class="hs-pragma">-&gt;</span><span> </span><span class="annot"><span class="hs-pragma hs-type">Builder</span></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-86"></span></pre></body></html>

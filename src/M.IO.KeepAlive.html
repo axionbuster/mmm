@@ -1,0 +1,195 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span class="hs-comment">-- |</span><span>
+</span><span id="line-2"></span><span class="hs-comment">-- Module: M.IO.KeepAlive</span><span>
+</span><span id="line-3"></span><span class="hs-comment">-- Description: Keep-alive mechanism for maintaining server connections</span><span>
+</span><span id="line-4"></span><span class="hs-comment">-- License: BSD-3-Clause</span><span>
+</span><span id="line-5"></span><span class="hs-comment">--</span><span>
+</span><span id="line-6"></span><span class="hs-comment">-- This module implements the Minecraft protocol's keep-alive mechanism, which helps</span><span>
+</span><span id="line-7"></span><span class="hs-comment">-- detect stale connections by periodically exchanging random numbers.</span><span>
+</span><span id="line-8"></span><span class="hs-keyword">module</span><span> </span><span class="annot"><a href="M.IO.KeepAlive.html"><span class="hs-identifier">M.IO.KeepAlive</span></a></span><span>
+</span><span id="line-9"></span><span>  </span><span class="hs-special">(</span><span> </span><span class="annot"><span class="hs-comment">-- * Types</span></span><span>
+</span><span id="line-10"></span><span>    </span><span class="annot"><a href="M.IO.KeepAlive.html#KeepAliveFail"><span class="hs-identifier">KeepAliveFail</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span>
+</span><span id="line-11"></span><span>
+</span><span id="line-12"></span><span>    </span><span class="annot"><span class="hs-comment">-- * Keep-alive functions</span></span><span>
+</span><span id="line-13"></span><span>    </span><span class="annot"><a href="M.IO.KeepAlive.html#skeepalive"><span class="hs-identifier">skeepalive</span></a></span><span class="hs-special">,</span><span> </span><span class="hs-comment">-- ^ Server keep-alive handler</span><span>
+</span><span id="line-14"></span><span>  </span><span class="hs-special">)</span><span>
+</span><span id="line-15"></span><span class="hs-keyword">where</span><span>
+</span><span id="line-16"></span><span>
+</span><span id="line-17"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Control.Applicative</span></span><span>
+</span><span id="line-18"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Control.Monad</span></span><span>
+</span><span id="line-19"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Data</span></span><span>
+</span><span id="line-20"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Functor</span></span><span>
+</span><span id="line-21"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Effectful</span></span><span>
+</span><span id="line-22"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Effectful.Concurrent</span></span><span>
+</span><span id="line-23"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Effectful.Exception</span></span><span>
+</span><span id="line-24"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="M.IO.Internal.EffectTypes.html"><span class="hs-identifier">M.IO.Internal.EffectTypes</span></a></span><span>
+</span><span id="line-25"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="M.Pack.html"><span class="hs-identifier">M.Pack</span></a></span><span>
+</span><span id="line-26"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">System.Random</span></span><span>
+</span><span id="line-27"></span><span>
+</span><span id="line-28"></span><span class="hs-comment">-- | keep-alive failure modes. Occurs when:</span><span>
+</span><span id="line-29"></span><span class="hs-comment">--</span><span>
+</span><span id="line-30"></span><span class="hs-comment">-- * the response number doesn't match the sent number ('KeepAliveFail')</span><span>
+</span><span id="line-31"></span><span class="hs-comment">-- * no response is received within timeout ('KeepAliveTimeout')</span><span>
+</span><span id="line-32"></span><span class="hs-keyword">data</span><span> </span><span id="KeepAliveFail"><span class="annot"><a href="M.IO.KeepAlive.html#KeepAliveFail"><span class="hs-identifier hs-var">KeepAliveFail</span></a></span></span><span> </span><span id="local-6989586621680387993"><span class="annot"><a href="#local-6989586621680387993"><span class="hs-identifier hs-type">a</span></a></span></span><span>
+</span><span id="line-33"></span><span>  </span><span class="hs-glyph">=</span><span> </span><span id="KeepAliveFail"><span class="annot"><a href="M.IO.KeepAlive.html#KeepAliveFail"><span class="hs-identifier hs-var">KeepAliveFail</span></a></span></span><span>
+</span><span id="line-34"></span><span>      </span><span class="annot"><span class="hs-comment">-- | sent</span></span><span>
+</span><span id="line-35"></span><span>      </span><span class="annot"><a href="#local-6989586621680387993"><span class="hs-identifier hs-type">a</span></a></span><span>
+</span><span id="line-36"></span><span>      </span><span class="annot"><span class="hs-comment">-- | received</span></span><span>
+</span><span id="line-37"></span><span>      </span><span class="annot"><a href="#local-6989586621680387993"><span class="hs-identifier hs-type">a</span></a></span><span>
+</span><span id="line-38"></span><span>  </span><span class="hs-glyph">|</span><span> </span><span id="KeepAliveTimeout"><span class="annot"><a href="M.IO.KeepAlive.html#KeepAliveTimeout"><span class="hs-identifier hs-var">KeepAliveTimeout</span></a></span></span><span>
+</span><span id="line-39"></span><span>  </span><span class="hs-keyword">deriving</span><span> </span><span class="hs-special">(</span><span id="local-6989586621680387999"><span id="local-6989586621680388006"><span class="annot"><span class="annottext">KeepAliveFail a -&gt; KeepAliveFail a -&gt; Bool
+(KeepAliveFail a -&gt; KeepAliveFail a -&gt; Bool)
+-&gt; (KeepAliveFail a -&gt; KeepAliveFail a -&gt; Bool)
+-&gt; Eq (KeepAliveFail a)
+forall a. Eq a =&gt; KeepAliveFail a -&gt; KeepAliveFail a -&gt; Bool
+forall a. (a -&gt; a -&gt; Bool) -&gt; (a -&gt; a -&gt; Bool) -&gt; Eq a
+$c== :: forall a. Eq a =&gt; KeepAliveFail a -&gt; KeepAliveFail a -&gt; Bool
+== :: KeepAliveFail a -&gt; KeepAliveFail a -&gt; Bool
+$c/= :: forall a. Eq a =&gt; KeepAliveFail a -&gt; KeepAliveFail a -&gt; Bool
+/= :: KeepAliveFail a -&gt; KeepAliveFail a -&gt; Bool
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Eq</span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680388012"><span id="local-6989586621680388018"><span id="local-6989586621680388022"><span class="annot"><span class="annottext">Int -&gt; KeepAliveFail a -&gt; ShowS
+[KeepAliveFail a] -&gt; ShowS
+KeepAliveFail a -&gt; String
+(Int -&gt; KeepAliveFail a -&gt; ShowS)
+-&gt; (KeepAliveFail a -&gt; String)
+-&gt; ([KeepAliveFail a] -&gt; ShowS)
+-&gt; Show (KeepAliveFail a)
+forall a. Show a =&gt; Int -&gt; KeepAliveFail a -&gt; ShowS
+forall a. Show a =&gt; [KeepAliveFail a] -&gt; ShowS
+forall a. Show a =&gt; KeepAliveFail a -&gt; String
+forall a.
+(Int -&gt; a -&gt; ShowS) -&gt; (a -&gt; String) -&gt; ([a] -&gt; ShowS) -&gt; Show a
+$cshowsPrec :: forall a. Show a =&gt; Int -&gt; KeepAliveFail a -&gt; ShowS
+showsPrec :: Int -&gt; KeepAliveFail a -&gt; ShowS
+$cshow :: forall a. Show a =&gt; KeepAliveFail a -&gt; String
+show :: KeepAliveFail a -&gt; String
+$cshowList :: forall a. Show a =&gt; [KeepAliveFail a] -&gt; ShowS
+showList :: [KeepAliveFail a] -&gt; ShowS
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Show</span></span></span></span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Typeable</span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680388034"><span id="local-6989586621680388038"><span id="local-6989586621680388041"><span id="local-6989586621680388044"><span class="annot"><span class="annottext">Show (KeepAliveFail a)
+Typeable (KeepAliveFail a)
+(Typeable (KeepAliveFail a), Show (KeepAliveFail a)) =&gt;
+(KeepAliveFail a -&gt; SomeException)
+-&gt; (SomeException -&gt; Maybe (KeepAliveFail a))
+-&gt; (KeepAliveFail a -&gt; String)
+-&gt; (KeepAliveFail a -&gt; Bool)
+-&gt; Exception (KeepAliveFail a)
+SomeException -&gt; Maybe (KeepAliveFail a)
+KeepAliveFail a -&gt; Bool
+KeepAliveFail a -&gt; String
+KeepAliveFail a -&gt; SomeException
+forall a. (Typeable a, Show a) =&gt; Show (KeepAliveFail a)
+forall a. (Typeable a, Show a) =&gt; Typeable (KeepAliveFail a)
+forall a.
+(Typeable a, Show a) =&gt;
+SomeException -&gt; Maybe (KeepAliveFail a)
+forall a. (Typeable a, Show a) =&gt; KeepAliveFail a -&gt; Bool
+forall a. (Typeable a, Show a) =&gt; KeepAliveFail a -&gt; String
+forall a. (Typeable a, Show a) =&gt; KeepAliveFail a -&gt; SomeException
+forall e.
+(Typeable e, Show e) =&gt;
+(e -&gt; SomeException)
+-&gt; (SomeException -&gt; Maybe e)
+-&gt; (e -&gt; String)
+-&gt; (e -&gt; Bool)
+-&gt; Exception e
+$ctoException :: forall a. (Typeable a, Show a) =&gt; KeepAliveFail a -&gt; SomeException
+toException :: KeepAliveFail a -&gt; SomeException
+$cfromException :: forall a.
+(Typeable a, Show a) =&gt;
+SomeException -&gt; Maybe (KeepAliveFail a)
+fromException :: SomeException -&gt; Maybe (KeepAliveFail a)
+$cdisplayException :: forall a. (Typeable a, Show a) =&gt; KeepAliveFail a -&gt; String
+displayException :: KeepAliveFail a -&gt; String
+$cbacktraceDesired :: forall a. (Typeable a, Show a) =&gt; KeepAliveFail a -&gt; Bool
+backtraceDesired :: KeepAliveFail a -&gt; Bool
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Exception</span></span></span></span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-40"></span><span>
+</span><span id="line-41"></span><span class="hs-comment">-- | server's keep-alive mechanism. sends a random number every 15 seconds</span><span>
+</span><span id="line-42"></span><span class="hs-comment">-- and verifies the client echoes it back correctly</span><span>
+</span><span id="line-43"></span><span class="hs-comment">--</span><span>
+</span><span id="line-44"></span><span class="hs-comment">-- throws:</span><span>
+</span><span id="line-45"></span><span class="hs-comment">--</span><span>
+</span><span id="line-46"></span><span class="hs-comment">-- * 'KeepAliveFail' if response doesn't match</span><span>
+</span><span id="line-47"></span><span class="hs-comment">-- * 'KeepAliveTimeout' if no response within timeout</span><span>
+</span><span id="line-48"></span><span class="annot"><a href="M.IO.KeepAlive.html#skeepalive"><span class="hs-identifier hs-type">skeepalive</span></a></span><span> </span><span class="hs-glyph">::</span><span>
+</span><span id="line-49"></span><span>  </span><span class="hs-keyword">forall</span><span> </span><span id="local-6989586621680387938"><span class="annot"><a href="#local-6989586621680387938"><span class="hs-identifier hs-type">a</span></a></span></span><span> </span><span id="local-6989586621680387934"><span class="annot"><a href="#local-6989586621680387934"><span class="hs-identifier hs-type">es</span></a></span></span><span> </span><span id="local-6989586621680387942"><span class="annot"><a href="#local-6989586621680387942"><span class="hs-identifier hs-type">void</span></a></span></span><span class="hs-operator">.</span><span>
+</span><span id="line-50"></span><span>  </span><span class="hs-special">(</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Concurrent</span></span><span> </span><span class="annot"><span class="hs-operator hs-type">:&gt;</span></span><span> </span><span class="annot"><a href="#local-6989586621680387934"><span class="hs-identifier hs-type">es</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-51"></span><span>    </span><span class="annot"><a href="M.IO.Internal.EffectTypes.html#Talking%27"><span class="hs-identifier hs-type">Talking'</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680387934"><span class="hs-identifier hs-type">es</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-52"></span><span>    </span><span class="annot"><span class="hs-identifier hs-type">IOE</span></span><span> </span><span class="annot"><span class="hs-operator hs-type">:&gt;</span></span><span> </span><span class="annot"><a href="#local-6989586621680387934"><span class="hs-identifier hs-type">es</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-53"></span><span>    </span><span class="annot"><span class="hs-identifier hs-type">Random</span></span><span> </span><span class="annot"><a href="#local-6989586621680387938"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-54"></span><span>    </span><span class="annot"><span class="hs-identifier hs-type">Show</span></span><span> </span><span class="annot"><a href="#local-6989586621680387938"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-55"></span><span>    </span><span class="annot"><span class="hs-identifier hs-type">Eq</span></span><span> </span><span class="annot"><a href="#local-6989586621680387938"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-56"></span><span>    </span><span class="annot"><a href="M.Pack.Internal.Types.html#Pack"><span class="hs-identifier hs-type">Pack</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680387938"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-57"></span><span>    </span><span class="annot"><a href="M.Pack.Internal.Types.html#Unpack"><span class="hs-identifier hs-type">Unpack</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680387938"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-58"></span><span>    </span><span class="annot"><span class="hs-identifier hs-type">Typeable</span></span><span> </span><span class="annot"><a href="#local-6989586621680387938"><span class="hs-identifier hs-type">a</span></a></span><span>
+</span><span id="line-59"></span><span>  </span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=&gt;</span><span>
+</span><span id="line-60"></span><span>  </span><span class="annot"><span class="hs-identifier hs-type">Eff</span></span><span> </span><span class="annot"><a href="#local-6989586621680387934"><span class="hs-identifier hs-type">es</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680387942"><span class="hs-identifier hs-type">void</span></a></span><span>
+</span><span id="line-61"></span><span id="skeepalive"><span class="annot"><span class="annottext">skeepalive :: forall a (es :: [Effect]) void.
+(Concurrent :&gt; es, Talking' es, IOE :&gt; es, Random a, Show a, Eq a,
+ Pack a, Unpack a, Typeable a) =&gt;
+Eff es void
+</span><a href="M.IO.KeepAlive.html#skeepalive"><span class="hs-identifier hs-var hs-var">skeepalive</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-62"></span><span>  </span><span class="annot"><span class="annottext">Eff es ()
+</span><a href="#local-6989586621680388090"><span class="hs-identifier hs-var">wait</span></a></span><span> </span><span class="annot"><span class="annottext">Eff es () -&gt; Eff es void -&gt; Eff es void
+forall a b. Eff es a -&gt; Eff es b -&gt; Eff es b
+forall (f :: * -&gt; *) a b. Applicative f =&gt; f a -&gt; f b -&gt; f b
+</span><span class="hs-operator hs-var">*&gt;</span></span><span> </span><span class="annot"><span class="annottext">Eff es () -&gt; Eff es void
+forall (f :: * -&gt; *) a b. Applicative f =&gt; f a -&gt; f b
+</span><span class="hs-identifier hs-var">forever</span></span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-63"></span><span>    </span><span id="local-6989586621680388092"><span class="annot"><a href="#local-6989586621680388092"><span class="hs-identifier hs-var">a</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">Eff es a
+</span><a href="#local-6989586621680388093"><span class="hs-identifier hs-var">send</span></a></span><span>
+</span><span id="line-64"></span><span>    </span><span id="local-6989586621680388094"><span class="annot"><a href="#local-6989586621680388094"><span class="hs-identifier hs-var">b</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><a href="#local-6989586621680388090"><span class="hs-identifier hs-type">wait</span></a></span><span> </span><span class="annot"><span class="hs-operator hs-type">*&gt;</span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621680388095"><span class="hs-identifier hs-type">receive</span></a></span><span> </span><span class="annot"><span class="hs-operator hs-type">&lt;|&gt;</span></span><span> </span><span class="annot"><a href="#local-6989586621680388097"><span class="hs-identifier hs-type">timeout</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-65"></span><span>    </span><span class="annot"><span class="hs-identifier hs-type">unless</span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621680388092"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="annot"><span class="hs-operator hs-type">==</span></span><span> </span><span class="annot"><a href="#local-6989586621680388094"><span class="hs-identifier hs-type">b</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-66"></span><span>      </span><span class="annot"><a href="#local-6989586621680388099"><span class="hs-identifier hs-type">mismatch</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680388092"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680388094"><span class="hs-identifier hs-type">b</span></a></span><span>
+</span><span id="line-67"></span><span>  </span><span class="hs-keyword">where</span><span>
+</span><span id="line-68"></span><span>    </span><span id="local-6989586621680388090"><span class="annot"><span class="annottext">wait :: Eff es ()
+</span><a href="#local-6989586621680388090"><span class="hs-identifier hs-var hs-var">wait</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int -&gt; Eff es ()
+forall (es :: [Effect]). (Concurrent :&gt; es) =&gt; Int -&gt; Eff es ()
+</span><span class="hs-identifier hs-var">threadDelay</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">15_000_000</span></span><span> </span><span class="hs-comment">-- microseconds</span><span>
+</span><span id="line-69"></span><span>    </span><span id="local-6989586621680388093"><span class="annot"><span class="annottext">send :: Eff es a
+</span><a href="#local-6989586621680388093"><span class="hs-identifier hs-var hs-var">send</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">IO a -&gt; Eff es a
+forall a. IO a -&gt; Eff es a
+forall (m :: * -&gt; *) a. MonadIO m =&gt; IO a -&gt; m a
+</span><span class="hs-identifier hs-var">liftIO</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">IO a
+forall a (m :: * -&gt; *). (Random a, MonadIO m) =&gt; m a
+</span><span class="hs-identifier hs-var">randomIO</span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">IO</span></span><span> </span><span class="annot"><a href="#local-6989586621680387938"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Eff es a -&gt; (a -&gt; Eff es a) -&gt; Eff es a
+forall a b. Eff es a -&gt; (a -&gt; Eff es b) -&gt; Eff es b
+forall (m :: * -&gt; *) a b. Monad m =&gt; m a -&gt; (a -&gt; m b) -&gt; m b
+</span><span class="hs-operator hs-var">&gt;&gt;=</span></span><span> </span><span class="hs-glyph">\</span><span id="local-6989586621680388104"><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621680388104"><span class="hs-identifier hs-var">n</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">a -&gt; Eff es ()
+forall a (es :: [Effect]).
+(HasCallStack, Talking :&gt; es, Pack a, Typeable a) =&gt;
+a -&gt; Eff es ()
+</span><a href="M.IO.Internal.EffectTypes.html#say"><span class="hs-identifier hs-var">say</span></a></span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621680388104"><span class="hs-identifier hs-var">n</span></a></span><span> </span><span class="annot"><span class="annottext">Eff es () -&gt; a -&gt; Eff es a
+forall (f :: * -&gt; *) a b. Functor f =&gt; f a -&gt; b -&gt; f b
+</span><span class="hs-operator hs-var">$&gt;</span></span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621680388104"><span class="hs-identifier hs-var">n</span></a></span><span>
+</span><span id="line-70"></span><span>    </span><span id="local-6989586621680388095"><span class="annot"><span class="annottext">receive :: Eff es a
+</span><a href="#local-6989586621680388095"><span class="hs-identifier hs-var hs-var">receive</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall a (es :: [Effect]).
+(HasCallStack, Talking :&gt; es, Unpack a, Typeable a) =&gt;
+Immediately -&gt; Eff es a
+</span><a href="M.IO.Internal.EffectTypes.html#hear"><span class="hs-identifier hs-var">hear</span></a></span><span> </span><span class="hs-glyph">@</span><span class="annot"><a href="#local-6989586621680387938"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="annot"><span class="annottext">Immediately
+</span><a href="M.IO.Internal.EffectTypes.html#Immediately"><span class="hs-identifier hs-var">Immediately</span></a></span><span>
+</span><span id="line-71"></span><span>    </span><span id="local-6989586621680388099"><span class="annot"><span class="annottext">mismatch :: a -&gt; a -&gt; Eff es a
+</span><a href="#local-6989586621680388099"><span class="hs-identifier hs-var hs-var">mismatch</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">KeepAliveFail a -&gt; Eff es a
+forall e (es :: [Effect]) a.
+(HasCallStack, Exception e) =&gt;
+e -&gt; Eff es a
+</span><span class="hs-identifier hs-var">throwIO</span></span><span> </span><span class="annot"><span class="annottext">(KeepAliveFail a -&gt; Eff es a)
+-&gt; (a -&gt; KeepAliveFail a) -&gt; a -&gt; Eff es a
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">((a -&gt; KeepAliveFail a) -&gt; a -&gt; Eff es a)
+-&gt; (a -&gt; a -&gt; KeepAliveFail a) -&gt; a -&gt; a -&gt; Eff es a
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">a -&gt; a -&gt; KeepAliveFail a
+forall a. a -&gt; a -&gt; KeepAliveFail a
+</span><a href="M.IO.KeepAlive.html#KeepAliveFail"><span class="hs-identifier hs-var">KeepAliveFail</span></a></span><span>
+</span><span id="line-72"></span><span>    </span><span id="local-6989586621680388097"><span class="annot"><span class="annottext">timeout :: Eff es a
+</span><a href="#local-6989586621680388097"><span class="hs-identifier hs-var hs-var">timeout</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">KeepAliveFail a -&gt; Eff es a
+forall e (es :: [Effect]) a.
+(HasCallStack, Exception e) =&gt;
+e -&gt; Eff es a
+</span><span class="hs-identifier hs-var">throwIO</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">forall a. KeepAliveFail a
+</span><a href="M.IO.KeepAlive.html#KeepAliveTimeout"><span class="hs-identifier hs-var">KeepAliveTimeout</span></a></span><span> </span><span class="hs-glyph">@</span><span class="annot"><a href="#local-6989586621680387938"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-73"></span></pre></body></html>

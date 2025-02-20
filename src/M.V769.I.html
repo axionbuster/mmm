@@ -1,0 +1,2547 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span id="local-6989586621680395547"><span id="local-6989586621680395548"><span id="local-6989586621680395549"><span id="local-6989586621680395550"><span id="local-6989586621680395551"><span id="local-6989586621680395552"><span id="local-6989586621680395553"><span id="local-6989586621680395554"><span id="local-6989586621680395555"><span id="local-6989586621680395556"><span id="local-6989586621680395557"><span id="local-6989586621680395558"><span id="local-6989586621680395559"><span id="local-6989586621680395560"><span id="local-6989586621680395561"><span id="local-6989586621680395562"><span id="local-6989586621680395563"><span id="local-6989586621680395564"><span id="local-6989586621680395565"><span id="local-6989586621680395566"><span id="local-6989586621680395567"><span id="local-6989586621680395568"><span id="local-6989586621680395569"><span id="local-6989586621680395570"><span id="local-6989586621680395571"><span id="local-6989586621680395572"><span id="local-6989586621680395573"><span id="local-6989586621680395574"><span id="local-6989586621680395575"><span id="local-6989586621680395576"><span id="local-6989586621680395577"><span id="local-6989586621680395578"><span id="local-6989586621680395579"><span id="local-6989586621680395580"><span id="local-6989586621680395581"><span id="local-6989586621680395582"></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span><span class="hs-pragma">{-# OPTIONS_GHC -Wno-missing-export-lists #-}</span><span>
+</span><span id="line-2"></span><span>
+</span><span id="line-3"></span><span class="hs-comment">-- |</span><span>
+</span><span id="line-4"></span><span class="hs-comment">-- Module: M.V769.I</span><span>
+</span><span id="line-5"></span><span class="hs-comment">-- Description: Internal protocol types and utilities (AI-generated)</span><span>
+</span><span id="line-6"></span><span class="hs-comment">-- Copyright: (c) axionbuster, 2025</span><span>
+</span><span id="line-7"></span><span class="hs-comment">-- License: BSD-3-Clause</span><span>
+</span><span id="line-8"></span><span class="hs-comment">--</span><span>
+</span><span id="line-9"></span><span class="hs-comment">-- Provides internal type definitions and utilities for protocol version 769,</span><span>
+</span><span id="line-10"></span><span class="hs-comment">-- including game-specific enumerations, resolution specifications, and</span><span>
+</span><span id="line-11"></span><span class="hs-comment">-- display configuration types used across different protocol states.</span><span>
+</span><span id="line-12"></span><span class="hs-keyword">module</span><span> </span><span class="annot"><a href="M.V769.I.html"><span class="hs-identifier">M.V769.I</span></a></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-13"></span><span>
+</span><span id="line-14"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Control.DeepSeq</span></span><span>
+</span><span id="line-15"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Bits</span></span><span>
+</span><span id="line-16"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.ByteString</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">ByteString</span></span><span class="hs-special">)</span><span>
+</span><span id="line-17"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Data</span></span><span>
+</span><span id="line-18"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Fixed</span></span><span>
+</span><span id="line-19"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Hashable</span></span><span>
+</span><span id="line-20"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Int</span></span><span>
+</span><span id="line-21"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Text</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">Text</span></span><span class="hs-special">)</span><span>
+</span><span id="line-22"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">GHC.Generics</span></span><span>
+</span><span id="line-23"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Language.Haskell.TH.Syntax</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">Lift</span></span><span class="hs-special">)</span><span>
+</span><span id="line-24"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="M.Pack.html"><span class="hs-identifier">M.Pack</span></a></span><span>
+</span><span id="line-25"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="M.PkMacro.html"><span class="hs-identifier">M.PkMacro</span></a></span><span>
+</span><span id="line-26"></span><span>
+</span><span id="line-27"></span><span class="annot"><span class="hs-comment">-- | given in 1/8000 resolution</span></span><span>
+</span><span id="line-28"></span><span class="hs-keyword">data</span><span> </span><span id="SetEntityVelocityRes"><span class="annot"><a href="M.V769.I.html#SetEntityVelocityRes"><span class="hs-identifier hs-var">SetEntityVelocityRes</span></a></span></span><span>
+</span><span id="line-29"></span><span>
+</span><span id="line-30"></span><span class="annot"><span class="hs-comment">-- | given in 1/8000 resolution</span></span><span>
+</span><span id="line-31"></span><span class="hs-keyword">instance</span><span> </span><span class="annot"><span class="hs-identifier hs-type">HasResolution</span></span><span> </span><span class="annot"><a href="M.V769.I.html#SetEntityVelocityRes"><span class="hs-identifier hs-type">SetEntityVelocityRes</span></a></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-32"></span><span>  </span><span id="local-6989586621680395623"><span class="annot"><span class="annottext">resolution :: forall (p :: * -&gt; *). p SetEntityVelocityRes -&gt; Integer
+</span><a href="#local-6989586621680395623"><span class="hs-identifier hs-var hs-var hs-var">resolution</span></a></span></span><span> </span><span class="annot"><span class="annottext">p SetEntityVelocityRes
+</span><span class="hs-identifier">_</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Integer
+</span><span class="hs-number">8000</span></span><span>
+</span><span id="line-33"></span><span>
+</span><span id="line-34"></span><span class="hs-keyword">data</span><span> </span><span id="ChatMode"><span class="annot"><a href="M.V769.I.html#ChatMode"><span class="hs-identifier hs-var">ChatMode</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="CMEnabled"><span class="annot"><a href="M.V769.I.html#CMEnabled"><span class="hs-identifier hs-var">CMEnabled</span></a></span></span><span> </span><span class="hs-glyph">|</span><span> </span><span id="CMCommandsOnly"><span class="annot"><a href="M.V769.I.html#CMCommandsOnly"><span class="hs-identifier hs-var">CMCommandsOnly</span></a></span></span><span> </span><span class="hs-glyph">|</span><span> </span><span id="CMHidden"><span class="annot"><a href="M.V769.I.html#CMHidden"><span class="hs-identifier hs-var">CMHidden</span></a></span></span><span>
+</span><span id="line-35"></span><span>  </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">stock</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621680395629"><span id="local-6989586621680395634"><span class="annot"><span class="annottext">ChatMode -&gt; ChatMode -&gt; Bool
+(ChatMode -&gt; ChatMode -&gt; Bool)
+-&gt; (ChatMode -&gt; ChatMode -&gt; Bool) -&gt; Eq ChatMode
+forall a. (a -&gt; a -&gt; Bool) -&gt; (a -&gt; a -&gt; Bool) -&gt; Eq a
+$c== :: ChatMode -&gt; ChatMode -&gt; Bool
+== :: ChatMode -&gt; ChatMode -&gt; Bool
+$c/= :: ChatMode -&gt; ChatMode -&gt; Bool
+/= :: ChatMode -&gt; ChatMode -&gt; Bool
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Eq</span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680395641"><span id="local-6989586621680395645"><span id="local-6989586621680395649"><span id="local-6989586621680395653"><span id="local-6989586621680395656"><span id="local-6989586621680395659"><span id="local-6989586621680395662"><span class="annot"><span class="annottext">Eq ChatMode
+Eq ChatMode =&gt;
+(ChatMode -&gt; ChatMode -&gt; Ordering)
+-&gt; (ChatMode -&gt; ChatMode -&gt; Bool)
+-&gt; (ChatMode -&gt; ChatMode -&gt; Bool)
+-&gt; (ChatMode -&gt; ChatMode -&gt; Bool)
+-&gt; (ChatMode -&gt; ChatMode -&gt; Bool)
+-&gt; (ChatMode -&gt; ChatMode -&gt; ChatMode)
+-&gt; (ChatMode -&gt; ChatMode -&gt; ChatMode)
+-&gt; Ord ChatMode
+ChatMode -&gt; ChatMode -&gt; Bool
+ChatMode -&gt; ChatMode -&gt; Ordering
+ChatMode -&gt; ChatMode -&gt; ChatMode
+forall a.
+Eq a =&gt;
+(a -&gt; a -&gt; Ordering)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; Ord a
+$ccompare :: ChatMode -&gt; ChatMode -&gt; Ordering
+compare :: ChatMode -&gt; ChatMode -&gt; Ordering
+$c&lt; :: ChatMode -&gt; ChatMode -&gt; Bool
+&lt; :: ChatMode -&gt; ChatMode -&gt; Bool
+$c&lt;= :: ChatMode -&gt; ChatMode -&gt; Bool
+&lt;= :: ChatMode -&gt; ChatMode -&gt; Bool
+$c&gt; :: ChatMode -&gt; ChatMode -&gt; Bool
+&gt; :: ChatMode -&gt; ChatMode -&gt; Bool
+$c&gt;= :: ChatMode -&gt; ChatMode -&gt; Bool
+&gt;= :: ChatMode -&gt; ChatMode -&gt; Bool
+$cmax :: ChatMode -&gt; ChatMode -&gt; ChatMode
+max :: ChatMode -&gt; ChatMode -&gt; ChatMode
+$cmin :: ChatMode -&gt; ChatMode -&gt; ChatMode
+min :: ChatMode -&gt; ChatMode -&gt; ChatMode
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Ord</span></span></span></span></span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680395670"><span id="local-6989586621680395672"><span id="local-6989586621680395676"><span class="annot"><span class="annottext">Int -&gt; ChatMode -&gt; String -&gt; String
+[ChatMode] -&gt; String -&gt; String
+ChatMode -&gt; String
+(Int -&gt; ChatMode -&gt; String -&gt; String)
+-&gt; (ChatMode -&gt; String)
+-&gt; ([ChatMode] -&gt; String -&gt; String)
+-&gt; Show ChatMode
+forall a.
+(Int -&gt; a -&gt; String -&gt; String)
+-&gt; (a -&gt; String) -&gt; ([a] -&gt; String -&gt; String) -&gt; Show a
+$cshowsPrec :: Int -&gt; ChatMode -&gt; String -&gt; String
+showsPrec :: Int -&gt; ChatMode -&gt; String -&gt; String
+$cshow :: ChatMode -&gt; String
+show :: ChatMode -&gt; String
+$cshowList :: [ChatMode] -&gt; String -&gt; String
+showList :: [ChatMode] -&gt; String -&gt; String
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Show</span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680395681"><span id="local-6989586621680395685"><span id="local-6989586621680395688"><span id="local-6989586621680395698"><span class="annot"><span class="annottext">ReadPrec [ChatMode]
+ReadPrec ChatMode
+Int -&gt; ReadS ChatMode
+ReadS [ChatMode]
+(Int -&gt; ReadS ChatMode)
+-&gt; ReadS [ChatMode]
+-&gt; ReadPrec ChatMode
+-&gt; ReadPrec [ChatMode]
+-&gt; Read ChatMode
+forall a.
+(Int -&gt; ReadS a)
+-&gt; ReadS [a] -&gt; ReadPrec a -&gt; ReadPrec [a] -&gt; Read a
+$creadsPrec :: Int -&gt; ReadS ChatMode
+readsPrec :: Int -&gt; ReadS ChatMode
+$creadList :: ReadS [ChatMode]
+readList :: ReadS [ChatMode]
+$creadPrec :: ReadPrec ChatMode
+readPrec :: ReadPrec ChatMode
+$creadListPrec :: ReadPrec [ChatMode]
+readListPrec :: ReadPrec [ChatMode]
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Read</span></span></span></span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-36"></span><span>  </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">stock</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621680395705"><span id="local-6989586621680395714"><span id="local-6989586621680395721"><span id="local-6989586621680395733"><span id="local-6989586621680395736"><span id="local-6989586621680395741"><span id="local-6989586621680395747"><span id="local-6989586621680395751"><span class="annot"><span class="annottext">Int -&gt; ChatMode
+ChatMode -&gt; Int
+ChatMode -&gt; [ChatMode]
+ChatMode -&gt; ChatMode
+ChatMode -&gt; ChatMode -&gt; [ChatMode]
+ChatMode -&gt; ChatMode -&gt; ChatMode -&gt; [ChatMode]
+(ChatMode -&gt; ChatMode)
+-&gt; (ChatMode -&gt; ChatMode)
+-&gt; (Int -&gt; ChatMode)
+-&gt; (ChatMode -&gt; Int)
+-&gt; (ChatMode -&gt; [ChatMode])
+-&gt; (ChatMode -&gt; ChatMode -&gt; [ChatMode])
+-&gt; (ChatMode -&gt; ChatMode -&gt; [ChatMode])
+-&gt; (ChatMode -&gt; ChatMode -&gt; ChatMode -&gt; [ChatMode])
+-&gt; Enum ChatMode
+forall a.
+(a -&gt; a)
+-&gt; (a -&gt; a)
+-&gt; (Int -&gt; a)
+-&gt; (a -&gt; Int)
+-&gt; (a -&gt; [a])
+-&gt; (a -&gt; a -&gt; [a])
+-&gt; (a -&gt; a -&gt; [a])
+-&gt; (a -&gt; a -&gt; a -&gt; [a])
+-&gt; Enum a
+$csucc :: ChatMode -&gt; ChatMode
+succ :: ChatMode -&gt; ChatMode
+$cpred :: ChatMode -&gt; ChatMode
+pred :: ChatMode -&gt; ChatMode
+$ctoEnum :: Int -&gt; ChatMode
+toEnum :: Int -&gt; ChatMode
+$cfromEnum :: ChatMode -&gt; Int
+fromEnum :: ChatMode -&gt; Int
+$cenumFrom :: ChatMode -&gt; [ChatMode]
+enumFrom :: ChatMode -&gt; [ChatMode]
+$cenumFromThen :: ChatMode -&gt; ChatMode -&gt; [ChatMode]
+enumFromThen :: ChatMode -&gt; ChatMode -&gt; [ChatMode]
+$cenumFromTo :: ChatMode -&gt; ChatMode -&gt; [ChatMode]
+enumFromTo :: ChatMode -&gt; ChatMode -&gt; [ChatMode]
+$cenumFromThenTo :: ChatMode -&gt; ChatMode -&gt; ChatMode -&gt; [ChatMode]
+enumFromThenTo :: ChatMode -&gt; ChatMode -&gt; ChatMode -&gt; [ChatMode]
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Enum</span></span></span></span></span></span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680395759"><span id="local-6989586621680395761"><span class="annot"><span class="annottext">ChatMode
+ChatMode -&gt; ChatMode -&gt; Bounded ChatMode
+forall a. a -&gt; a -&gt; Bounded a
+$cminBound :: ChatMode
+minBound :: ChatMode
+$cmaxBound :: ChatMode
+maxBound :: ChatMode
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Bounded</span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680395767"><span id="local-6989586621680395769"><span class="annot"><span class="annottext">(forall x. ChatMode -&gt; Rep ChatMode x)
+-&gt; (forall x. Rep ChatMode x -&gt; ChatMode) -&gt; Generic ChatMode
+forall x. Rep ChatMode x -&gt; ChatMode
+forall x. ChatMode -&gt; Rep ChatMode x
+forall a.
+(forall x. a -&gt; Rep a x) -&gt; (forall x. Rep a x -&gt; a) -&gt; Generic a
+$cfrom :: forall x. ChatMode -&gt; Rep ChatMode x
+from :: forall x. ChatMode -&gt; Rep ChatMode x
+$cto :: forall x. Rep ChatMode x -&gt; ChatMode
+to :: forall x. Rep ChatMode x -&gt; ChatMode
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Generic</span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680395777"><span id="local-6989586621680395779"><span id="local-6989586621680395781"><span id="local-6989586621680395783"><span id="local-6989586621680395785"><span id="local-6989586621680395791"><span id="local-6989586621680395796"><span id="local-6989586621680395799"><span id="local-6989586621680395802"><span id="local-6989586621680395805"><span id="local-6989586621680395808"><span id="local-6989586621680395811"><span id="local-6989586621680395816"><span id="local-6989586621680395821"><span class="annot"><span class="annottext">Typeable ChatMode
+Typeable ChatMode =&gt;
+(forall (c :: * -&gt; *).
+ (forall d b. Data d =&gt; c (d -&gt; b) -&gt; d -&gt; c b)
+ -&gt; (forall g. g -&gt; c g) -&gt; ChatMode -&gt; c ChatMode)
+-&gt; (forall (c :: * -&gt; *).
+    (forall b r. Data b =&gt; c (b -&gt; r) -&gt; c r)
+    -&gt; (forall r. r -&gt; c r) -&gt; Constr -&gt; c ChatMode)
+-&gt; (ChatMode -&gt; Constr)
+-&gt; (ChatMode -&gt; DataType)
+-&gt; (forall (t :: * -&gt; *) (c :: * -&gt; *).
+    Typeable t =&gt;
+    (forall d. Data d =&gt; c (t d)) -&gt; Maybe (c ChatMode))
+-&gt; (forall (t :: * -&gt; * -&gt; *) (c :: * -&gt; *).
+    Typeable t =&gt;
+    (forall d e. (Data d, Data e) =&gt; c (t d e)) -&gt; Maybe (c ChatMode))
+-&gt; ((forall b. Data b =&gt; b -&gt; b) -&gt; ChatMode -&gt; ChatMode)
+-&gt; (forall r r'.
+    (r -&gt; r' -&gt; r)
+    -&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; ChatMode -&gt; r)
+-&gt; (forall r r'.
+    (r' -&gt; r -&gt; r)
+    -&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; ChatMode -&gt; r)
+-&gt; (forall u. (forall d. Data d =&gt; d -&gt; u) -&gt; ChatMode -&gt; [u])
+-&gt; (forall u. Int -&gt; (forall d. Data d =&gt; d -&gt; u) -&gt; ChatMode -&gt; u)
+-&gt; (forall (m :: * -&gt; *).
+    Monad m =&gt;
+    (forall d. Data d =&gt; d -&gt; m d) -&gt; ChatMode -&gt; m ChatMode)
+-&gt; (forall (m :: * -&gt; *).
+    MonadPlus m =&gt;
+    (forall d. Data d =&gt; d -&gt; m d) -&gt; ChatMode -&gt; m ChatMode)
+-&gt; (forall (m :: * -&gt; *).
+    MonadPlus m =&gt;
+    (forall d. Data d =&gt; d -&gt; m d) -&gt; ChatMode -&gt; m ChatMode)
+-&gt; Data ChatMode
+ChatMode -&gt; Constr
+ChatMode -&gt; DataType
+(forall b. Data b =&gt; b -&gt; b) -&gt; ChatMode -&gt; ChatMode
+forall a.
+Typeable a =&gt;
+(forall (c :: * -&gt; *).
+ (forall d b. Data d =&gt; c (d -&gt; b) -&gt; d -&gt; c b)
+ -&gt; (forall g. g -&gt; c g) -&gt; a -&gt; c a)
+-&gt; (forall (c :: * -&gt; *).
+    (forall b r. Data b =&gt; c (b -&gt; r) -&gt; c r)
+    -&gt; (forall r. r -&gt; c r) -&gt; Constr -&gt; c a)
+-&gt; (a -&gt; Constr)
+-&gt; (a -&gt; DataType)
+-&gt; (forall (t :: * -&gt; *) (c :: * -&gt; *).
+    Typeable t =&gt;
+    (forall d. Data d =&gt; c (t d)) -&gt; Maybe (c a))
+-&gt; (forall (t :: * -&gt; * -&gt; *) (c :: * -&gt; *).
+    Typeable t =&gt;
+    (forall d e. (Data d, Data e) =&gt; c (t d e)) -&gt; Maybe (c a))
+-&gt; ((forall b. Data b =&gt; b -&gt; b) -&gt; a -&gt; a)
+-&gt; (forall r r'.
+    (r -&gt; r' -&gt; r) -&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; a -&gt; r)
+-&gt; (forall r r'.
+    (r' -&gt; r -&gt; r) -&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; a -&gt; r)
+-&gt; (forall u. (forall d. Data d =&gt; d -&gt; u) -&gt; a -&gt; [u])
+-&gt; (forall u. Int -&gt; (forall d. Data d =&gt; d -&gt; u) -&gt; a -&gt; u)
+-&gt; (forall (m :: * -&gt; *).
+    Monad m =&gt;
+    (forall d. Data d =&gt; d -&gt; m d) -&gt; a -&gt; m a)
+-&gt; (forall (m :: * -&gt; *).
+    MonadPlus m =&gt;
+    (forall d. Data d =&gt; d -&gt; m d) -&gt; a -&gt; m a)
+-&gt; (forall (m :: * -&gt; *).
+    MonadPlus m =&gt;
+    (forall d. Data d =&gt; d -&gt; m d) -&gt; a -&gt; m a)
+-&gt; Data a
+forall u. Int -&gt; (forall d. Data d =&gt; d -&gt; u) -&gt; ChatMode -&gt; u
+forall u. (forall d. Data d =&gt; d -&gt; u) -&gt; ChatMode -&gt; [u]
+forall r r'.
+(r -&gt; r' -&gt; r)
+-&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; ChatMode -&gt; r
+forall r r'.
+(r' -&gt; r -&gt; r)
+-&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; ChatMode -&gt; r
+forall (m :: * -&gt; *).
+Monad m =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; ChatMode -&gt; m ChatMode
+forall (m :: * -&gt; *).
+MonadPlus m =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; ChatMode -&gt; m ChatMode
+forall (c :: * -&gt; *).
+(forall b r. Data b =&gt; c (b -&gt; r) -&gt; c r)
+-&gt; (forall r. r -&gt; c r) -&gt; Constr -&gt; c ChatMode
+forall (c :: * -&gt; *).
+(forall d b. Data d =&gt; c (d -&gt; b) -&gt; d -&gt; c b)
+-&gt; (forall g. g -&gt; c g) -&gt; ChatMode -&gt; c ChatMode
+forall (t :: * -&gt; *) (c :: * -&gt; *).
+Typeable t =&gt;
+(forall d. Data d =&gt; c (t d)) -&gt; Maybe (c ChatMode)
+forall (t :: * -&gt; * -&gt; *) (c :: * -&gt; *).
+Typeable t =&gt;
+(forall d e. (Data d, Data e) =&gt; c (t d e)) -&gt; Maybe (c ChatMode)
+$cgfoldl :: forall (c :: * -&gt; *).
+(forall d b. Data d =&gt; c (d -&gt; b) -&gt; d -&gt; c b)
+-&gt; (forall g. g -&gt; c g) -&gt; ChatMode -&gt; c ChatMode
+gfoldl :: forall (c :: * -&gt; *).
+(forall d b. Data d =&gt; c (d -&gt; b) -&gt; d -&gt; c b)
+-&gt; (forall g. g -&gt; c g) -&gt; ChatMode -&gt; c ChatMode
+$cgunfold :: forall (c :: * -&gt; *).
+(forall b r. Data b =&gt; c (b -&gt; r) -&gt; c r)
+-&gt; (forall r. r -&gt; c r) -&gt; Constr -&gt; c ChatMode
+gunfold :: forall (c :: * -&gt; *).
+(forall b r. Data b =&gt; c (b -&gt; r) -&gt; c r)
+-&gt; (forall r. r -&gt; c r) -&gt; Constr -&gt; c ChatMode
+$ctoConstr :: ChatMode -&gt; Constr
+toConstr :: ChatMode -&gt; Constr
+$cdataTypeOf :: ChatMode -&gt; DataType
+dataTypeOf :: ChatMode -&gt; DataType
+$cdataCast1 :: forall (t :: * -&gt; *) (c :: * -&gt; *).
+Typeable t =&gt;
+(forall d. Data d =&gt; c (t d)) -&gt; Maybe (c ChatMode)
+dataCast1 :: forall (t :: * -&gt; *) (c :: * -&gt; *).
+Typeable t =&gt;
+(forall d. Data d =&gt; c (t d)) -&gt; Maybe (c ChatMode)
+$cdataCast2 :: forall (t :: * -&gt; * -&gt; *) (c :: * -&gt; *).
+Typeable t =&gt;
+(forall d e. (Data d, Data e) =&gt; c (t d e)) -&gt; Maybe (c ChatMode)
+dataCast2 :: forall (t :: * -&gt; * -&gt; *) (c :: * -&gt; *).
+Typeable t =&gt;
+(forall d e. (Data d, Data e) =&gt; c (t d e)) -&gt; Maybe (c ChatMode)
+$cgmapT :: (forall b. Data b =&gt; b -&gt; b) -&gt; ChatMode -&gt; ChatMode
+gmapT :: (forall b. Data b =&gt; b -&gt; b) -&gt; ChatMode -&gt; ChatMode
+$cgmapQl :: forall r r'.
+(r -&gt; r' -&gt; r)
+-&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; ChatMode -&gt; r
+gmapQl :: forall r r'.
+(r -&gt; r' -&gt; r)
+-&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; ChatMode -&gt; r
+$cgmapQr :: forall r r'.
+(r' -&gt; r -&gt; r)
+-&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; ChatMode -&gt; r
+gmapQr :: forall r r'.
+(r' -&gt; r -&gt; r)
+-&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; ChatMode -&gt; r
+$cgmapQ :: forall u. (forall d. Data d =&gt; d -&gt; u) -&gt; ChatMode -&gt; [u]
+gmapQ :: forall u. (forall d. Data d =&gt; d -&gt; u) -&gt; ChatMode -&gt; [u]
+$cgmapQi :: forall u. Int -&gt; (forall d. Data d =&gt; d -&gt; u) -&gt; ChatMode -&gt; u
+gmapQi :: forall u. Int -&gt; (forall d. Data d =&gt; d -&gt; u) -&gt; ChatMode -&gt; u
+$cgmapM :: forall (m :: * -&gt; *).
+Monad m =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; ChatMode -&gt; m ChatMode
+gmapM :: forall (m :: * -&gt; *).
+Monad m =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; ChatMode -&gt; m ChatMode
+$cgmapMp :: forall (m :: * -&gt; *).
+MonadPlus m =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; ChatMode -&gt; m ChatMode
+gmapMp :: forall (m :: * -&gt; *).
+MonadPlus m =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; ChatMode -&gt; m ChatMode
+$cgmapMo :: forall (m :: * -&gt; *).
+MonadPlus m =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; ChatMode -&gt; m ChatMode
+gmapMo :: forall (m :: * -&gt; *).
+MonadPlus m =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; ChatMode -&gt; m ChatMode
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Data</span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Typeable</span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680395831"><span id="local-6989586621680395837"><span class="annot"><span class="annottext">(forall (m :: * -&gt; *). Quote m =&gt; ChatMode -&gt; m Exp)
+-&gt; (forall (m :: * -&gt; *). Quote m =&gt; ChatMode -&gt; Code m ChatMode)
+-&gt; Lift ChatMode
+forall t.
+(forall (m :: * -&gt; *). Quote m =&gt; t -&gt; m Exp)
+-&gt; (forall (m :: * -&gt; *). Quote m =&gt; t -&gt; Code m t) -&gt; Lift t
+forall (m :: * -&gt; *). Quote m =&gt; ChatMode -&gt; m Exp
+forall (m :: * -&gt; *). Quote m =&gt; ChatMode -&gt; Code m ChatMode
+$clift :: forall (m :: * -&gt; *). Quote m =&gt; ChatMode -&gt; m Exp
+lift :: forall (m :: * -&gt; *). Quote m =&gt; ChatMode -&gt; m Exp
+$cliftTyped :: forall (m :: * -&gt; *). Quote m =&gt; ChatMode -&gt; Code m ChatMode
+liftTyped :: forall (m :: * -&gt; *). Quote m =&gt; ChatMode -&gt; Code m ChatMode
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Lift</span></span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-37"></span><span>  </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">anyclass</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621680395845"><span class="annot"><span class="annottext">ChatMode -&gt; ()
+(ChatMode -&gt; ()) -&gt; NFData ChatMode
+forall a. (a -&gt; ()) -&gt; NFData a
+$crnf :: ChatMode -&gt; ()
+rnf :: ChatMode -&gt; ()
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var">NFData</span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680395864"><span id="local-6989586621680395871"><span class="annot"><span class="annottext">Eq ChatMode
+Eq ChatMode =&gt;
+(Int -&gt; ChatMode -&gt; Int) -&gt; (ChatMode -&gt; Int) -&gt; Hashable ChatMode
+Int -&gt; ChatMode -&gt; Int
+ChatMode -&gt; Int
+forall a. Eq a =&gt; (Int -&gt; a -&gt; Int) -&gt; (a -&gt; Int) -&gt; Hashable a
+$chashWithSalt :: Int -&gt; ChatMode -&gt; Int
+hashWithSalt :: Int -&gt; ChatMode -&gt; Int
+$chash :: ChatMode -&gt; Int
+hash :: ChatMode -&gt; Int
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Hashable</span></span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-38"></span><span>
+</span><span id="line-39"></span><span class="hs-keyword">data</span><span> </span><span id="ParticleStatus"><span class="annot"><a href="M.V769.I.html#ParticleStatus"><span class="hs-identifier hs-var">ParticleStatus</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="PSAll"><span class="annot"><a href="M.V769.I.html#PSAll"><span class="hs-identifier hs-var">PSAll</span></a></span></span><span> </span><span class="hs-glyph">|</span><span> </span><span id="PSDecreased"><span class="annot"><a href="M.V769.I.html#PSDecreased"><span class="hs-identifier hs-var">PSDecreased</span></a></span></span><span> </span><span class="hs-glyph">|</span><span> </span><span id="PSMinimal"><span class="annot"><a href="M.V769.I.html#PSMinimal"><span class="hs-identifier hs-var">PSMinimal</span></a></span></span><span>
+</span><span id="line-40"></span><span>  </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">stock</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621680395889"><span id="local-6989586621680395893"><span class="annot"><span class="annottext">ParticleStatus -&gt; ParticleStatus -&gt; Bool
+(ParticleStatus -&gt; ParticleStatus -&gt; Bool)
+-&gt; (ParticleStatus -&gt; ParticleStatus -&gt; Bool) -&gt; Eq ParticleStatus
+forall a. (a -&gt; a -&gt; Bool) -&gt; (a -&gt; a -&gt; Bool) -&gt; Eq a
+$c== :: ParticleStatus -&gt; ParticleStatus -&gt; Bool
+== :: ParticleStatus -&gt; ParticleStatus -&gt; Bool
+$c/= :: ParticleStatus -&gt; ParticleStatus -&gt; Bool
+/= :: ParticleStatus -&gt; ParticleStatus -&gt; Bool
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Eq</span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680395899"><span id="local-6989586621680395903"><span id="local-6989586621680395907"><span id="local-6989586621680395911"><span id="local-6989586621680395914"><span id="local-6989586621680395917"><span id="local-6989586621680395920"><span class="annot"><span class="annottext">Eq ParticleStatus
+Eq ParticleStatus =&gt;
+(ParticleStatus -&gt; ParticleStatus -&gt; Ordering)
+-&gt; (ParticleStatus -&gt; ParticleStatus -&gt; Bool)
+-&gt; (ParticleStatus -&gt; ParticleStatus -&gt; Bool)
+-&gt; (ParticleStatus -&gt; ParticleStatus -&gt; Bool)
+-&gt; (ParticleStatus -&gt; ParticleStatus -&gt; Bool)
+-&gt; (ParticleStatus -&gt; ParticleStatus -&gt; ParticleStatus)
+-&gt; (ParticleStatus -&gt; ParticleStatus -&gt; ParticleStatus)
+-&gt; Ord ParticleStatus
+ParticleStatus -&gt; ParticleStatus -&gt; Bool
+ParticleStatus -&gt; ParticleStatus -&gt; Ordering
+ParticleStatus -&gt; ParticleStatus -&gt; ParticleStatus
+forall a.
+Eq a =&gt;
+(a -&gt; a -&gt; Ordering)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; Ord a
+$ccompare :: ParticleStatus -&gt; ParticleStatus -&gt; Ordering
+compare :: ParticleStatus -&gt; ParticleStatus -&gt; Ordering
+$c&lt; :: ParticleStatus -&gt; ParticleStatus -&gt; Bool
+&lt; :: ParticleStatus -&gt; ParticleStatus -&gt; Bool
+$c&lt;= :: ParticleStatus -&gt; ParticleStatus -&gt; Bool
+&lt;= :: ParticleStatus -&gt; ParticleStatus -&gt; Bool
+$c&gt; :: ParticleStatus -&gt; ParticleStatus -&gt; Bool
+&gt; :: ParticleStatus -&gt; ParticleStatus -&gt; Bool
+$c&gt;= :: ParticleStatus -&gt; ParticleStatus -&gt; Bool
+&gt;= :: ParticleStatus -&gt; ParticleStatus -&gt; Bool
+$cmax :: ParticleStatus -&gt; ParticleStatus -&gt; ParticleStatus
+max :: ParticleStatus -&gt; ParticleStatus -&gt; ParticleStatus
+$cmin :: ParticleStatus -&gt; ParticleStatus -&gt; ParticleStatus
+min :: ParticleStatus -&gt; ParticleStatus -&gt; ParticleStatus
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Ord</span></span></span></span></span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680395923"><span id="local-6989586621680395925"><span id="local-6989586621680395929"><span class="annot"><span class="annottext">Int -&gt; ParticleStatus -&gt; String -&gt; String
+[ParticleStatus] -&gt; String -&gt; String
+ParticleStatus -&gt; String
+(Int -&gt; ParticleStatus -&gt; String -&gt; String)
+-&gt; (ParticleStatus -&gt; String)
+-&gt; ([ParticleStatus] -&gt; String -&gt; String)
+-&gt; Show ParticleStatus
+forall a.
+(Int -&gt; a -&gt; String -&gt; String)
+-&gt; (a -&gt; String) -&gt; ([a] -&gt; String -&gt; String) -&gt; Show a
+$cshowsPrec :: Int -&gt; ParticleStatus -&gt; String -&gt; String
+showsPrec :: Int -&gt; ParticleStatus -&gt; String -&gt; String
+$cshow :: ParticleStatus -&gt; String
+show :: ParticleStatus -&gt; String
+$cshowList :: [ParticleStatus] -&gt; String -&gt; String
+showList :: [ParticleStatus] -&gt; String -&gt; String
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Show</span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680395932"><span id="local-6989586621680395936"><span id="local-6989586621680395939"><span id="local-6989586621680395948"><span class="annot"><span class="annottext">ReadPrec [ParticleStatus]
+ReadPrec ParticleStatus
+Int -&gt; ReadS ParticleStatus
+ReadS [ParticleStatus]
+(Int -&gt; ReadS ParticleStatus)
+-&gt; ReadS [ParticleStatus]
+-&gt; ReadPrec ParticleStatus
+-&gt; ReadPrec [ParticleStatus]
+-&gt; Read ParticleStatus
+forall a.
+(Int -&gt; ReadS a)
+-&gt; ReadS [a] -&gt; ReadPrec a -&gt; ReadPrec [a] -&gt; Read a
+$creadsPrec :: Int -&gt; ReadS ParticleStatus
+readsPrec :: Int -&gt; ReadS ParticleStatus
+$creadList :: ReadS [ParticleStatus]
+readList :: ReadS [ParticleStatus]
+$creadPrec :: ReadPrec ParticleStatus
+readPrec :: ReadPrec ParticleStatus
+$creadListPrec :: ReadPrec [ParticleStatus]
+readListPrec :: ReadPrec [ParticleStatus]
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Read</span></span></span></span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-41"></span><span>  </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">stock</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621680395951"><span id="local-6989586621680395958"><span id="local-6989586621680395965"><span id="local-6989586621680395975"><span id="local-6989586621680395978"><span id="local-6989586621680395982"><span id="local-6989586621680395988"><span id="local-6989586621680395992"><span class="annot"><span class="annottext">Int -&gt; ParticleStatus
+ParticleStatus -&gt; Int
+ParticleStatus -&gt; [ParticleStatus]
+ParticleStatus -&gt; ParticleStatus
+ParticleStatus -&gt; ParticleStatus -&gt; [ParticleStatus]
+ParticleStatus
+-&gt; ParticleStatus -&gt; ParticleStatus -&gt; [ParticleStatus]
+(ParticleStatus -&gt; ParticleStatus)
+-&gt; (ParticleStatus -&gt; ParticleStatus)
+-&gt; (Int -&gt; ParticleStatus)
+-&gt; (ParticleStatus -&gt; Int)
+-&gt; (ParticleStatus -&gt; [ParticleStatus])
+-&gt; (ParticleStatus -&gt; ParticleStatus -&gt; [ParticleStatus])
+-&gt; (ParticleStatus -&gt; ParticleStatus -&gt; [ParticleStatus])
+-&gt; (ParticleStatus
+    -&gt; ParticleStatus -&gt; ParticleStatus -&gt; [ParticleStatus])
+-&gt; Enum ParticleStatus
+forall a.
+(a -&gt; a)
+-&gt; (a -&gt; a)
+-&gt; (Int -&gt; a)
+-&gt; (a -&gt; Int)
+-&gt; (a -&gt; [a])
+-&gt; (a -&gt; a -&gt; [a])
+-&gt; (a -&gt; a -&gt; [a])
+-&gt; (a -&gt; a -&gt; a -&gt; [a])
+-&gt; Enum a
+$csucc :: ParticleStatus -&gt; ParticleStatus
+succ :: ParticleStatus -&gt; ParticleStatus
+$cpred :: ParticleStatus -&gt; ParticleStatus
+pred :: ParticleStatus -&gt; ParticleStatus
+$ctoEnum :: Int -&gt; ParticleStatus
+toEnum :: Int -&gt; ParticleStatus
+$cfromEnum :: ParticleStatus -&gt; Int
+fromEnum :: ParticleStatus -&gt; Int
+$cenumFrom :: ParticleStatus -&gt; [ParticleStatus]
+enumFrom :: ParticleStatus -&gt; [ParticleStatus]
+$cenumFromThen :: ParticleStatus -&gt; ParticleStatus -&gt; [ParticleStatus]
+enumFromThen :: ParticleStatus -&gt; ParticleStatus -&gt; [ParticleStatus]
+$cenumFromTo :: ParticleStatus -&gt; ParticleStatus -&gt; [ParticleStatus]
+enumFromTo :: ParticleStatus -&gt; ParticleStatus -&gt; [ParticleStatus]
+$cenumFromThenTo :: ParticleStatus
+-&gt; ParticleStatus -&gt; ParticleStatus -&gt; [ParticleStatus]
+enumFromThenTo :: ParticleStatus
+-&gt; ParticleStatus -&gt; ParticleStatus -&gt; [ParticleStatus]
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Enum</span></span></span></span></span></span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680395995"><span id="local-6989586621680395997"><span class="annot"><span class="annottext">ParticleStatus
+ParticleStatus -&gt; ParticleStatus -&gt; Bounded ParticleStatus
+forall a. a -&gt; a -&gt; Bounded a
+$cminBound :: ParticleStatus
+minBound :: ParticleStatus
+$cmaxBound :: ParticleStatus
+maxBound :: ParticleStatus
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Bounded</span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680396000"><span id="local-6989586621680396002"><span class="annot"><span class="annottext">(forall x. ParticleStatus -&gt; Rep ParticleStatus x)
+-&gt; (forall x. Rep ParticleStatus x -&gt; ParticleStatus)
+-&gt; Generic ParticleStatus
+forall x. Rep ParticleStatus x -&gt; ParticleStatus
+forall x. ParticleStatus -&gt; Rep ParticleStatus x
+forall a.
+(forall x. a -&gt; Rep a x) -&gt; (forall x. Rep a x -&gt; a) -&gt; Generic a
+$cfrom :: forall x. ParticleStatus -&gt; Rep ParticleStatus x
+from :: forall x. ParticleStatus -&gt; Rep ParticleStatus x
+$cto :: forall x. Rep ParticleStatus x -&gt; ParticleStatus
+to :: forall x. Rep ParticleStatus x -&gt; ParticleStatus
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Generic</span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680396007"><span id="local-6989586621680396009"><span id="local-6989586621680396011"><span id="local-6989586621680396013"><span id="local-6989586621680396015"><span id="local-6989586621680396021"><span id="local-6989586621680396026"><span id="local-6989586621680396029"><span id="local-6989586621680396032"><span id="local-6989586621680396035"><span id="local-6989586621680396038"><span id="local-6989586621680396041"><span id="local-6989586621680396046"><span id="local-6989586621680396051"><span class="annot"><span class="annottext">Typeable ParticleStatus
+Typeable ParticleStatus =&gt;
+(forall (c :: * -&gt; *).
+ (forall d b. Data d =&gt; c (d -&gt; b) -&gt; d -&gt; c b)
+ -&gt; (forall g. g -&gt; c g) -&gt; ParticleStatus -&gt; c ParticleStatus)
+-&gt; (forall (c :: * -&gt; *).
+    (forall b r. Data b =&gt; c (b -&gt; r) -&gt; c r)
+    -&gt; (forall r. r -&gt; c r) -&gt; Constr -&gt; c ParticleStatus)
+-&gt; (ParticleStatus -&gt; Constr)
+-&gt; (ParticleStatus -&gt; DataType)
+-&gt; (forall (t :: * -&gt; *) (c :: * -&gt; *).
+    Typeable t =&gt;
+    (forall d. Data d =&gt; c (t d)) -&gt; Maybe (c ParticleStatus))
+-&gt; (forall (t :: * -&gt; * -&gt; *) (c :: * -&gt; *).
+    Typeable t =&gt;
+    (forall d e. (Data d, Data e) =&gt; c (t d e))
+    -&gt; Maybe (c ParticleStatus))
+-&gt; ((forall b. Data b =&gt; b -&gt; b)
+    -&gt; ParticleStatus -&gt; ParticleStatus)
+-&gt; (forall r r'.
+    (r -&gt; r' -&gt; r)
+    -&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; ParticleStatus -&gt; r)
+-&gt; (forall r r'.
+    (r' -&gt; r -&gt; r)
+    -&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; ParticleStatus -&gt; r)
+-&gt; (forall u.
+    (forall d. Data d =&gt; d -&gt; u) -&gt; ParticleStatus -&gt; [u])
+-&gt; (forall u.
+    Int -&gt; (forall d. Data d =&gt; d -&gt; u) -&gt; ParticleStatus -&gt; u)
+-&gt; (forall (m :: * -&gt; *).
+    Monad m =&gt;
+    (forall d. Data d =&gt; d -&gt; m d)
+    -&gt; ParticleStatus -&gt; m ParticleStatus)
+-&gt; (forall (m :: * -&gt; *).
+    MonadPlus m =&gt;
+    (forall d. Data d =&gt; d -&gt; m d)
+    -&gt; ParticleStatus -&gt; m ParticleStatus)
+-&gt; (forall (m :: * -&gt; *).
+    MonadPlus m =&gt;
+    (forall d. Data d =&gt; d -&gt; m d)
+    -&gt; ParticleStatus -&gt; m ParticleStatus)
+-&gt; Data ParticleStatus
+ParticleStatus -&gt; Constr
+ParticleStatus -&gt; DataType
+(forall b. Data b =&gt; b -&gt; b) -&gt; ParticleStatus -&gt; ParticleStatus
+forall a.
+Typeable a =&gt;
+(forall (c :: * -&gt; *).
+ (forall d b. Data d =&gt; c (d -&gt; b) -&gt; d -&gt; c b)
+ -&gt; (forall g. g -&gt; c g) -&gt; a -&gt; c a)
+-&gt; (forall (c :: * -&gt; *).
+    (forall b r. Data b =&gt; c (b -&gt; r) -&gt; c r)
+    -&gt; (forall r. r -&gt; c r) -&gt; Constr -&gt; c a)
+-&gt; (a -&gt; Constr)
+-&gt; (a -&gt; DataType)
+-&gt; (forall (t :: * -&gt; *) (c :: * -&gt; *).
+    Typeable t =&gt;
+    (forall d. Data d =&gt; c (t d)) -&gt; Maybe (c a))
+-&gt; (forall (t :: * -&gt; * -&gt; *) (c :: * -&gt; *).
+    Typeable t =&gt;
+    (forall d e. (Data d, Data e) =&gt; c (t d e)) -&gt; Maybe (c a))
+-&gt; ((forall b. Data b =&gt; b -&gt; b) -&gt; a -&gt; a)
+-&gt; (forall r r'.
+    (r -&gt; r' -&gt; r) -&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; a -&gt; r)
+-&gt; (forall r r'.
+    (r' -&gt; r -&gt; r) -&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; a -&gt; r)
+-&gt; (forall u. (forall d. Data d =&gt; d -&gt; u) -&gt; a -&gt; [u])
+-&gt; (forall u. Int -&gt; (forall d. Data d =&gt; d -&gt; u) -&gt; a -&gt; u)
+-&gt; (forall (m :: * -&gt; *).
+    Monad m =&gt;
+    (forall d. Data d =&gt; d -&gt; m d) -&gt; a -&gt; m a)
+-&gt; (forall (m :: * -&gt; *).
+    MonadPlus m =&gt;
+    (forall d. Data d =&gt; d -&gt; m d) -&gt; a -&gt; m a)
+-&gt; (forall (m :: * -&gt; *).
+    MonadPlus m =&gt;
+    (forall d. Data d =&gt; d -&gt; m d) -&gt; a -&gt; m a)
+-&gt; Data a
+forall u.
+Int -&gt; (forall d. Data d =&gt; d -&gt; u) -&gt; ParticleStatus -&gt; u
+forall u. (forall d. Data d =&gt; d -&gt; u) -&gt; ParticleStatus -&gt; [u]
+forall r r'.
+(r -&gt; r' -&gt; r)
+-&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; ParticleStatus -&gt; r
+forall r r'.
+(r' -&gt; r -&gt; r)
+-&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; ParticleStatus -&gt; r
+forall (m :: * -&gt; *).
+Monad m =&gt;
+(forall d. Data d =&gt; d -&gt; m d)
+-&gt; ParticleStatus -&gt; m ParticleStatus
+forall (m :: * -&gt; *).
+MonadPlus m =&gt;
+(forall d. Data d =&gt; d -&gt; m d)
+-&gt; ParticleStatus -&gt; m ParticleStatus
+forall (c :: * -&gt; *).
+(forall b r. Data b =&gt; c (b -&gt; r) -&gt; c r)
+-&gt; (forall r. r -&gt; c r) -&gt; Constr -&gt; c ParticleStatus
+forall (c :: * -&gt; *).
+(forall d b. Data d =&gt; c (d -&gt; b) -&gt; d -&gt; c b)
+-&gt; (forall g. g -&gt; c g) -&gt; ParticleStatus -&gt; c ParticleStatus
+forall (t :: * -&gt; *) (c :: * -&gt; *).
+Typeable t =&gt;
+(forall d. Data d =&gt; c (t d)) -&gt; Maybe (c ParticleStatus)
+forall (t :: * -&gt; * -&gt; *) (c :: * -&gt; *).
+Typeable t =&gt;
+(forall d e. (Data d, Data e) =&gt; c (t d e))
+-&gt; Maybe (c ParticleStatus)
+$cgfoldl :: forall (c :: * -&gt; *).
+(forall d b. Data d =&gt; c (d -&gt; b) -&gt; d -&gt; c b)
+-&gt; (forall g. g -&gt; c g) -&gt; ParticleStatus -&gt; c ParticleStatus
+gfoldl :: forall (c :: * -&gt; *).
+(forall d b. Data d =&gt; c (d -&gt; b) -&gt; d -&gt; c b)
+-&gt; (forall g. g -&gt; c g) -&gt; ParticleStatus -&gt; c ParticleStatus
+$cgunfold :: forall (c :: * -&gt; *).
+(forall b r. Data b =&gt; c (b -&gt; r) -&gt; c r)
+-&gt; (forall r. r -&gt; c r) -&gt; Constr -&gt; c ParticleStatus
+gunfold :: forall (c :: * -&gt; *).
+(forall b r. Data b =&gt; c (b -&gt; r) -&gt; c r)
+-&gt; (forall r. r -&gt; c r) -&gt; Constr -&gt; c ParticleStatus
+$ctoConstr :: ParticleStatus -&gt; Constr
+toConstr :: ParticleStatus -&gt; Constr
+$cdataTypeOf :: ParticleStatus -&gt; DataType
+dataTypeOf :: ParticleStatus -&gt; DataType
+$cdataCast1 :: forall (t :: * -&gt; *) (c :: * -&gt; *).
+Typeable t =&gt;
+(forall d. Data d =&gt; c (t d)) -&gt; Maybe (c ParticleStatus)
+dataCast1 :: forall (t :: * -&gt; *) (c :: * -&gt; *).
+Typeable t =&gt;
+(forall d. Data d =&gt; c (t d)) -&gt; Maybe (c ParticleStatus)
+$cdataCast2 :: forall (t :: * -&gt; * -&gt; *) (c :: * -&gt; *).
+Typeable t =&gt;
+(forall d e. (Data d, Data e) =&gt; c (t d e))
+-&gt; Maybe (c ParticleStatus)
+dataCast2 :: forall (t :: * -&gt; * -&gt; *) (c :: * -&gt; *).
+Typeable t =&gt;
+(forall d e. (Data d, Data e) =&gt; c (t d e))
+-&gt; Maybe (c ParticleStatus)
+$cgmapT :: (forall b. Data b =&gt; b -&gt; b) -&gt; ParticleStatus -&gt; ParticleStatus
+gmapT :: (forall b. Data b =&gt; b -&gt; b) -&gt; ParticleStatus -&gt; ParticleStatus
+$cgmapQl :: forall r r'.
+(r -&gt; r' -&gt; r)
+-&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; ParticleStatus -&gt; r
+gmapQl :: forall r r'.
+(r -&gt; r' -&gt; r)
+-&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; ParticleStatus -&gt; r
+$cgmapQr :: forall r r'.
+(r' -&gt; r -&gt; r)
+-&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; ParticleStatus -&gt; r
+gmapQr :: forall r r'.
+(r' -&gt; r -&gt; r)
+-&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; ParticleStatus -&gt; r
+$cgmapQ :: forall u. (forall d. Data d =&gt; d -&gt; u) -&gt; ParticleStatus -&gt; [u]
+gmapQ :: forall u. (forall d. Data d =&gt; d -&gt; u) -&gt; ParticleStatus -&gt; [u]
+$cgmapQi :: forall u.
+Int -&gt; (forall d. Data d =&gt; d -&gt; u) -&gt; ParticleStatus -&gt; u
+gmapQi :: forall u.
+Int -&gt; (forall d. Data d =&gt; d -&gt; u) -&gt; ParticleStatus -&gt; u
+$cgmapM :: forall (m :: * -&gt; *).
+Monad m =&gt;
+(forall d. Data d =&gt; d -&gt; m d)
+-&gt; ParticleStatus -&gt; m ParticleStatus
+gmapM :: forall (m :: * -&gt; *).
+Monad m =&gt;
+(forall d. Data d =&gt; d -&gt; m d)
+-&gt; ParticleStatus -&gt; m ParticleStatus
+$cgmapMp :: forall (m :: * -&gt; *).
+MonadPlus m =&gt;
+(forall d. Data d =&gt; d -&gt; m d)
+-&gt; ParticleStatus -&gt; m ParticleStatus
+gmapMp :: forall (m :: * -&gt; *).
+MonadPlus m =&gt;
+(forall d. Data d =&gt; d -&gt; m d)
+-&gt; ParticleStatus -&gt; m ParticleStatus
+$cgmapMo :: forall (m :: * -&gt; *).
+MonadPlus m =&gt;
+(forall d. Data d =&gt; d -&gt; m d)
+-&gt; ParticleStatus -&gt; m ParticleStatus
+gmapMo :: forall (m :: * -&gt; *).
+MonadPlus m =&gt;
+(forall d. Data d =&gt; d -&gt; m d)
+-&gt; ParticleStatus -&gt; m ParticleStatus
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Data</span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Typeable</span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680396056"><span id="local-6989586621680396062"><span class="annot"><span class="annottext">(forall (m :: * -&gt; *). Quote m =&gt; ParticleStatus -&gt; m Exp)
+-&gt; (forall (m :: * -&gt; *).
+    Quote m =&gt;
+    ParticleStatus -&gt; Code m ParticleStatus)
+-&gt; Lift ParticleStatus
+forall t.
+(forall (m :: * -&gt; *). Quote m =&gt; t -&gt; m Exp)
+-&gt; (forall (m :: * -&gt; *). Quote m =&gt; t -&gt; Code m t) -&gt; Lift t
+forall (m :: * -&gt; *). Quote m =&gt; ParticleStatus -&gt; m Exp
+forall (m :: * -&gt; *).
+Quote m =&gt;
+ParticleStatus -&gt; Code m ParticleStatus
+$clift :: forall (m :: * -&gt; *). Quote m =&gt; ParticleStatus -&gt; m Exp
+lift :: forall (m :: * -&gt; *). Quote m =&gt; ParticleStatus -&gt; m Exp
+$cliftTyped :: forall (m :: * -&gt; *).
+Quote m =&gt;
+ParticleStatus -&gt; Code m ParticleStatus
+liftTyped :: forall (m :: * -&gt; *).
+Quote m =&gt;
+ParticleStatus -&gt; Code m ParticleStatus
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Lift</span></span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-42"></span><span>  </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">anyclass</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621680396069"><span class="annot"><span class="annottext">ParticleStatus -&gt; ()
+(ParticleStatus -&gt; ()) -&gt; NFData ParticleStatus
+forall a. (a -&gt; ()) -&gt; NFData a
+$crnf :: ParticleStatus -&gt; ()
+rnf :: ParticleStatus -&gt; ()
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var">NFData</span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680396084"><span id="local-6989586621680396091"><span class="annot"><span class="annottext">Eq ParticleStatus
+Eq ParticleStatus =&gt;
+(Int -&gt; ParticleStatus -&gt; Int)
+-&gt; (ParticleStatus -&gt; Int) -&gt; Hashable ParticleStatus
+Int -&gt; ParticleStatus -&gt; Int
+ParticleStatus -&gt; Int
+forall a. Eq a =&gt; (Int -&gt; a -&gt; Int) -&gt; (a -&gt; Int) -&gt; Hashable a
+$chashWithSalt :: Int -&gt; ParticleStatus -&gt; Int
+hashWithSalt :: Int -&gt; ParticleStatus -&gt; Int
+$chash :: ParticleStatus -&gt; Int
+hash :: ParticleStatus -&gt; Int
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Hashable</span></span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-43"></span><span>
+</span><span id="line-44"></span><span class="hs-keyword">data</span><span> </span><span id="FilterType"><span class="annot"><a href="M.V769.I.html#FilterType"><span class="hs-identifier hs-var">FilterType</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="PassThrough"><span class="annot"><a href="M.V769.I.html#PassThrough"><span class="hs-identifier hs-var">PassThrough</span></a></span></span><span> </span><span class="hs-glyph">|</span><span> </span><span id="FullyFiltered"><span class="annot"><a href="M.V769.I.html#FullyFiltered"><span class="hs-identifier hs-var">FullyFiltered</span></a></span></span><span> </span><span class="hs-glyph">|</span><span> </span><span id="PartiallyFiltered"><span class="annot"><a href="M.V769.I.html#PartiallyFiltered"><span class="hs-identifier hs-var">PartiallyFiltered</span></a></span></span><span>
+</span><span id="line-45"></span><span>  </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">stock</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621680396103"><span id="local-6989586621680396107"><span class="annot"><span class="annottext">FilterType -&gt; FilterType -&gt; Bool
+(FilterType -&gt; FilterType -&gt; Bool)
+-&gt; (FilterType -&gt; FilterType -&gt; Bool) -&gt; Eq FilterType
+forall a. (a -&gt; a -&gt; Bool) -&gt; (a -&gt; a -&gt; Bool) -&gt; Eq a
+$c== :: FilterType -&gt; FilterType -&gt; Bool
+== :: FilterType -&gt; FilterType -&gt; Bool
+$c/= :: FilterType -&gt; FilterType -&gt; Bool
+/= :: FilterType -&gt; FilterType -&gt; Bool
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Eq</span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680396113"><span id="local-6989586621680396117"><span id="local-6989586621680396121"><span id="local-6989586621680396125"><span id="local-6989586621680396128"><span id="local-6989586621680396131"><span id="local-6989586621680396134"><span class="annot"><span class="annottext">Eq FilterType
+Eq FilterType =&gt;
+(FilterType -&gt; FilterType -&gt; Ordering)
+-&gt; (FilterType -&gt; FilterType -&gt; Bool)
+-&gt; (FilterType -&gt; FilterType -&gt; Bool)
+-&gt; (FilterType -&gt; FilterType -&gt; Bool)
+-&gt; (FilterType -&gt; FilterType -&gt; Bool)
+-&gt; (FilterType -&gt; FilterType -&gt; FilterType)
+-&gt; (FilterType -&gt; FilterType -&gt; FilterType)
+-&gt; Ord FilterType
+FilterType -&gt; FilterType -&gt; Bool
+FilterType -&gt; FilterType -&gt; Ordering
+FilterType -&gt; FilterType -&gt; FilterType
+forall a.
+Eq a =&gt;
+(a -&gt; a -&gt; Ordering)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; Ord a
+$ccompare :: FilterType -&gt; FilterType -&gt; Ordering
+compare :: FilterType -&gt; FilterType -&gt; Ordering
+$c&lt; :: FilterType -&gt; FilterType -&gt; Bool
+&lt; :: FilterType -&gt; FilterType -&gt; Bool
+$c&lt;= :: FilterType -&gt; FilterType -&gt; Bool
+&lt;= :: FilterType -&gt; FilterType -&gt; Bool
+$c&gt; :: FilterType -&gt; FilterType -&gt; Bool
+&gt; :: FilterType -&gt; FilterType -&gt; Bool
+$c&gt;= :: FilterType -&gt; FilterType -&gt; Bool
+&gt;= :: FilterType -&gt; FilterType -&gt; Bool
+$cmax :: FilterType -&gt; FilterType -&gt; FilterType
+max :: FilterType -&gt; FilterType -&gt; FilterType
+$cmin :: FilterType -&gt; FilterType -&gt; FilterType
+min :: FilterType -&gt; FilterType -&gt; FilterType
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Ord</span></span></span></span></span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680396137"><span id="local-6989586621680396139"><span id="local-6989586621680396143"><span class="annot"><span class="annottext">Int -&gt; FilterType -&gt; String -&gt; String
+[FilterType] -&gt; String -&gt; String
+FilterType -&gt; String
+(Int -&gt; FilterType -&gt; String -&gt; String)
+-&gt; (FilterType -&gt; String)
+-&gt; ([FilterType] -&gt; String -&gt; String)
+-&gt; Show FilterType
+forall a.
+(Int -&gt; a -&gt; String -&gt; String)
+-&gt; (a -&gt; String) -&gt; ([a] -&gt; String -&gt; String) -&gt; Show a
+$cshowsPrec :: Int -&gt; FilterType -&gt; String -&gt; String
+showsPrec :: Int -&gt; FilterType -&gt; String -&gt; String
+$cshow :: FilterType -&gt; String
+show :: FilterType -&gt; String
+$cshowList :: [FilterType] -&gt; String -&gt; String
+showList :: [FilterType] -&gt; String -&gt; String
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Show</span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680396146"><span id="local-6989586621680396150"><span id="local-6989586621680396153"><span id="local-6989586621680396162"><span class="annot"><span class="annottext">ReadPrec [FilterType]
+ReadPrec FilterType
+Int -&gt; ReadS FilterType
+ReadS [FilterType]
+(Int -&gt; ReadS FilterType)
+-&gt; ReadS [FilterType]
+-&gt; ReadPrec FilterType
+-&gt; ReadPrec [FilterType]
+-&gt; Read FilterType
+forall a.
+(Int -&gt; ReadS a)
+-&gt; ReadS [a] -&gt; ReadPrec a -&gt; ReadPrec [a] -&gt; Read a
+$creadsPrec :: Int -&gt; ReadS FilterType
+readsPrec :: Int -&gt; ReadS FilterType
+$creadList :: ReadS [FilterType]
+readList :: ReadS [FilterType]
+$creadPrec :: ReadPrec FilterType
+readPrec :: ReadPrec FilterType
+$creadListPrec :: ReadPrec [FilterType]
+readListPrec :: ReadPrec [FilterType]
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Read</span></span></span></span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-46"></span><span>  </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">stock</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621680396165"><span id="local-6989586621680396172"><span id="local-6989586621680396179"><span id="local-6989586621680396189"><span id="local-6989586621680396192"><span id="local-6989586621680396196"><span id="local-6989586621680396202"><span id="local-6989586621680396206"><span class="annot"><span class="annottext">Int -&gt; FilterType
+FilterType -&gt; Int
+FilterType -&gt; [FilterType]
+FilterType -&gt; FilterType
+FilterType -&gt; FilterType -&gt; [FilterType]
+FilterType -&gt; FilterType -&gt; FilterType -&gt; [FilterType]
+(FilterType -&gt; FilterType)
+-&gt; (FilterType -&gt; FilterType)
+-&gt; (Int -&gt; FilterType)
+-&gt; (FilterType -&gt; Int)
+-&gt; (FilterType -&gt; [FilterType])
+-&gt; (FilterType -&gt; FilterType -&gt; [FilterType])
+-&gt; (FilterType -&gt; FilterType -&gt; [FilterType])
+-&gt; (FilterType -&gt; FilterType -&gt; FilterType -&gt; [FilterType])
+-&gt; Enum FilterType
+forall a.
+(a -&gt; a)
+-&gt; (a -&gt; a)
+-&gt; (Int -&gt; a)
+-&gt; (a -&gt; Int)
+-&gt; (a -&gt; [a])
+-&gt; (a -&gt; a -&gt; [a])
+-&gt; (a -&gt; a -&gt; [a])
+-&gt; (a -&gt; a -&gt; a -&gt; [a])
+-&gt; Enum a
+$csucc :: FilterType -&gt; FilterType
+succ :: FilterType -&gt; FilterType
+$cpred :: FilterType -&gt; FilterType
+pred :: FilterType -&gt; FilterType
+$ctoEnum :: Int -&gt; FilterType
+toEnum :: Int -&gt; FilterType
+$cfromEnum :: FilterType -&gt; Int
+fromEnum :: FilterType -&gt; Int
+$cenumFrom :: FilterType -&gt; [FilterType]
+enumFrom :: FilterType -&gt; [FilterType]
+$cenumFromThen :: FilterType -&gt; FilterType -&gt; [FilterType]
+enumFromThen :: FilterType -&gt; FilterType -&gt; [FilterType]
+$cenumFromTo :: FilterType -&gt; FilterType -&gt; [FilterType]
+enumFromTo :: FilterType -&gt; FilterType -&gt; [FilterType]
+$cenumFromThenTo :: FilterType -&gt; FilterType -&gt; FilterType -&gt; [FilterType]
+enumFromThenTo :: FilterType -&gt; FilterType -&gt; FilterType -&gt; [FilterType]
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Enum</span></span></span></span></span></span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680396209"><span id="local-6989586621680396211"><span class="annot"><span class="annottext">FilterType
+FilterType -&gt; FilterType -&gt; Bounded FilterType
+forall a. a -&gt; a -&gt; Bounded a
+$cminBound :: FilterType
+minBound :: FilterType
+$cmaxBound :: FilterType
+maxBound :: FilterType
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Bounded</span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680396214"><span id="local-6989586621680396216"><span class="annot"><span class="annottext">(forall x. FilterType -&gt; Rep FilterType x)
+-&gt; (forall x. Rep FilterType x -&gt; FilterType) -&gt; Generic FilterType
+forall x. Rep FilterType x -&gt; FilterType
+forall x. FilterType -&gt; Rep FilterType x
+forall a.
+(forall x. a -&gt; Rep a x) -&gt; (forall x. Rep a x -&gt; a) -&gt; Generic a
+$cfrom :: forall x. FilterType -&gt; Rep FilterType x
+from :: forall x. FilterType -&gt; Rep FilterType x
+$cto :: forall x. Rep FilterType x -&gt; FilterType
+to :: forall x. Rep FilterType x -&gt; FilterType
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Generic</span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680396221"><span id="local-6989586621680396223"><span id="local-6989586621680396225"><span id="local-6989586621680396227"><span id="local-6989586621680396229"><span id="local-6989586621680396235"><span id="local-6989586621680396240"><span id="local-6989586621680396243"><span id="local-6989586621680396246"><span id="local-6989586621680396249"><span id="local-6989586621680396252"><span id="local-6989586621680396255"><span id="local-6989586621680396260"><span id="local-6989586621680396265"><span class="annot"><span class="annottext">Typeable FilterType
+Typeable FilterType =&gt;
+(forall (c :: * -&gt; *).
+ (forall d b. Data d =&gt; c (d -&gt; b) -&gt; d -&gt; c b)
+ -&gt; (forall g. g -&gt; c g) -&gt; FilterType -&gt; c FilterType)
+-&gt; (forall (c :: * -&gt; *).
+    (forall b r. Data b =&gt; c (b -&gt; r) -&gt; c r)
+    -&gt; (forall r. r -&gt; c r) -&gt; Constr -&gt; c FilterType)
+-&gt; (FilterType -&gt; Constr)
+-&gt; (FilterType -&gt; DataType)
+-&gt; (forall (t :: * -&gt; *) (c :: * -&gt; *).
+    Typeable t =&gt;
+    (forall d. Data d =&gt; c (t d)) -&gt; Maybe (c FilterType))
+-&gt; (forall (t :: * -&gt; * -&gt; *) (c :: * -&gt; *).
+    Typeable t =&gt;
+    (forall d e. (Data d, Data e) =&gt; c (t d e))
+    -&gt; Maybe (c FilterType))
+-&gt; ((forall b. Data b =&gt; b -&gt; b) -&gt; FilterType -&gt; FilterType)
+-&gt; (forall r r'.
+    (r -&gt; r' -&gt; r)
+    -&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; FilterType -&gt; r)
+-&gt; (forall r r'.
+    (r' -&gt; r -&gt; r)
+    -&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; FilterType -&gt; r)
+-&gt; (forall u. (forall d. Data d =&gt; d -&gt; u) -&gt; FilterType -&gt; [u])
+-&gt; (forall u.
+    Int -&gt; (forall d. Data d =&gt; d -&gt; u) -&gt; FilterType -&gt; u)
+-&gt; (forall (m :: * -&gt; *).
+    Monad m =&gt;
+    (forall d. Data d =&gt; d -&gt; m d) -&gt; FilterType -&gt; m FilterType)
+-&gt; (forall (m :: * -&gt; *).
+    MonadPlus m =&gt;
+    (forall d. Data d =&gt; d -&gt; m d) -&gt; FilterType -&gt; m FilterType)
+-&gt; (forall (m :: * -&gt; *).
+    MonadPlus m =&gt;
+    (forall d. Data d =&gt; d -&gt; m d) -&gt; FilterType -&gt; m FilterType)
+-&gt; Data FilterType
+FilterType -&gt; Constr
+FilterType -&gt; DataType
+(forall b. Data b =&gt; b -&gt; b) -&gt; FilterType -&gt; FilterType
+forall a.
+Typeable a =&gt;
+(forall (c :: * -&gt; *).
+ (forall d b. Data d =&gt; c (d -&gt; b) -&gt; d -&gt; c b)
+ -&gt; (forall g. g -&gt; c g) -&gt; a -&gt; c a)
+-&gt; (forall (c :: * -&gt; *).
+    (forall b r. Data b =&gt; c (b -&gt; r) -&gt; c r)
+    -&gt; (forall r. r -&gt; c r) -&gt; Constr -&gt; c a)
+-&gt; (a -&gt; Constr)
+-&gt; (a -&gt; DataType)
+-&gt; (forall (t :: * -&gt; *) (c :: * -&gt; *).
+    Typeable t =&gt;
+    (forall d. Data d =&gt; c (t d)) -&gt; Maybe (c a))
+-&gt; (forall (t :: * -&gt; * -&gt; *) (c :: * -&gt; *).
+    Typeable t =&gt;
+    (forall d e. (Data d, Data e) =&gt; c (t d e)) -&gt; Maybe (c a))
+-&gt; ((forall b. Data b =&gt; b -&gt; b) -&gt; a -&gt; a)
+-&gt; (forall r r'.
+    (r -&gt; r' -&gt; r) -&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; a -&gt; r)
+-&gt; (forall r r'.
+    (r' -&gt; r -&gt; r) -&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; a -&gt; r)
+-&gt; (forall u. (forall d. Data d =&gt; d -&gt; u) -&gt; a -&gt; [u])
+-&gt; (forall u. Int -&gt; (forall d. Data d =&gt; d -&gt; u) -&gt; a -&gt; u)
+-&gt; (forall (m :: * -&gt; *).
+    Monad m =&gt;
+    (forall d. Data d =&gt; d -&gt; m d) -&gt; a -&gt; m a)
+-&gt; (forall (m :: * -&gt; *).
+    MonadPlus m =&gt;
+    (forall d. Data d =&gt; d -&gt; m d) -&gt; a -&gt; m a)
+-&gt; (forall (m :: * -&gt; *).
+    MonadPlus m =&gt;
+    (forall d. Data d =&gt; d -&gt; m d) -&gt; a -&gt; m a)
+-&gt; Data a
+forall u. Int -&gt; (forall d. Data d =&gt; d -&gt; u) -&gt; FilterType -&gt; u
+forall u. (forall d. Data d =&gt; d -&gt; u) -&gt; FilterType -&gt; [u]
+forall r r'.
+(r -&gt; r' -&gt; r)
+-&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; FilterType -&gt; r
+forall r r'.
+(r' -&gt; r -&gt; r)
+-&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; FilterType -&gt; r
+forall (m :: * -&gt; *).
+Monad m =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; FilterType -&gt; m FilterType
+forall (m :: * -&gt; *).
+MonadPlus m =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; FilterType -&gt; m FilterType
+forall (c :: * -&gt; *).
+(forall b r. Data b =&gt; c (b -&gt; r) -&gt; c r)
+-&gt; (forall r. r -&gt; c r) -&gt; Constr -&gt; c FilterType
+forall (c :: * -&gt; *).
+(forall d b. Data d =&gt; c (d -&gt; b) -&gt; d -&gt; c b)
+-&gt; (forall g. g -&gt; c g) -&gt; FilterType -&gt; c FilterType
+forall (t :: * -&gt; *) (c :: * -&gt; *).
+Typeable t =&gt;
+(forall d. Data d =&gt; c (t d)) -&gt; Maybe (c FilterType)
+forall (t :: * -&gt; * -&gt; *) (c :: * -&gt; *).
+Typeable t =&gt;
+(forall d e. (Data d, Data e) =&gt; c (t d e)) -&gt; Maybe (c FilterType)
+$cgfoldl :: forall (c :: * -&gt; *).
+(forall d b. Data d =&gt; c (d -&gt; b) -&gt; d -&gt; c b)
+-&gt; (forall g. g -&gt; c g) -&gt; FilterType -&gt; c FilterType
+gfoldl :: forall (c :: * -&gt; *).
+(forall d b. Data d =&gt; c (d -&gt; b) -&gt; d -&gt; c b)
+-&gt; (forall g. g -&gt; c g) -&gt; FilterType -&gt; c FilterType
+$cgunfold :: forall (c :: * -&gt; *).
+(forall b r. Data b =&gt; c (b -&gt; r) -&gt; c r)
+-&gt; (forall r. r -&gt; c r) -&gt; Constr -&gt; c FilterType
+gunfold :: forall (c :: * -&gt; *).
+(forall b r. Data b =&gt; c (b -&gt; r) -&gt; c r)
+-&gt; (forall r. r -&gt; c r) -&gt; Constr -&gt; c FilterType
+$ctoConstr :: FilterType -&gt; Constr
+toConstr :: FilterType -&gt; Constr
+$cdataTypeOf :: FilterType -&gt; DataType
+dataTypeOf :: FilterType -&gt; DataType
+$cdataCast1 :: forall (t :: * -&gt; *) (c :: * -&gt; *).
+Typeable t =&gt;
+(forall d. Data d =&gt; c (t d)) -&gt; Maybe (c FilterType)
+dataCast1 :: forall (t :: * -&gt; *) (c :: * -&gt; *).
+Typeable t =&gt;
+(forall d. Data d =&gt; c (t d)) -&gt; Maybe (c FilterType)
+$cdataCast2 :: forall (t :: * -&gt; * -&gt; *) (c :: * -&gt; *).
+Typeable t =&gt;
+(forall d e. (Data d, Data e) =&gt; c (t d e)) -&gt; Maybe (c FilterType)
+dataCast2 :: forall (t :: * -&gt; * -&gt; *) (c :: * -&gt; *).
+Typeable t =&gt;
+(forall d e. (Data d, Data e) =&gt; c (t d e)) -&gt; Maybe (c FilterType)
+$cgmapT :: (forall b. Data b =&gt; b -&gt; b) -&gt; FilterType -&gt; FilterType
+gmapT :: (forall b. Data b =&gt; b -&gt; b) -&gt; FilterType -&gt; FilterType
+$cgmapQl :: forall r r'.
+(r -&gt; r' -&gt; r)
+-&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; FilterType -&gt; r
+gmapQl :: forall r r'.
+(r -&gt; r' -&gt; r)
+-&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; FilterType -&gt; r
+$cgmapQr :: forall r r'.
+(r' -&gt; r -&gt; r)
+-&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; FilterType -&gt; r
+gmapQr :: forall r r'.
+(r' -&gt; r -&gt; r)
+-&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; FilterType -&gt; r
+$cgmapQ :: forall u. (forall d. Data d =&gt; d -&gt; u) -&gt; FilterType -&gt; [u]
+gmapQ :: forall u. (forall d. Data d =&gt; d -&gt; u) -&gt; FilterType -&gt; [u]
+$cgmapQi :: forall u. Int -&gt; (forall d. Data d =&gt; d -&gt; u) -&gt; FilterType -&gt; u
+gmapQi :: forall u. Int -&gt; (forall d. Data d =&gt; d -&gt; u) -&gt; FilterType -&gt; u
+$cgmapM :: forall (m :: * -&gt; *).
+Monad m =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; FilterType -&gt; m FilterType
+gmapM :: forall (m :: * -&gt; *).
+Monad m =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; FilterType -&gt; m FilterType
+$cgmapMp :: forall (m :: * -&gt; *).
+MonadPlus m =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; FilterType -&gt; m FilterType
+gmapMp :: forall (m :: * -&gt; *).
+MonadPlus m =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; FilterType -&gt; m FilterType
+$cgmapMo :: forall (m :: * -&gt; *).
+MonadPlus m =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; FilterType -&gt; m FilterType
+gmapMo :: forall (m :: * -&gt; *).
+MonadPlus m =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; FilterType -&gt; m FilterType
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Data</span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Typeable</span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680396270"><span id="local-6989586621680396276"><span class="annot"><span class="annottext">(forall (m :: * -&gt; *). Quote m =&gt; FilterType -&gt; m Exp)
+-&gt; (forall (m :: * -&gt; *).
+    Quote m =&gt;
+    FilterType -&gt; Code m FilterType)
+-&gt; Lift FilterType
+forall t.
+(forall (m :: * -&gt; *). Quote m =&gt; t -&gt; m Exp)
+-&gt; (forall (m :: * -&gt; *). Quote m =&gt; t -&gt; Code m t) -&gt; Lift t
+forall (m :: * -&gt; *). Quote m =&gt; FilterType -&gt; m Exp
+forall (m :: * -&gt; *). Quote m =&gt; FilterType -&gt; Code m FilterType
+$clift :: forall (m :: * -&gt; *). Quote m =&gt; FilterType -&gt; m Exp
+lift :: forall (m :: * -&gt; *). Quote m =&gt; FilterType -&gt; m Exp
+$cliftTyped :: forall (m :: * -&gt; *). Quote m =&gt; FilterType -&gt; Code m FilterType
+liftTyped :: forall (m :: * -&gt; *). Quote m =&gt; FilterType -&gt; Code m FilterType
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Lift</span></span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-47"></span><span>  </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">anyclass</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621680396283"><span class="annot"><span class="annottext">FilterType -&gt; ()
+(FilterType -&gt; ()) -&gt; NFData FilterType
+forall a. (a -&gt; ()) -&gt; NFData a
+$crnf :: FilterType -&gt; ()
+rnf :: FilterType -&gt; ()
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var">NFData</span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680396298"><span id="local-6989586621680396305"><span class="annot"><span class="annottext">Eq FilterType
+Eq FilterType =&gt;
+(Int -&gt; FilterType -&gt; Int)
+-&gt; (FilterType -&gt; Int) -&gt; Hashable FilterType
+Int -&gt; FilterType -&gt; Int
+FilterType -&gt; Int
+forall a. Eq a =&gt; (Int -&gt; a -&gt; Int) -&gt; (a -&gt; Int) -&gt; Hashable a
+$chashWithSalt :: Int -&gt; FilterType -&gt; Int
+hashWithSalt :: Int -&gt; FilterType -&gt; Int
+$chash :: FilterType -&gt; Int
+hash :: FilterType -&gt; Int
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Hashable</span></span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-48"></span><span>
+</span><span id="line-49"></span><span class="hs-keyword">data</span><span> </span><span id="BossBarColor"><span class="annot"><a href="M.V769.I.html#BossBarColor"><span class="hs-identifier hs-var">BossBarColor</span></a></span></span><span>
+</span><span id="line-50"></span><span>  </span><span class="hs-glyph">=</span><span> </span><span id="BCPink"><span class="annot"><a href="M.V769.I.html#BCPink"><span class="hs-identifier hs-var">BCPink</span></a></span></span><span>
+</span><span id="line-51"></span><span>  </span><span class="hs-glyph">|</span><span> </span><span id="BCBlue"><span class="annot"><a href="M.V769.I.html#BCBlue"><span class="hs-identifier hs-var">BCBlue</span></a></span></span><span>
+</span><span id="line-52"></span><span>  </span><span class="hs-glyph">|</span><span> </span><span id="BCRed"><span class="annot"><a href="M.V769.I.html#BCRed"><span class="hs-identifier hs-var">BCRed</span></a></span></span><span>
+</span><span id="line-53"></span><span>  </span><span class="hs-glyph">|</span><span> </span><span id="BCGreen"><span class="annot"><a href="M.V769.I.html#BCGreen"><span class="hs-identifier hs-var">BCGreen</span></a></span></span><span>
+</span><span id="line-54"></span><span>  </span><span class="hs-glyph">|</span><span> </span><span id="BCYellow"><span class="annot"><a href="M.V769.I.html#BCYellow"><span class="hs-identifier hs-var">BCYellow</span></a></span></span><span>
+</span><span id="line-55"></span><span>  </span><span class="hs-glyph">|</span><span> </span><span id="BCPurple"><span class="annot"><a href="M.V769.I.html#BCPurple"><span class="hs-identifier hs-var">BCPurple</span></a></span></span><span>
+</span><span id="line-56"></span><span>  </span><span class="hs-glyph">|</span><span> </span><span id="BCWhite"><span class="annot"><a href="M.V769.I.html#BCWhite"><span class="hs-identifier hs-var">BCWhite</span></a></span></span><span>
+</span><span id="line-57"></span><span>  </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">stock</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621680396321"><span id="local-6989586621680396325"><span class="annot"><span class="annottext">BossBarColor -&gt; BossBarColor -&gt; Bool
+(BossBarColor -&gt; BossBarColor -&gt; Bool)
+-&gt; (BossBarColor -&gt; BossBarColor -&gt; Bool) -&gt; Eq BossBarColor
+forall a. (a -&gt; a -&gt; Bool) -&gt; (a -&gt; a -&gt; Bool) -&gt; Eq a
+$c== :: BossBarColor -&gt; BossBarColor -&gt; Bool
+== :: BossBarColor -&gt; BossBarColor -&gt; Bool
+$c/= :: BossBarColor -&gt; BossBarColor -&gt; Bool
+/= :: BossBarColor -&gt; BossBarColor -&gt; Bool
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Eq</span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680396331"><span id="local-6989586621680396335"><span id="local-6989586621680396339"><span id="local-6989586621680396343"><span id="local-6989586621680396346"><span id="local-6989586621680396349"><span id="local-6989586621680396352"><span class="annot"><span class="annottext">Eq BossBarColor
+Eq BossBarColor =&gt;
+(BossBarColor -&gt; BossBarColor -&gt; Ordering)
+-&gt; (BossBarColor -&gt; BossBarColor -&gt; Bool)
+-&gt; (BossBarColor -&gt; BossBarColor -&gt; Bool)
+-&gt; (BossBarColor -&gt; BossBarColor -&gt; Bool)
+-&gt; (BossBarColor -&gt; BossBarColor -&gt; Bool)
+-&gt; (BossBarColor -&gt; BossBarColor -&gt; BossBarColor)
+-&gt; (BossBarColor -&gt; BossBarColor -&gt; BossBarColor)
+-&gt; Ord BossBarColor
+BossBarColor -&gt; BossBarColor -&gt; Bool
+BossBarColor -&gt; BossBarColor -&gt; Ordering
+BossBarColor -&gt; BossBarColor -&gt; BossBarColor
+forall a.
+Eq a =&gt;
+(a -&gt; a -&gt; Ordering)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; Ord a
+$ccompare :: BossBarColor -&gt; BossBarColor -&gt; Ordering
+compare :: BossBarColor -&gt; BossBarColor -&gt; Ordering
+$c&lt; :: BossBarColor -&gt; BossBarColor -&gt; Bool
+&lt; :: BossBarColor -&gt; BossBarColor -&gt; Bool
+$c&lt;= :: BossBarColor -&gt; BossBarColor -&gt; Bool
+&lt;= :: BossBarColor -&gt; BossBarColor -&gt; Bool
+$c&gt; :: BossBarColor -&gt; BossBarColor -&gt; Bool
+&gt; :: BossBarColor -&gt; BossBarColor -&gt; Bool
+$c&gt;= :: BossBarColor -&gt; BossBarColor -&gt; Bool
+&gt;= :: BossBarColor -&gt; BossBarColor -&gt; Bool
+$cmax :: BossBarColor -&gt; BossBarColor -&gt; BossBarColor
+max :: BossBarColor -&gt; BossBarColor -&gt; BossBarColor
+$cmin :: BossBarColor -&gt; BossBarColor -&gt; BossBarColor
+min :: BossBarColor -&gt; BossBarColor -&gt; BossBarColor
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Ord</span></span></span></span></span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680396355"><span id="local-6989586621680396357"><span id="local-6989586621680396361"><span class="annot"><span class="annottext">Int -&gt; BossBarColor -&gt; String -&gt; String
+[BossBarColor] -&gt; String -&gt; String
+BossBarColor -&gt; String
+(Int -&gt; BossBarColor -&gt; String -&gt; String)
+-&gt; (BossBarColor -&gt; String)
+-&gt; ([BossBarColor] -&gt; String -&gt; String)
+-&gt; Show BossBarColor
+forall a.
+(Int -&gt; a -&gt; String -&gt; String)
+-&gt; (a -&gt; String) -&gt; ([a] -&gt; String -&gt; String) -&gt; Show a
+$cshowsPrec :: Int -&gt; BossBarColor -&gt; String -&gt; String
+showsPrec :: Int -&gt; BossBarColor -&gt; String -&gt; String
+$cshow :: BossBarColor -&gt; String
+show :: BossBarColor -&gt; String
+$cshowList :: [BossBarColor] -&gt; String -&gt; String
+showList :: [BossBarColor] -&gt; String -&gt; String
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Show</span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680396364"><span id="local-6989586621680396368"><span id="local-6989586621680396371"><span id="local-6989586621680396388"><span class="annot"><span class="annottext">ReadPrec [BossBarColor]
+ReadPrec BossBarColor
+Int -&gt; ReadS BossBarColor
+ReadS [BossBarColor]
+(Int -&gt; ReadS BossBarColor)
+-&gt; ReadS [BossBarColor]
+-&gt; ReadPrec BossBarColor
+-&gt; ReadPrec [BossBarColor]
+-&gt; Read BossBarColor
+forall a.
+(Int -&gt; ReadS a)
+-&gt; ReadS [a] -&gt; ReadPrec a -&gt; ReadPrec [a] -&gt; Read a
+$creadsPrec :: Int -&gt; ReadS BossBarColor
+readsPrec :: Int -&gt; ReadS BossBarColor
+$creadList :: ReadS [BossBarColor]
+readList :: ReadS [BossBarColor]
+$creadPrec :: ReadPrec BossBarColor
+readPrec :: ReadPrec BossBarColor
+$creadListPrec :: ReadPrec [BossBarColor]
+readListPrec :: ReadPrec [BossBarColor]
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Read</span></span></span></span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-58"></span><span>  </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">stock</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621680396391"><span id="local-6989586621680396398"><span id="local-6989586621680396405"><span id="local-6989586621680396415"><span id="local-6989586621680396418"><span id="local-6989586621680396422"><span id="local-6989586621680396428"><span id="local-6989586621680396432"><span class="annot"><span class="annottext">Int -&gt; BossBarColor
+BossBarColor -&gt; Int
+BossBarColor -&gt; [BossBarColor]
+BossBarColor -&gt; BossBarColor
+BossBarColor -&gt; BossBarColor -&gt; [BossBarColor]
+BossBarColor -&gt; BossBarColor -&gt; BossBarColor -&gt; [BossBarColor]
+(BossBarColor -&gt; BossBarColor)
+-&gt; (BossBarColor -&gt; BossBarColor)
+-&gt; (Int -&gt; BossBarColor)
+-&gt; (BossBarColor -&gt; Int)
+-&gt; (BossBarColor -&gt; [BossBarColor])
+-&gt; (BossBarColor -&gt; BossBarColor -&gt; [BossBarColor])
+-&gt; (BossBarColor -&gt; BossBarColor -&gt; [BossBarColor])
+-&gt; (BossBarColor -&gt; BossBarColor -&gt; BossBarColor -&gt; [BossBarColor])
+-&gt; Enum BossBarColor
+forall a.
+(a -&gt; a)
+-&gt; (a -&gt; a)
+-&gt; (Int -&gt; a)
+-&gt; (a -&gt; Int)
+-&gt; (a -&gt; [a])
+-&gt; (a -&gt; a -&gt; [a])
+-&gt; (a -&gt; a -&gt; [a])
+-&gt; (a -&gt; a -&gt; a -&gt; [a])
+-&gt; Enum a
+$csucc :: BossBarColor -&gt; BossBarColor
+succ :: BossBarColor -&gt; BossBarColor
+$cpred :: BossBarColor -&gt; BossBarColor
+pred :: BossBarColor -&gt; BossBarColor
+$ctoEnum :: Int -&gt; BossBarColor
+toEnum :: Int -&gt; BossBarColor
+$cfromEnum :: BossBarColor -&gt; Int
+fromEnum :: BossBarColor -&gt; Int
+$cenumFrom :: BossBarColor -&gt; [BossBarColor]
+enumFrom :: BossBarColor -&gt; [BossBarColor]
+$cenumFromThen :: BossBarColor -&gt; BossBarColor -&gt; [BossBarColor]
+enumFromThen :: BossBarColor -&gt; BossBarColor -&gt; [BossBarColor]
+$cenumFromTo :: BossBarColor -&gt; BossBarColor -&gt; [BossBarColor]
+enumFromTo :: BossBarColor -&gt; BossBarColor -&gt; [BossBarColor]
+$cenumFromThenTo :: BossBarColor -&gt; BossBarColor -&gt; BossBarColor -&gt; [BossBarColor]
+enumFromThenTo :: BossBarColor -&gt; BossBarColor -&gt; BossBarColor -&gt; [BossBarColor]
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Enum</span></span></span></span></span></span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680396435"><span id="local-6989586621680396437"><span class="annot"><span class="annottext">BossBarColor
+BossBarColor -&gt; BossBarColor -&gt; Bounded BossBarColor
+forall a. a -&gt; a -&gt; Bounded a
+$cminBound :: BossBarColor
+minBound :: BossBarColor
+$cmaxBound :: BossBarColor
+maxBound :: BossBarColor
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Bounded</span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680396440"><span id="local-6989586621680396442"><span class="annot"><span class="annottext">(forall x. BossBarColor -&gt; Rep BossBarColor x)
+-&gt; (forall x. Rep BossBarColor x -&gt; BossBarColor)
+-&gt; Generic BossBarColor
+forall x. Rep BossBarColor x -&gt; BossBarColor
+forall x. BossBarColor -&gt; Rep BossBarColor x
+forall a.
+(forall x. a -&gt; Rep a x) -&gt; (forall x. Rep a x -&gt; a) -&gt; Generic a
+$cfrom :: forall x. BossBarColor -&gt; Rep BossBarColor x
+from :: forall x. BossBarColor -&gt; Rep BossBarColor x
+$cto :: forall x. Rep BossBarColor x -&gt; BossBarColor
+to :: forall x. Rep BossBarColor x -&gt; BossBarColor
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Generic</span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680396447"><span id="local-6989586621680396449"><span id="local-6989586621680396451"><span id="local-6989586621680396453"><span id="local-6989586621680396455"><span id="local-6989586621680396461"><span id="local-6989586621680396466"><span id="local-6989586621680396469"><span id="local-6989586621680396472"><span id="local-6989586621680396475"><span id="local-6989586621680396478"><span id="local-6989586621680396481"><span id="local-6989586621680396486"><span id="local-6989586621680396491"><span class="annot"><span class="annottext">Typeable BossBarColor
+Typeable BossBarColor =&gt;
+(forall (c :: * -&gt; *).
+ (forall d b. Data d =&gt; c (d -&gt; b) -&gt; d -&gt; c b)
+ -&gt; (forall g. g -&gt; c g) -&gt; BossBarColor -&gt; c BossBarColor)
+-&gt; (forall (c :: * -&gt; *).
+    (forall b r. Data b =&gt; c (b -&gt; r) -&gt; c r)
+    -&gt; (forall r. r -&gt; c r) -&gt; Constr -&gt; c BossBarColor)
+-&gt; (BossBarColor -&gt; Constr)
+-&gt; (BossBarColor -&gt; DataType)
+-&gt; (forall (t :: * -&gt; *) (c :: * -&gt; *).
+    Typeable t =&gt;
+    (forall d. Data d =&gt; c (t d)) -&gt; Maybe (c BossBarColor))
+-&gt; (forall (t :: * -&gt; * -&gt; *) (c :: * -&gt; *).
+    Typeable t =&gt;
+    (forall d e. (Data d, Data e) =&gt; c (t d e))
+    -&gt; Maybe (c BossBarColor))
+-&gt; ((forall b. Data b =&gt; b -&gt; b) -&gt; BossBarColor -&gt; BossBarColor)
+-&gt; (forall r r'.
+    (r -&gt; r' -&gt; r)
+    -&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; BossBarColor -&gt; r)
+-&gt; (forall r r'.
+    (r' -&gt; r -&gt; r)
+    -&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; BossBarColor -&gt; r)
+-&gt; (forall u. (forall d. Data d =&gt; d -&gt; u) -&gt; BossBarColor -&gt; [u])
+-&gt; (forall u.
+    Int -&gt; (forall d. Data d =&gt; d -&gt; u) -&gt; BossBarColor -&gt; u)
+-&gt; (forall (m :: * -&gt; *).
+    Monad m =&gt;
+    (forall d. Data d =&gt; d -&gt; m d) -&gt; BossBarColor -&gt; m BossBarColor)
+-&gt; (forall (m :: * -&gt; *).
+    MonadPlus m =&gt;
+    (forall d. Data d =&gt; d -&gt; m d) -&gt; BossBarColor -&gt; m BossBarColor)
+-&gt; (forall (m :: * -&gt; *).
+    MonadPlus m =&gt;
+    (forall d. Data d =&gt; d -&gt; m d) -&gt; BossBarColor -&gt; m BossBarColor)
+-&gt; Data BossBarColor
+BossBarColor -&gt; Constr
+BossBarColor -&gt; DataType
+(forall b. Data b =&gt; b -&gt; b) -&gt; BossBarColor -&gt; BossBarColor
+forall a.
+Typeable a =&gt;
+(forall (c :: * -&gt; *).
+ (forall d b. Data d =&gt; c (d -&gt; b) -&gt; d -&gt; c b)
+ -&gt; (forall g. g -&gt; c g) -&gt; a -&gt; c a)
+-&gt; (forall (c :: * -&gt; *).
+    (forall b r. Data b =&gt; c (b -&gt; r) -&gt; c r)
+    -&gt; (forall r. r -&gt; c r) -&gt; Constr -&gt; c a)
+-&gt; (a -&gt; Constr)
+-&gt; (a -&gt; DataType)
+-&gt; (forall (t :: * -&gt; *) (c :: * -&gt; *).
+    Typeable t =&gt;
+    (forall d. Data d =&gt; c (t d)) -&gt; Maybe (c a))
+-&gt; (forall (t :: * -&gt; * -&gt; *) (c :: * -&gt; *).
+    Typeable t =&gt;
+    (forall d e. (Data d, Data e) =&gt; c (t d e)) -&gt; Maybe (c a))
+-&gt; ((forall b. Data b =&gt; b -&gt; b) -&gt; a -&gt; a)
+-&gt; (forall r r'.
+    (r -&gt; r' -&gt; r) -&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; a -&gt; r)
+-&gt; (forall r r'.
+    (r' -&gt; r -&gt; r) -&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; a -&gt; r)
+-&gt; (forall u. (forall d. Data d =&gt; d -&gt; u) -&gt; a -&gt; [u])
+-&gt; (forall u. Int -&gt; (forall d. Data d =&gt; d -&gt; u) -&gt; a -&gt; u)
+-&gt; (forall (m :: * -&gt; *).
+    Monad m =&gt;
+    (forall d. Data d =&gt; d -&gt; m d) -&gt; a -&gt; m a)
+-&gt; (forall (m :: * -&gt; *).
+    MonadPlus m =&gt;
+    (forall d. Data d =&gt; d -&gt; m d) -&gt; a -&gt; m a)
+-&gt; (forall (m :: * -&gt; *).
+    MonadPlus m =&gt;
+    (forall d. Data d =&gt; d -&gt; m d) -&gt; a -&gt; m a)
+-&gt; Data a
+forall u. Int -&gt; (forall d. Data d =&gt; d -&gt; u) -&gt; BossBarColor -&gt; u
+forall u. (forall d. Data d =&gt; d -&gt; u) -&gt; BossBarColor -&gt; [u]
+forall r r'.
+(r -&gt; r' -&gt; r)
+-&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; BossBarColor -&gt; r
+forall r r'.
+(r' -&gt; r -&gt; r)
+-&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; BossBarColor -&gt; r
+forall (m :: * -&gt; *).
+Monad m =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; BossBarColor -&gt; m BossBarColor
+forall (m :: * -&gt; *).
+MonadPlus m =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; BossBarColor -&gt; m BossBarColor
+forall (c :: * -&gt; *).
+(forall b r. Data b =&gt; c (b -&gt; r) -&gt; c r)
+-&gt; (forall r. r -&gt; c r) -&gt; Constr -&gt; c BossBarColor
+forall (c :: * -&gt; *).
+(forall d b. Data d =&gt; c (d -&gt; b) -&gt; d -&gt; c b)
+-&gt; (forall g. g -&gt; c g) -&gt; BossBarColor -&gt; c BossBarColor
+forall (t :: * -&gt; *) (c :: * -&gt; *).
+Typeable t =&gt;
+(forall d. Data d =&gt; c (t d)) -&gt; Maybe (c BossBarColor)
+forall (t :: * -&gt; * -&gt; *) (c :: * -&gt; *).
+Typeable t =&gt;
+(forall d e. (Data d, Data e) =&gt; c (t d e))
+-&gt; Maybe (c BossBarColor)
+$cgfoldl :: forall (c :: * -&gt; *).
+(forall d b. Data d =&gt; c (d -&gt; b) -&gt; d -&gt; c b)
+-&gt; (forall g. g -&gt; c g) -&gt; BossBarColor -&gt; c BossBarColor
+gfoldl :: forall (c :: * -&gt; *).
+(forall d b. Data d =&gt; c (d -&gt; b) -&gt; d -&gt; c b)
+-&gt; (forall g. g -&gt; c g) -&gt; BossBarColor -&gt; c BossBarColor
+$cgunfold :: forall (c :: * -&gt; *).
+(forall b r. Data b =&gt; c (b -&gt; r) -&gt; c r)
+-&gt; (forall r. r -&gt; c r) -&gt; Constr -&gt; c BossBarColor
+gunfold :: forall (c :: * -&gt; *).
+(forall b r. Data b =&gt; c (b -&gt; r) -&gt; c r)
+-&gt; (forall r. r -&gt; c r) -&gt; Constr -&gt; c BossBarColor
+$ctoConstr :: BossBarColor -&gt; Constr
+toConstr :: BossBarColor -&gt; Constr
+$cdataTypeOf :: BossBarColor -&gt; DataType
+dataTypeOf :: BossBarColor -&gt; DataType
+$cdataCast1 :: forall (t :: * -&gt; *) (c :: * -&gt; *).
+Typeable t =&gt;
+(forall d. Data d =&gt; c (t d)) -&gt; Maybe (c BossBarColor)
+dataCast1 :: forall (t :: * -&gt; *) (c :: * -&gt; *).
+Typeable t =&gt;
+(forall d. Data d =&gt; c (t d)) -&gt; Maybe (c BossBarColor)
+$cdataCast2 :: forall (t :: * -&gt; * -&gt; *) (c :: * -&gt; *).
+Typeable t =&gt;
+(forall d e. (Data d, Data e) =&gt; c (t d e))
+-&gt; Maybe (c BossBarColor)
+dataCast2 :: forall (t :: * -&gt; * -&gt; *) (c :: * -&gt; *).
+Typeable t =&gt;
+(forall d e. (Data d, Data e) =&gt; c (t d e))
+-&gt; Maybe (c BossBarColor)
+$cgmapT :: (forall b. Data b =&gt; b -&gt; b) -&gt; BossBarColor -&gt; BossBarColor
+gmapT :: (forall b. Data b =&gt; b -&gt; b) -&gt; BossBarColor -&gt; BossBarColor
+$cgmapQl :: forall r r'.
+(r -&gt; r' -&gt; r)
+-&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; BossBarColor -&gt; r
+gmapQl :: forall r r'.
+(r -&gt; r' -&gt; r)
+-&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; BossBarColor -&gt; r
+$cgmapQr :: forall r r'.
+(r' -&gt; r -&gt; r)
+-&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; BossBarColor -&gt; r
+gmapQr :: forall r r'.
+(r' -&gt; r -&gt; r)
+-&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; BossBarColor -&gt; r
+$cgmapQ :: forall u. (forall d. Data d =&gt; d -&gt; u) -&gt; BossBarColor -&gt; [u]
+gmapQ :: forall u. (forall d. Data d =&gt; d -&gt; u) -&gt; BossBarColor -&gt; [u]
+$cgmapQi :: forall u. Int -&gt; (forall d. Data d =&gt; d -&gt; u) -&gt; BossBarColor -&gt; u
+gmapQi :: forall u. Int -&gt; (forall d. Data d =&gt; d -&gt; u) -&gt; BossBarColor -&gt; u
+$cgmapM :: forall (m :: * -&gt; *).
+Monad m =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; BossBarColor -&gt; m BossBarColor
+gmapM :: forall (m :: * -&gt; *).
+Monad m =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; BossBarColor -&gt; m BossBarColor
+$cgmapMp :: forall (m :: * -&gt; *).
+MonadPlus m =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; BossBarColor -&gt; m BossBarColor
+gmapMp :: forall (m :: * -&gt; *).
+MonadPlus m =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; BossBarColor -&gt; m BossBarColor
+$cgmapMo :: forall (m :: * -&gt; *).
+MonadPlus m =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; BossBarColor -&gt; m BossBarColor
+gmapMo :: forall (m :: * -&gt; *).
+MonadPlus m =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; BossBarColor -&gt; m BossBarColor
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Data</span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Typeable</span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680396496"><span id="local-6989586621680396506"><span class="annot"><span class="annottext">(forall (m :: * -&gt; *). Quote m =&gt; BossBarColor -&gt; m Exp)
+-&gt; (forall (m :: * -&gt; *).
+    Quote m =&gt;
+    BossBarColor -&gt; Code m BossBarColor)
+-&gt; Lift BossBarColor
+forall t.
+(forall (m :: * -&gt; *). Quote m =&gt; t -&gt; m Exp)
+-&gt; (forall (m :: * -&gt; *). Quote m =&gt; t -&gt; Code m t) -&gt; Lift t
+forall (m :: * -&gt; *). Quote m =&gt; BossBarColor -&gt; m Exp
+forall (m :: * -&gt; *).
+Quote m =&gt;
+BossBarColor -&gt; Code m BossBarColor
+$clift :: forall (m :: * -&gt; *). Quote m =&gt; BossBarColor -&gt; m Exp
+lift :: forall (m :: * -&gt; *). Quote m =&gt; BossBarColor -&gt; m Exp
+$cliftTyped :: forall (m :: * -&gt; *).
+Quote m =&gt;
+BossBarColor -&gt; Code m BossBarColor
+liftTyped :: forall (m :: * -&gt; *).
+Quote m =&gt;
+BossBarColor -&gt; Code m BossBarColor
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Lift</span></span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-59"></span><span>  </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">anyclass</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621680396517"><span class="annot"><span class="annottext">BossBarColor -&gt; ()
+(BossBarColor -&gt; ()) -&gt; NFData BossBarColor
+forall a. (a -&gt; ()) -&gt; NFData a
+$crnf :: BossBarColor -&gt; ()
+rnf :: BossBarColor -&gt; ()
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var">NFData</span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680396540"><span id="local-6989586621680396547"><span class="annot"><span class="annottext">Eq BossBarColor
+Eq BossBarColor =&gt;
+(Int -&gt; BossBarColor -&gt; Int)
+-&gt; (BossBarColor -&gt; Int) -&gt; Hashable BossBarColor
+Int -&gt; BossBarColor -&gt; Int
+BossBarColor -&gt; Int
+forall a. Eq a =&gt; (Int -&gt; a -&gt; Int) -&gt; (a -&gt; Int) -&gt; Hashable a
+$chashWithSalt :: Int -&gt; BossBarColor -&gt; Int
+hashWithSalt :: Int -&gt; BossBarColor -&gt; Int
+$chash :: BossBarColor -&gt; Int
+hash :: BossBarColor -&gt; Int
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Hashable</span></span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-60"></span><span>
+</span><span id="line-61"></span><span class="hs-comment">-- Shared packet types between states</span><span>
+</span><span id="line-62"></span><span class="hs-keyword">newtype</span><span> </span><span id="KeepAlive"><span class="annot"><a href="M.V769.I.html#KeepAlive"><span class="hs-identifier hs-var">KeepAlive</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="KeepAlive"><span class="annot"><a href="M.V769.I.html#KeepAlive"><span class="hs-identifier hs-var">KeepAlive</span></a></span></span><span>
+</span><span id="line-63"></span><span>  </span><span class="hs-special">{</span><span id="id"><span class="annot"><span class="annottext">KeepAlive -&gt; Int64
+</span><a href="M.V769.I.html#id"><span class="hs-identifier hs-var hs-var">id</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Int64</span></span><span class="hs-special">}</span><span>
+</span><span id="line-64"></span><span>  </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">newtype</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621680396566"><span id="local-6989586621680396571"><span id="local-6989586621680396575"><span class="annot"><span class="annottext">Int -&gt; KeepAlive -&gt; String -&gt; String
+[KeepAlive] -&gt; String -&gt; String
+KeepAlive -&gt; String
+(Int -&gt; KeepAlive -&gt; String -&gt; String)
+-&gt; (KeepAlive -&gt; String)
+-&gt; ([KeepAlive] -&gt; String -&gt; String)
+-&gt; Show KeepAlive
+forall a.
+(Int -&gt; a -&gt; String -&gt; String)
+-&gt; (a -&gt; String) -&gt; ([a] -&gt; String -&gt; String) -&gt; Show a
+$cshowsPrec :: Int -&gt; KeepAlive -&gt; String -&gt; String
+showsPrec :: Int -&gt; KeepAlive -&gt; String -&gt; String
+$cshow :: KeepAlive -&gt; String
+show :: KeepAlive -&gt; String
+$cshowList :: [KeepAlive] -&gt; String -&gt; String
+showList :: [KeepAlive] -&gt; String -&gt; String
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Show</span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680396582"><span id="local-6989586621680396587"><span id="local-6989586621680396591"><span id="local-6989586621680396595"><span class="annot"><span class="annottext">ReadPrec [KeepAlive]
+ReadPrec KeepAlive
+Int -&gt; ReadS KeepAlive
+ReadS [KeepAlive]
+(Int -&gt; ReadS KeepAlive)
+-&gt; ReadS [KeepAlive]
+-&gt; ReadPrec KeepAlive
+-&gt; ReadPrec [KeepAlive]
+-&gt; Read KeepAlive
+forall a.
+(Int -&gt; ReadS a)
+-&gt; ReadS [a] -&gt; ReadPrec a -&gt; ReadPrec [a] -&gt; Read a
+$creadsPrec :: Int -&gt; ReadS KeepAlive
+readsPrec :: Int -&gt; ReadS KeepAlive
+$creadList :: ReadS [KeepAlive]
+readList :: ReadS [KeepAlive]
+$creadPrec :: ReadPrec KeepAlive
+readPrec :: ReadPrec KeepAlive
+$creadListPrec :: ReadPrec [KeepAlive]
+readListPrec :: ReadPrec [KeepAlive]
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Read</span></span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680396601"><span class="annot"><span class="annottext">KeepAlive -&gt; ()
+(KeepAlive -&gt; ()) -&gt; NFData KeepAlive
+forall a. (a -&gt; ()) -&gt; NFData a
+$crnf :: KeepAlive -&gt; ()
+rnf :: KeepAlive -&gt; ()
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var">NFData</span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680396608"><span id="local-6989586621680396613"><span class="annot"><span class="annottext">KeepAlive -&gt; KeepAlive -&gt; Bool
+(KeepAlive -&gt; KeepAlive -&gt; Bool)
+-&gt; (KeepAlive -&gt; KeepAlive -&gt; Bool) -&gt; Eq KeepAlive
+forall a. (a -&gt; a -&gt; Bool) -&gt; (a -&gt; a -&gt; Bool) -&gt; Eq a
+$c== :: KeepAlive -&gt; KeepAlive -&gt; Bool
+== :: KeepAlive -&gt; KeepAlive -&gt; Bool
+$c/= :: KeepAlive -&gt; KeepAlive -&gt; Bool
+/= :: KeepAlive -&gt; KeepAlive -&gt; Bool
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Eq</span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680396621"><span id="local-6989586621680396626"><span id="local-6989586621680396630"><span id="local-6989586621680396634"><span id="local-6989586621680396638"><span id="local-6989586621680396642"><span id="local-6989586621680396646"><span class="annot"><span class="annottext">Eq KeepAlive
+Eq KeepAlive =&gt;
+(KeepAlive -&gt; KeepAlive -&gt; Ordering)
+-&gt; (KeepAlive -&gt; KeepAlive -&gt; Bool)
+-&gt; (KeepAlive -&gt; KeepAlive -&gt; Bool)
+-&gt; (KeepAlive -&gt; KeepAlive -&gt; Bool)
+-&gt; (KeepAlive -&gt; KeepAlive -&gt; Bool)
+-&gt; (KeepAlive -&gt; KeepAlive -&gt; KeepAlive)
+-&gt; (KeepAlive -&gt; KeepAlive -&gt; KeepAlive)
+-&gt; Ord KeepAlive
+KeepAlive -&gt; KeepAlive -&gt; Bool
+KeepAlive -&gt; KeepAlive -&gt; Ordering
+KeepAlive -&gt; KeepAlive -&gt; KeepAlive
+forall a.
+Eq a =&gt;
+(a -&gt; a -&gt; Ordering)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; Ord a
+$ccompare :: KeepAlive -&gt; KeepAlive -&gt; Ordering
+compare :: KeepAlive -&gt; KeepAlive -&gt; Ordering
+$c&lt; :: KeepAlive -&gt; KeepAlive -&gt; Bool
+&lt; :: KeepAlive -&gt; KeepAlive -&gt; Bool
+$c&lt;= :: KeepAlive -&gt; KeepAlive -&gt; Bool
+&lt;= :: KeepAlive -&gt; KeepAlive -&gt; Bool
+$c&gt; :: KeepAlive -&gt; KeepAlive -&gt; Bool
+&gt; :: KeepAlive -&gt; KeepAlive -&gt; Bool
+$c&gt;= :: KeepAlive -&gt; KeepAlive -&gt; Bool
+&gt;= :: KeepAlive -&gt; KeepAlive -&gt; Bool
+$cmax :: KeepAlive -&gt; KeepAlive -&gt; KeepAlive
+max :: KeepAlive -&gt; KeepAlive -&gt; KeepAlive
+$cmin :: KeepAlive -&gt; KeepAlive -&gt; KeepAlive
+min :: KeepAlive -&gt; KeepAlive -&gt; KeepAlive
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Ord</span></span></span></span></span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680396653"><span class="annot"><span class="annottext">KeepAlive -&gt; Builder
+(KeepAlive -&gt; Builder) -&gt; Pack KeepAlive
+forall a. (a -&gt; Builder) -&gt; Pack a
+$cpack :: KeepAlive -&gt; Builder
+pack :: KeepAlive -&gt; Builder
+</span><a href="M.Pack.Internal.Types.html#Pack"><span class="hs-identifier hs-var hs-var hs-var hs-var">Pack</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680396661"><span class="annot"><span class="annottext">(forall (st :: ZeroBitType) r. Parser st r KeepAlive)
+-&gt; Unpack KeepAlive
+forall (st :: ZeroBitType) r. Parser st r KeepAlive
+forall a. (forall (st :: ZeroBitType) r. Parser st r a) -&gt; Unpack a
+$cunpack :: forall (st :: ZeroBitType) r. Parser st r KeepAlive
+unpack :: forall (st :: ZeroBitType) r. Parser st r KeepAlive
+</span><a href="M.Pack.Internal.Types.html#Unpack"><span class="hs-identifier hs-var hs-var hs-var hs-var">Unpack</span></a></span></span><span class="hs-special">)</span><span>
+</span><span id="line-65"></span><span>  </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">stock</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621680396671"><span id="local-6989586621680396675"><span id="local-6989586621680396678"><span id="local-6989586621680396680"><span id="local-6989586621680396682"><span id="local-6989586621680396688"><span id="local-6989586621680396693"><span id="local-6989586621680396696"><span id="local-6989586621680396699"><span id="local-6989586621680396702"><span id="local-6989586621680396705"><span id="local-6989586621680396708"><span id="local-6989586621680396713"><span id="local-6989586621680396718"><span class="annot"><span class="annottext">Typeable KeepAlive
+Typeable KeepAlive =&gt;
+(forall (c :: * -&gt; *).
+ (forall d b. Data d =&gt; c (d -&gt; b) -&gt; d -&gt; c b)
+ -&gt; (forall g. g -&gt; c g) -&gt; KeepAlive -&gt; c KeepAlive)
+-&gt; (forall (c :: * -&gt; *).
+    (forall b r. Data b =&gt; c (b -&gt; r) -&gt; c r)
+    -&gt; (forall r. r -&gt; c r) -&gt; Constr -&gt; c KeepAlive)
+-&gt; (KeepAlive -&gt; Constr)
+-&gt; (KeepAlive -&gt; DataType)
+-&gt; (forall (t :: * -&gt; *) (c :: * -&gt; *).
+    Typeable t =&gt;
+    (forall d. Data d =&gt; c (t d)) -&gt; Maybe (c KeepAlive))
+-&gt; (forall (t :: * -&gt; * -&gt; *) (c :: * -&gt; *).
+    Typeable t =&gt;
+    (forall d e. (Data d, Data e) =&gt; c (t d e)) -&gt; Maybe (c KeepAlive))
+-&gt; ((forall b. Data b =&gt; b -&gt; b) -&gt; KeepAlive -&gt; KeepAlive)
+-&gt; (forall r r'.
+    (r -&gt; r' -&gt; r)
+    -&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; KeepAlive -&gt; r)
+-&gt; (forall r r'.
+    (r' -&gt; r -&gt; r)
+    -&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; KeepAlive -&gt; r)
+-&gt; (forall u. (forall d. Data d =&gt; d -&gt; u) -&gt; KeepAlive -&gt; [u])
+-&gt; (forall u.
+    Int -&gt; (forall d. Data d =&gt; d -&gt; u) -&gt; KeepAlive -&gt; u)
+-&gt; (forall (m :: * -&gt; *).
+    Monad m =&gt;
+    (forall d. Data d =&gt; d -&gt; m d) -&gt; KeepAlive -&gt; m KeepAlive)
+-&gt; (forall (m :: * -&gt; *).
+    MonadPlus m =&gt;
+    (forall d. Data d =&gt; d -&gt; m d) -&gt; KeepAlive -&gt; m KeepAlive)
+-&gt; (forall (m :: * -&gt; *).
+    MonadPlus m =&gt;
+    (forall d. Data d =&gt; d -&gt; m d) -&gt; KeepAlive -&gt; m KeepAlive)
+-&gt; Data KeepAlive
+KeepAlive -&gt; Constr
+KeepAlive -&gt; DataType
+(forall b. Data b =&gt; b -&gt; b) -&gt; KeepAlive -&gt; KeepAlive
+forall a.
+Typeable a =&gt;
+(forall (c :: * -&gt; *).
+ (forall d b. Data d =&gt; c (d -&gt; b) -&gt; d -&gt; c b)
+ -&gt; (forall g. g -&gt; c g) -&gt; a -&gt; c a)
+-&gt; (forall (c :: * -&gt; *).
+    (forall b r. Data b =&gt; c (b -&gt; r) -&gt; c r)
+    -&gt; (forall r. r -&gt; c r) -&gt; Constr -&gt; c a)
+-&gt; (a -&gt; Constr)
+-&gt; (a -&gt; DataType)
+-&gt; (forall (t :: * -&gt; *) (c :: * -&gt; *).
+    Typeable t =&gt;
+    (forall d. Data d =&gt; c (t d)) -&gt; Maybe (c a))
+-&gt; (forall (t :: * -&gt; * -&gt; *) (c :: * -&gt; *).
+    Typeable t =&gt;
+    (forall d e. (Data d, Data e) =&gt; c (t d e)) -&gt; Maybe (c a))
+-&gt; ((forall b. Data b =&gt; b -&gt; b) -&gt; a -&gt; a)
+-&gt; (forall r r'.
+    (r -&gt; r' -&gt; r) -&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; a -&gt; r)
+-&gt; (forall r r'.
+    (r' -&gt; r -&gt; r) -&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; a -&gt; r)
+-&gt; (forall u. (forall d. Data d =&gt; d -&gt; u) -&gt; a -&gt; [u])
+-&gt; (forall u. Int -&gt; (forall d. Data d =&gt; d -&gt; u) -&gt; a -&gt; u)
+-&gt; (forall (m :: * -&gt; *).
+    Monad m =&gt;
+    (forall d. Data d =&gt; d -&gt; m d) -&gt; a -&gt; m a)
+-&gt; (forall (m :: * -&gt; *).
+    MonadPlus m =&gt;
+    (forall d. Data d =&gt; d -&gt; m d) -&gt; a -&gt; m a)
+-&gt; (forall (m :: * -&gt; *).
+    MonadPlus m =&gt;
+    (forall d. Data d =&gt; d -&gt; m d) -&gt; a -&gt; m a)
+-&gt; Data a
+forall u. Int -&gt; (forall d. Data d =&gt; d -&gt; u) -&gt; KeepAlive -&gt; u
+forall u. (forall d. Data d =&gt; d -&gt; u) -&gt; KeepAlive -&gt; [u]
+forall r r'.
+(r -&gt; r' -&gt; r)
+-&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; KeepAlive -&gt; r
+forall r r'.
+(r' -&gt; r -&gt; r)
+-&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; KeepAlive -&gt; r
+forall (m :: * -&gt; *).
+Monad m =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; KeepAlive -&gt; m KeepAlive
+forall (m :: * -&gt; *).
+MonadPlus m =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; KeepAlive -&gt; m KeepAlive
+forall (c :: * -&gt; *).
+(forall b r. Data b =&gt; c (b -&gt; r) -&gt; c r)
+-&gt; (forall r. r -&gt; c r) -&gt; Constr -&gt; c KeepAlive
+forall (c :: * -&gt; *).
+(forall d b. Data d =&gt; c (d -&gt; b) -&gt; d -&gt; c b)
+-&gt; (forall g. g -&gt; c g) -&gt; KeepAlive -&gt; c KeepAlive
+forall (t :: * -&gt; *) (c :: * -&gt; *).
+Typeable t =&gt;
+(forall d. Data d =&gt; c (t d)) -&gt; Maybe (c KeepAlive)
+forall (t :: * -&gt; * -&gt; *) (c :: * -&gt; *).
+Typeable t =&gt;
+(forall d e. (Data d, Data e) =&gt; c (t d e)) -&gt; Maybe (c KeepAlive)
+$cgfoldl :: forall (c :: * -&gt; *).
+(forall d b. Data d =&gt; c (d -&gt; b) -&gt; d -&gt; c b)
+-&gt; (forall g. g -&gt; c g) -&gt; KeepAlive -&gt; c KeepAlive
+gfoldl :: forall (c :: * -&gt; *).
+(forall d b. Data d =&gt; c (d -&gt; b) -&gt; d -&gt; c b)
+-&gt; (forall g. g -&gt; c g) -&gt; KeepAlive -&gt; c KeepAlive
+$cgunfold :: forall (c :: * -&gt; *).
+(forall b r. Data b =&gt; c (b -&gt; r) -&gt; c r)
+-&gt; (forall r. r -&gt; c r) -&gt; Constr -&gt; c KeepAlive
+gunfold :: forall (c :: * -&gt; *).
+(forall b r. Data b =&gt; c (b -&gt; r) -&gt; c r)
+-&gt; (forall r. r -&gt; c r) -&gt; Constr -&gt; c KeepAlive
+$ctoConstr :: KeepAlive -&gt; Constr
+toConstr :: KeepAlive -&gt; Constr
+$cdataTypeOf :: KeepAlive -&gt; DataType
+dataTypeOf :: KeepAlive -&gt; DataType
+$cdataCast1 :: forall (t :: * -&gt; *) (c :: * -&gt; *).
+Typeable t =&gt;
+(forall d. Data d =&gt; c (t d)) -&gt; Maybe (c KeepAlive)
+dataCast1 :: forall (t :: * -&gt; *) (c :: * -&gt; *).
+Typeable t =&gt;
+(forall d. Data d =&gt; c (t d)) -&gt; Maybe (c KeepAlive)
+$cdataCast2 :: forall (t :: * -&gt; * -&gt; *) (c :: * -&gt; *).
+Typeable t =&gt;
+(forall d e. (Data d, Data e) =&gt; c (t d e)) -&gt; Maybe (c KeepAlive)
+dataCast2 :: forall (t :: * -&gt; * -&gt; *) (c :: * -&gt; *).
+Typeable t =&gt;
+(forall d e. (Data d, Data e) =&gt; c (t d e)) -&gt; Maybe (c KeepAlive)
+$cgmapT :: (forall b. Data b =&gt; b -&gt; b) -&gt; KeepAlive -&gt; KeepAlive
+gmapT :: (forall b. Data b =&gt; b -&gt; b) -&gt; KeepAlive -&gt; KeepAlive
+$cgmapQl :: forall r r'.
+(r -&gt; r' -&gt; r)
+-&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; KeepAlive -&gt; r
+gmapQl :: forall r r'.
+(r -&gt; r' -&gt; r)
+-&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; KeepAlive -&gt; r
+$cgmapQr :: forall r r'.
+(r' -&gt; r -&gt; r)
+-&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; KeepAlive -&gt; r
+gmapQr :: forall r r'.
+(r' -&gt; r -&gt; r)
+-&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; KeepAlive -&gt; r
+$cgmapQ :: forall u. (forall d. Data d =&gt; d -&gt; u) -&gt; KeepAlive -&gt; [u]
+gmapQ :: forall u. (forall d. Data d =&gt; d -&gt; u) -&gt; KeepAlive -&gt; [u]
+$cgmapQi :: forall u. Int -&gt; (forall d. Data d =&gt; d -&gt; u) -&gt; KeepAlive -&gt; u
+gmapQi :: forall u. Int -&gt; (forall d. Data d =&gt; d -&gt; u) -&gt; KeepAlive -&gt; u
+$cgmapM :: forall (m :: * -&gt; *).
+Monad m =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; KeepAlive -&gt; m KeepAlive
+gmapM :: forall (m :: * -&gt; *).
+Monad m =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; KeepAlive -&gt; m KeepAlive
+$cgmapMp :: forall (m :: * -&gt; *).
+MonadPlus m =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; KeepAlive -&gt; m KeepAlive
+gmapMp :: forall (m :: * -&gt; *).
+MonadPlus m =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; KeepAlive -&gt; m KeepAlive
+$cgmapMo :: forall (m :: * -&gt; *).
+MonadPlus m =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; KeepAlive -&gt; m KeepAlive
+gmapMo :: forall (m :: * -&gt; *).
+MonadPlus m =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; KeepAlive -&gt; m KeepAlive
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Data</span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Typeable</span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680396723"><span id="local-6989586621680396725"><span class="annot"><span class="annottext">(forall x. KeepAlive -&gt; Rep KeepAlive x)
+-&gt; (forall x. Rep KeepAlive x -&gt; KeepAlive) -&gt; Generic KeepAlive
+forall x. Rep KeepAlive x -&gt; KeepAlive
+forall x. KeepAlive -&gt; Rep KeepAlive x
+forall a.
+(forall x. a -&gt; Rep a x) -&gt; (forall x. Rep a x -&gt; a) -&gt; Generic a
+$cfrom :: forall x. KeepAlive -&gt; Rep KeepAlive x
+from :: forall x. KeepAlive -&gt; Rep KeepAlive x
+$cto :: forall x. Rep KeepAlive x -&gt; KeepAlive
+to :: forall x. Rep KeepAlive x -&gt; KeepAlive
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Generic</span></span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-66"></span><span>
+</span><span id="line-67"></span><span class="hs-keyword">data</span><span> </span><span id="PluginMessage"><span class="annot"><a href="M.V769.I.html#PluginMessage"><span class="hs-identifier hs-var">PluginMessage</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="PluginMessage"><span class="annot"><a href="M.V769.I.html#PluginMessage"><span class="hs-identifier hs-var">PluginMessage</span></a></span></span><span>
+</span><span id="line-68"></span><span>  </span><span class="hs-special">{</span><span> </span><span id="channel"><span class="annot"><span class="annottext">PluginMessage -&gt; Text
+</span><a href="M.V769.I.html#channel"><span class="hs-identifier hs-var hs-var">channel</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Text</span></span><span class="hs-special">,</span><span>
+</span><span id="line-69"></span><span>    </span><span id="data_"><span class="annot"><span class="annottext">PluginMessage -&gt; ByteString
+</span><a href="M.V769.I.html#data_"><span class="hs-identifier hs-var hs-var">data_</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">ByteString</span></span><span>
+</span><span id="line-70"></span><span>  </span><span class="hs-special">}</span><span>
+</span><span id="line-71"></span><span>  </span><span class="hs-keyword">deriving</span><span> </span><span class="hs-special">(</span><span id="local-6989586621680396731"><span id="local-6989586621680396738"><span id="local-6989586621680396742"><span class="annot"><span class="annottext">Int -&gt; PluginMessage -&gt; String -&gt; String
+[PluginMessage] -&gt; String -&gt; String
+PluginMessage -&gt; String
+(Int -&gt; PluginMessage -&gt; String -&gt; String)
+-&gt; (PluginMessage -&gt; String)
+-&gt; ([PluginMessage] -&gt; String -&gt; String)
+-&gt; Show PluginMessage
+forall a.
+(Int -&gt; a -&gt; String -&gt; String)
+-&gt; (a -&gt; String) -&gt; ([a] -&gt; String -&gt; String) -&gt; Show a
+$cshowsPrec :: Int -&gt; PluginMessage -&gt; String -&gt; String
+showsPrec :: Int -&gt; PluginMessage -&gt; String -&gt; String
+$cshow :: PluginMessage -&gt; String
+show :: PluginMessage -&gt; String
+$cshowList :: [PluginMessage] -&gt; String -&gt; String
+showList :: [PluginMessage] -&gt; String -&gt; String
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Show</span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680396745"><span id="local-6989586621680396749"><span id="local-6989586621680396752"><span id="local-6989586621680396765"><span class="annot"><span class="annottext">ReadPrec [PluginMessage]
+ReadPrec PluginMessage
+Int -&gt; ReadS PluginMessage
+ReadS [PluginMessage]
+(Int -&gt; ReadS PluginMessage)
+-&gt; ReadS [PluginMessage]
+-&gt; ReadPrec PluginMessage
+-&gt; ReadPrec [PluginMessage]
+-&gt; Read PluginMessage
+forall a.
+(Int -&gt; ReadS a)
+-&gt; ReadS [a] -&gt; ReadPrec a -&gt; ReadPrec [a] -&gt; Read a
+$creadsPrec :: Int -&gt; ReadS PluginMessage
+readsPrec :: Int -&gt; ReadS PluginMessage
+$creadList :: ReadS [PluginMessage]
+readList :: ReadS [PluginMessage]
+$creadPrec :: ReadPrec PluginMessage
+readPrec :: ReadPrec PluginMessage
+$creadListPrec :: ReadPrec [PluginMessage]
+readListPrec :: ReadPrec [PluginMessage]
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Read</span></span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680396770"><span id="local-6989586621680396776"><span id="local-6989586621680396780"><span id="local-6989586621680396782"><span id="local-6989586621680396784"><span id="local-6989586621680396790"><span id="local-6989586621680396795"><span id="local-6989586621680396798"><span id="local-6989586621680396801"><span id="local-6989586621680396804"><span id="local-6989586621680396807"><span id="local-6989586621680396810"><span id="local-6989586621680396815"><span id="local-6989586621680396820"><span class="annot"><span class="annottext">Typeable PluginMessage
+Typeable PluginMessage =&gt;
+(forall (c :: * -&gt; *).
+ (forall d b. Data d =&gt; c (d -&gt; b) -&gt; d -&gt; c b)
+ -&gt; (forall g. g -&gt; c g) -&gt; PluginMessage -&gt; c PluginMessage)
+-&gt; (forall (c :: * -&gt; *).
+    (forall b r. Data b =&gt; c (b -&gt; r) -&gt; c r)
+    -&gt; (forall r. r -&gt; c r) -&gt; Constr -&gt; c PluginMessage)
+-&gt; (PluginMessage -&gt; Constr)
+-&gt; (PluginMessage -&gt; DataType)
+-&gt; (forall (t :: * -&gt; *) (c :: * -&gt; *).
+    Typeable t =&gt;
+    (forall d. Data d =&gt; c (t d)) -&gt; Maybe (c PluginMessage))
+-&gt; (forall (t :: * -&gt; * -&gt; *) (c :: * -&gt; *).
+    Typeable t =&gt;
+    (forall d e. (Data d, Data e) =&gt; c (t d e))
+    -&gt; Maybe (c PluginMessage))
+-&gt; ((forall b. Data b =&gt; b -&gt; b) -&gt; PluginMessage -&gt; PluginMessage)
+-&gt; (forall r r'.
+    (r -&gt; r' -&gt; r)
+    -&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; PluginMessage -&gt; r)
+-&gt; (forall r r'.
+    (r' -&gt; r -&gt; r)
+    -&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; PluginMessage -&gt; r)
+-&gt; (forall u. (forall d. Data d =&gt; d -&gt; u) -&gt; PluginMessage -&gt; [u])
+-&gt; (forall u.
+    Int -&gt; (forall d. Data d =&gt; d -&gt; u) -&gt; PluginMessage -&gt; u)
+-&gt; (forall (m :: * -&gt; *).
+    Monad m =&gt;
+    (forall d. Data d =&gt; d -&gt; m d) -&gt; PluginMessage -&gt; m PluginMessage)
+-&gt; (forall (m :: * -&gt; *).
+    MonadPlus m =&gt;
+    (forall d. Data d =&gt; d -&gt; m d) -&gt; PluginMessage -&gt; m PluginMessage)
+-&gt; (forall (m :: * -&gt; *).
+    MonadPlus m =&gt;
+    (forall d. Data d =&gt; d -&gt; m d) -&gt; PluginMessage -&gt; m PluginMessage)
+-&gt; Data PluginMessage
+PluginMessage -&gt; Constr
+PluginMessage -&gt; DataType
+(forall b. Data b =&gt; b -&gt; b) -&gt; PluginMessage -&gt; PluginMessage
+forall a.
+Typeable a =&gt;
+(forall (c :: * -&gt; *).
+ (forall d b. Data d =&gt; c (d -&gt; b) -&gt; d -&gt; c b)
+ -&gt; (forall g. g -&gt; c g) -&gt; a -&gt; c a)
+-&gt; (forall (c :: * -&gt; *).
+    (forall b r. Data b =&gt; c (b -&gt; r) -&gt; c r)
+    -&gt; (forall r. r -&gt; c r) -&gt; Constr -&gt; c a)
+-&gt; (a -&gt; Constr)
+-&gt; (a -&gt; DataType)
+-&gt; (forall (t :: * -&gt; *) (c :: * -&gt; *).
+    Typeable t =&gt;
+    (forall d. Data d =&gt; c (t d)) -&gt; Maybe (c a))
+-&gt; (forall (t :: * -&gt; * -&gt; *) (c :: * -&gt; *).
+    Typeable t =&gt;
+    (forall d e. (Data d, Data e) =&gt; c (t d e)) -&gt; Maybe (c a))
+-&gt; ((forall b. Data b =&gt; b -&gt; b) -&gt; a -&gt; a)
+-&gt; (forall r r'.
+    (r -&gt; r' -&gt; r) -&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; a -&gt; r)
+-&gt; (forall r r'.
+    (r' -&gt; r -&gt; r) -&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; a -&gt; r)
+-&gt; (forall u. (forall d. Data d =&gt; d -&gt; u) -&gt; a -&gt; [u])
+-&gt; (forall u. Int -&gt; (forall d. Data d =&gt; d -&gt; u) -&gt; a -&gt; u)
+-&gt; (forall (m :: * -&gt; *).
+    Monad m =&gt;
+    (forall d. Data d =&gt; d -&gt; m d) -&gt; a -&gt; m a)
+-&gt; (forall (m :: * -&gt; *).
+    MonadPlus m =&gt;
+    (forall d. Data d =&gt; d -&gt; m d) -&gt; a -&gt; m a)
+-&gt; (forall (m :: * -&gt; *).
+    MonadPlus m =&gt;
+    (forall d. Data d =&gt; d -&gt; m d) -&gt; a -&gt; m a)
+-&gt; Data a
+forall u. Int -&gt; (forall d. Data d =&gt; d -&gt; u) -&gt; PluginMessage -&gt; u
+forall u. (forall d. Data d =&gt; d -&gt; u) -&gt; PluginMessage -&gt; [u]
+forall r r'.
+(r -&gt; r' -&gt; r)
+-&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; PluginMessage -&gt; r
+forall r r'.
+(r' -&gt; r -&gt; r)
+-&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; PluginMessage -&gt; r
+forall (m :: * -&gt; *).
+Monad m =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; PluginMessage -&gt; m PluginMessage
+forall (m :: * -&gt; *).
+MonadPlus m =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; PluginMessage -&gt; m PluginMessage
+forall (c :: * -&gt; *).
+(forall b r. Data b =&gt; c (b -&gt; r) -&gt; c r)
+-&gt; (forall r. r -&gt; c r) -&gt; Constr -&gt; c PluginMessage
+forall (c :: * -&gt; *).
+(forall d b. Data d =&gt; c (d -&gt; b) -&gt; d -&gt; c b)
+-&gt; (forall g. g -&gt; c g) -&gt; PluginMessage -&gt; c PluginMessage
+forall (t :: * -&gt; *) (c :: * -&gt; *).
+Typeable t =&gt;
+(forall d. Data d =&gt; c (t d)) -&gt; Maybe (c PluginMessage)
+forall (t :: * -&gt; * -&gt; *) (c :: * -&gt; *).
+Typeable t =&gt;
+(forall d e. (Data d, Data e) =&gt; c (t d e))
+-&gt; Maybe (c PluginMessage)
+$cgfoldl :: forall (c :: * -&gt; *).
+(forall d b. Data d =&gt; c (d -&gt; b) -&gt; d -&gt; c b)
+-&gt; (forall g. g -&gt; c g) -&gt; PluginMessage -&gt; c PluginMessage
+gfoldl :: forall (c :: * -&gt; *).
+(forall d b. Data d =&gt; c (d -&gt; b) -&gt; d -&gt; c b)
+-&gt; (forall g. g -&gt; c g) -&gt; PluginMessage -&gt; c PluginMessage
+$cgunfold :: forall (c :: * -&gt; *).
+(forall b r. Data b =&gt; c (b -&gt; r) -&gt; c r)
+-&gt; (forall r. r -&gt; c r) -&gt; Constr -&gt; c PluginMessage
+gunfold :: forall (c :: * -&gt; *).
+(forall b r. Data b =&gt; c (b -&gt; r) -&gt; c r)
+-&gt; (forall r. r -&gt; c r) -&gt; Constr -&gt; c PluginMessage
+$ctoConstr :: PluginMessage -&gt; Constr
+toConstr :: PluginMessage -&gt; Constr
+$cdataTypeOf :: PluginMessage -&gt; DataType
+dataTypeOf :: PluginMessage -&gt; DataType
+$cdataCast1 :: forall (t :: * -&gt; *) (c :: * -&gt; *).
+Typeable t =&gt;
+(forall d. Data d =&gt; c (t d)) -&gt; Maybe (c PluginMessage)
+dataCast1 :: forall (t :: * -&gt; *) (c :: * -&gt; *).
+Typeable t =&gt;
+(forall d. Data d =&gt; c (t d)) -&gt; Maybe (c PluginMessage)
+$cdataCast2 :: forall (t :: * -&gt; * -&gt; *) (c :: * -&gt; *).
+Typeable t =&gt;
+(forall d e. (Data d, Data e) =&gt; c (t d e))
+-&gt; Maybe (c PluginMessage)
+dataCast2 :: forall (t :: * -&gt; * -&gt; *) (c :: * -&gt; *).
+Typeable t =&gt;
+(forall d e. (Data d, Data e) =&gt; c (t d e))
+-&gt; Maybe (c PluginMessage)
+$cgmapT :: (forall b. Data b =&gt; b -&gt; b) -&gt; PluginMessage -&gt; PluginMessage
+gmapT :: (forall b. Data b =&gt; b -&gt; b) -&gt; PluginMessage -&gt; PluginMessage
+$cgmapQl :: forall r r'.
+(r -&gt; r' -&gt; r)
+-&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; PluginMessage -&gt; r
+gmapQl :: forall r r'.
+(r -&gt; r' -&gt; r)
+-&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; PluginMessage -&gt; r
+$cgmapQr :: forall r r'.
+(r' -&gt; r -&gt; r)
+-&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; PluginMessage -&gt; r
+gmapQr :: forall r r'.
+(r' -&gt; r -&gt; r)
+-&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; PluginMessage -&gt; r
+$cgmapQ :: forall u. (forall d. Data d =&gt; d -&gt; u) -&gt; PluginMessage -&gt; [u]
+gmapQ :: forall u. (forall d. Data d =&gt; d -&gt; u) -&gt; PluginMessage -&gt; [u]
+$cgmapQi :: forall u. Int -&gt; (forall d. Data d =&gt; d -&gt; u) -&gt; PluginMessage -&gt; u
+gmapQi :: forall u. Int -&gt; (forall d. Data d =&gt; d -&gt; u) -&gt; PluginMessage -&gt; u
+$cgmapM :: forall (m :: * -&gt; *).
+Monad m =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; PluginMessage -&gt; m PluginMessage
+gmapM :: forall (m :: * -&gt; *).
+Monad m =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; PluginMessage -&gt; m PluginMessage
+$cgmapMp :: forall (m :: * -&gt; *).
+MonadPlus m =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; PluginMessage -&gt; m PluginMessage
+gmapMp :: forall (m :: * -&gt; *).
+MonadPlus m =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; PluginMessage -&gt; m PluginMessage
+$cgmapMo :: forall (m :: * -&gt; *).
+MonadPlus m =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; PluginMessage -&gt; m PluginMessage
+gmapMo :: forall (m :: * -&gt; *).
+MonadPlus m =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; PluginMessage -&gt; m PluginMessage
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Data</span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Typeable</span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680396825"><span id="local-6989586621680396827"><span class="annot"><span class="annottext">(forall x. PluginMessage -&gt; Rep PluginMessage x)
+-&gt; (forall x. Rep PluginMessage x -&gt; PluginMessage)
+-&gt; Generic PluginMessage
+forall x. Rep PluginMessage x -&gt; PluginMessage
+forall x. PluginMessage -&gt; Rep PluginMessage x
+forall a.
+(forall x. a -&gt; Rep a x) -&gt; (forall x. Rep a x -&gt; a) -&gt; Generic a
+$cfrom :: forall x. PluginMessage -&gt; Rep PluginMessage x
+from :: forall x. PluginMessage -&gt; Rep PluginMessage x
+$cto :: forall x. Rep PluginMessage x -&gt; PluginMessage
+to :: forall x. Rep PluginMessage x -&gt; PluginMessage
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Generic</span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680396830"><span class="annot"><span class="annottext">PluginMessage -&gt; ()
+(PluginMessage -&gt; ()) -&gt; NFData PluginMessage
+forall a. (a -&gt; ()) -&gt; NFData a
+$crnf :: PluginMessage -&gt; ()
+rnf :: PluginMessage -&gt; ()
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var">NFData</span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680396849"><span id="local-6989586621680396855"><span class="annot"><span class="annottext">PluginMessage -&gt; PluginMessage -&gt; Bool
+(PluginMessage -&gt; PluginMessage -&gt; Bool)
+-&gt; (PluginMessage -&gt; PluginMessage -&gt; Bool) -&gt; Eq PluginMessage
+forall a. (a -&gt; a -&gt; Bool) -&gt; (a -&gt; a -&gt; Bool) -&gt; Eq a
+$c== :: PluginMessage -&gt; PluginMessage -&gt; Bool
+== :: PluginMessage -&gt; PluginMessage -&gt; Bool
+$c/= :: PluginMessage -&gt; PluginMessage -&gt; Bool
+/= :: PluginMessage -&gt; PluginMessage -&gt; Bool
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Eq</span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680396861"><span id="local-6989586621680396867"><span id="local-6989586621680396871"><span id="local-6989586621680396875"><span id="local-6989586621680396878"><span id="local-6989586621680396881"><span id="local-6989586621680396884"><span class="annot"><span class="annottext">Eq PluginMessage
+Eq PluginMessage =&gt;
+(PluginMessage -&gt; PluginMessage -&gt; Ordering)
+-&gt; (PluginMessage -&gt; PluginMessage -&gt; Bool)
+-&gt; (PluginMessage -&gt; PluginMessage -&gt; Bool)
+-&gt; (PluginMessage -&gt; PluginMessage -&gt; Bool)
+-&gt; (PluginMessage -&gt; PluginMessage -&gt; Bool)
+-&gt; (PluginMessage -&gt; PluginMessage -&gt; PluginMessage)
+-&gt; (PluginMessage -&gt; PluginMessage -&gt; PluginMessage)
+-&gt; Ord PluginMessage
+PluginMessage -&gt; PluginMessage -&gt; Bool
+PluginMessage -&gt; PluginMessage -&gt; Ordering
+PluginMessage -&gt; PluginMessage -&gt; PluginMessage
+forall a.
+Eq a =&gt;
+(a -&gt; a -&gt; Ordering)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; Ord a
+$ccompare :: PluginMessage -&gt; PluginMessage -&gt; Ordering
+compare :: PluginMessage -&gt; PluginMessage -&gt; Ordering
+$c&lt; :: PluginMessage -&gt; PluginMessage -&gt; Bool
+&lt; :: PluginMessage -&gt; PluginMessage -&gt; Bool
+$c&lt;= :: PluginMessage -&gt; PluginMessage -&gt; Bool
+&lt;= :: PluginMessage -&gt; PluginMessage -&gt; Bool
+$c&gt; :: PluginMessage -&gt; PluginMessage -&gt; Bool
+&gt; :: PluginMessage -&gt; PluginMessage -&gt; Bool
+$c&gt;= :: PluginMessage -&gt; PluginMessage -&gt; Bool
+&gt;= :: PluginMessage -&gt; PluginMessage -&gt; Bool
+$cmax :: PluginMessage -&gt; PluginMessage -&gt; PluginMessage
+max :: PluginMessage -&gt; PluginMessage -&gt; PluginMessage
+$cmin :: PluginMessage -&gt; PluginMessage -&gt; PluginMessage
+min :: PluginMessage -&gt; PluginMessage -&gt; PluginMessage
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Ord</span></span></span></span></span></span></span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-72"></span><span>  </span><span class="hs-keyword">deriving</span><span> </span><span class="hs-special">(</span><span id="local-6989586621680396887"><span class="annot"><span class="annottext">PluginMessage -&gt; Builder
+(PluginMessage -&gt; Builder) -&gt; Pack PluginMessage
+forall a. (a -&gt; Builder) -&gt; Pack a
+$cpack :: PluginMessage -&gt; Builder
+pack :: PluginMessage -&gt; Builder
+</span><a href="M.Pack.Internal.Types.html#Pack"><span class="hs-identifier hs-var hs-var hs-var hs-var">Pack</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680396907"><span class="annot"><span class="annottext">(forall (st :: ZeroBitType) r. Parser st r PluginMessage)
+-&gt; Unpack PluginMessage
+forall (st :: ZeroBitType) r. Parser st r PluginMessage
+forall a. (forall (st :: ZeroBitType) r. Parser st r a) -&gt; Unpack a
+$cunpack :: forall (st :: ZeroBitType) r. Parser st r PluginMessage
+unpack :: forall (st :: ZeroBitType) r. Parser st r PluginMessage
+</span><a href="M.Pack.Internal.Types.html#Unpack"><span class="hs-identifier hs-var hs-var hs-var hs-var">Unpack</span></a></span></span><span class="hs-special">)</span><span>
+</span><span id="line-73"></span><span>
+</span><span id="line-74"></span><span class="hs-keyword">data</span><span> </span><span id="ResourcePack"><span class="annot"><a href="M.V769.I.html#ResourcePack"><span class="hs-identifier hs-var">ResourcePack</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="ResourcePack"><span class="annot"><a href="M.V769.I.html#ResourcePack"><span class="hs-identifier hs-var">ResourcePack</span></a></span></span><span>
+</span><span id="line-75"></span><span>  </span><span class="hs-special">{</span><span> </span><span id="url"><span class="annot"><span class="annottext">ResourcePack -&gt; Text
+</span><a href="M.V769.I.html#url"><span class="hs-identifier hs-var hs-var">url</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Text</span></span><span class="hs-special">,</span><span>
+</span><span id="line-76"></span><span>    </span><span id="hash"><span class="annot"><span class="annottext">ResourcePack -&gt; Text
+</span><a href="M.V769.I.html#hash"><span class="hs-identifier hs-var hs-var">hash</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Text</span></span><span>
+</span><span id="line-77"></span><span>  </span><span class="hs-special">}</span><span>
+</span><span id="line-78"></span><span>  </span><span class="hs-keyword">deriving</span><span> </span><span class="hs-special">(</span><span id="local-6989586621680396930"><span id="local-6989586621680396935"><span id="local-6989586621680396939"><span class="annot"><span class="annottext">Int -&gt; ResourcePack -&gt; String -&gt; String
+[ResourcePack] -&gt; String -&gt; String
+ResourcePack -&gt; String
+(Int -&gt; ResourcePack -&gt; String -&gt; String)
+-&gt; (ResourcePack -&gt; String)
+-&gt; ([ResourcePack] -&gt; String -&gt; String)
+-&gt; Show ResourcePack
+forall a.
+(Int -&gt; a -&gt; String -&gt; String)
+-&gt; (a -&gt; String) -&gt; ([a] -&gt; String -&gt; String) -&gt; Show a
+$cshowsPrec :: Int -&gt; ResourcePack -&gt; String -&gt; String
+showsPrec :: Int -&gt; ResourcePack -&gt; String -&gt; String
+$cshow :: ResourcePack -&gt; String
+show :: ResourcePack -&gt; String
+$cshowList :: [ResourcePack] -&gt; String -&gt; String
+showList :: [ResourcePack] -&gt; String -&gt; String
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Show</span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680396942"><span id="local-6989586621680396946"><span id="local-6989586621680396949"><span id="local-6989586621680396960"><span class="annot"><span class="annottext">ReadPrec [ResourcePack]
+ReadPrec ResourcePack
+Int -&gt; ReadS ResourcePack
+ReadS [ResourcePack]
+(Int -&gt; ReadS ResourcePack)
+-&gt; ReadS [ResourcePack]
+-&gt; ReadPrec ResourcePack
+-&gt; ReadPrec [ResourcePack]
+-&gt; Read ResourcePack
+forall a.
+(Int -&gt; ReadS a)
+-&gt; ReadS [a] -&gt; ReadPrec a -&gt; ReadPrec [a] -&gt; Read a
+$creadsPrec :: Int -&gt; ReadS ResourcePack
+readsPrec :: Int -&gt; ReadS ResourcePack
+$creadList :: ReadS [ResourcePack]
+readList :: ReadS [ResourcePack]
+$creadPrec :: ReadPrec ResourcePack
+readPrec :: ReadPrec ResourcePack
+$creadListPrec :: ReadPrec [ResourcePack]
+readListPrec :: ReadPrec [ResourcePack]
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Read</span></span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680396965"><span id="local-6989586621680396969"><span id="local-6989586621680396973"><span id="local-6989586621680396975"><span id="local-6989586621680396977"><span id="local-6989586621680396983"><span id="local-6989586621680396988"><span id="local-6989586621680396991"><span id="local-6989586621680396994"><span id="local-6989586621680396997"><span id="local-6989586621680397000"><span id="local-6989586621680397003"><span id="local-6989586621680397008"><span id="local-6989586621680397013"><span class="annot"><span class="annottext">Typeable ResourcePack
+Typeable ResourcePack =&gt;
+(forall (c :: * -&gt; *).
+ (forall d b. Data d =&gt; c (d -&gt; b) -&gt; d -&gt; c b)
+ -&gt; (forall g. g -&gt; c g) -&gt; ResourcePack -&gt; c ResourcePack)
+-&gt; (forall (c :: * -&gt; *).
+    (forall b r. Data b =&gt; c (b -&gt; r) -&gt; c r)
+    -&gt; (forall r. r -&gt; c r) -&gt; Constr -&gt; c ResourcePack)
+-&gt; (ResourcePack -&gt; Constr)
+-&gt; (ResourcePack -&gt; DataType)
+-&gt; (forall (t :: * -&gt; *) (c :: * -&gt; *).
+    Typeable t =&gt;
+    (forall d. Data d =&gt; c (t d)) -&gt; Maybe (c ResourcePack))
+-&gt; (forall (t :: * -&gt; * -&gt; *) (c :: * -&gt; *).
+    Typeable t =&gt;
+    (forall d e. (Data d, Data e) =&gt; c (t d e))
+    -&gt; Maybe (c ResourcePack))
+-&gt; ((forall b. Data b =&gt; b -&gt; b) -&gt; ResourcePack -&gt; ResourcePack)
+-&gt; (forall r r'.
+    (r -&gt; r' -&gt; r)
+    -&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; ResourcePack -&gt; r)
+-&gt; (forall r r'.
+    (r' -&gt; r -&gt; r)
+    -&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; ResourcePack -&gt; r)
+-&gt; (forall u. (forall d. Data d =&gt; d -&gt; u) -&gt; ResourcePack -&gt; [u])
+-&gt; (forall u.
+    Int -&gt; (forall d. Data d =&gt; d -&gt; u) -&gt; ResourcePack -&gt; u)
+-&gt; (forall (m :: * -&gt; *).
+    Monad m =&gt;
+    (forall d. Data d =&gt; d -&gt; m d) -&gt; ResourcePack -&gt; m ResourcePack)
+-&gt; (forall (m :: * -&gt; *).
+    MonadPlus m =&gt;
+    (forall d. Data d =&gt; d -&gt; m d) -&gt; ResourcePack -&gt; m ResourcePack)
+-&gt; (forall (m :: * -&gt; *).
+    MonadPlus m =&gt;
+    (forall d. Data d =&gt; d -&gt; m d) -&gt; ResourcePack -&gt; m ResourcePack)
+-&gt; Data ResourcePack
+ResourcePack -&gt; Constr
+ResourcePack -&gt; DataType
+(forall b. Data b =&gt; b -&gt; b) -&gt; ResourcePack -&gt; ResourcePack
+forall a.
+Typeable a =&gt;
+(forall (c :: * -&gt; *).
+ (forall d b. Data d =&gt; c (d -&gt; b) -&gt; d -&gt; c b)
+ -&gt; (forall g. g -&gt; c g) -&gt; a -&gt; c a)
+-&gt; (forall (c :: * -&gt; *).
+    (forall b r. Data b =&gt; c (b -&gt; r) -&gt; c r)
+    -&gt; (forall r. r -&gt; c r) -&gt; Constr -&gt; c a)
+-&gt; (a -&gt; Constr)
+-&gt; (a -&gt; DataType)
+-&gt; (forall (t :: * -&gt; *) (c :: * -&gt; *).
+    Typeable t =&gt;
+    (forall d. Data d =&gt; c (t d)) -&gt; Maybe (c a))
+-&gt; (forall (t :: * -&gt; * -&gt; *) (c :: * -&gt; *).
+    Typeable t =&gt;
+    (forall d e. (Data d, Data e) =&gt; c (t d e)) -&gt; Maybe (c a))
+-&gt; ((forall b. Data b =&gt; b -&gt; b) -&gt; a -&gt; a)
+-&gt; (forall r r'.
+    (r -&gt; r' -&gt; r) -&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; a -&gt; r)
+-&gt; (forall r r'.
+    (r' -&gt; r -&gt; r) -&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; a -&gt; r)
+-&gt; (forall u. (forall d. Data d =&gt; d -&gt; u) -&gt; a -&gt; [u])
+-&gt; (forall u. Int -&gt; (forall d. Data d =&gt; d -&gt; u) -&gt; a -&gt; u)
+-&gt; (forall (m :: * -&gt; *).
+    Monad m =&gt;
+    (forall d. Data d =&gt; d -&gt; m d) -&gt; a -&gt; m a)
+-&gt; (forall (m :: * -&gt; *).
+    MonadPlus m =&gt;
+    (forall d. Data d =&gt; d -&gt; m d) -&gt; a -&gt; m a)
+-&gt; (forall (m :: * -&gt; *).
+    MonadPlus m =&gt;
+    (forall d. Data d =&gt; d -&gt; m d) -&gt; a -&gt; m a)
+-&gt; Data a
+forall u. Int -&gt; (forall d. Data d =&gt; d -&gt; u) -&gt; ResourcePack -&gt; u
+forall u. (forall d. Data d =&gt; d -&gt; u) -&gt; ResourcePack -&gt; [u]
+forall r r'.
+(r -&gt; r' -&gt; r)
+-&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; ResourcePack -&gt; r
+forall r r'.
+(r' -&gt; r -&gt; r)
+-&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; ResourcePack -&gt; r
+forall (m :: * -&gt; *).
+Monad m =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; ResourcePack -&gt; m ResourcePack
+forall (m :: * -&gt; *).
+MonadPlus m =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; ResourcePack -&gt; m ResourcePack
+forall (c :: * -&gt; *).
+(forall b r. Data b =&gt; c (b -&gt; r) -&gt; c r)
+-&gt; (forall r. r -&gt; c r) -&gt; Constr -&gt; c ResourcePack
+forall (c :: * -&gt; *).
+(forall d b. Data d =&gt; c (d -&gt; b) -&gt; d -&gt; c b)
+-&gt; (forall g. g -&gt; c g) -&gt; ResourcePack -&gt; c ResourcePack
+forall (t :: * -&gt; *) (c :: * -&gt; *).
+Typeable t =&gt;
+(forall d. Data d =&gt; c (t d)) -&gt; Maybe (c ResourcePack)
+forall (t :: * -&gt; * -&gt; *) (c :: * -&gt; *).
+Typeable t =&gt;
+(forall d e. (Data d, Data e) =&gt; c (t d e))
+-&gt; Maybe (c ResourcePack)
+$cgfoldl :: forall (c :: * -&gt; *).
+(forall d b. Data d =&gt; c (d -&gt; b) -&gt; d -&gt; c b)
+-&gt; (forall g. g -&gt; c g) -&gt; ResourcePack -&gt; c ResourcePack
+gfoldl :: forall (c :: * -&gt; *).
+(forall d b. Data d =&gt; c (d -&gt; b) -&gt; d -&gt; c b)
+-&gt; (forall g. g -&gt; c g) -&gt; ResourcePack -&gt; c ResourcePack
+$cgunfold :: forall (c :: * -&gt; *).
+(forall b r. Data b =&gt; c (b -&gt; r) -&gt; c r)
+-&gt; (forall r. r -&gt; c r) -&gt; Constr -&gt; c ResourcePack
+gunfold :: forall (c :: * -&gt; *).
+(forall b r. Data b =&gt; c (b -&gt; r) -&gt; c r)
+-&gt; (forall r. r -&gt; c r) -&gt; Constr -&gt; c ResourcePack
+$ctoConstr :: ResourcePack -&gt; Constr
+toConstr :: ResourcePack -&gt; Constr
+$cdataTypeOf :: ResourcePack -&gt; DataType
+dataTypeOf :: ResourcePack -&gt; DataType
+$cdataCast1 :: forall (t :: * -&gt; *) (c :: * -&gt; *).
+Typeable t =&gt;
+(forall d. Data d =&gt; c (t d)) -&gt; Maybe (c ResourcePack)
+dataCast1 :: forall (t :: * -&gt; *) (c :: * -&gt; *).
+Typeable t =&gt;
+(forall d. Data d =&gt; c (t d)) -&gt; Maybe (c ResourcePack)
+$cdataCast2 :: forall (t :: * -&gt; * -&gt; *) (c :: * -&gt; *).
+Typeable t =&gt;
+(forall d e. (Data d, Data e) =&gt; c (t d e))
+-&gt; Maybe (c ResourcePack)
+dataCast2 :: forall (t :: * -&gt; * -&gt; *) (c :: * -&gt; *).
+Typeable t =&gt;
+(forall d e. (Data d, Data e) =&gt; c (t d e))
+-&gt; Maybe (c ResourcePack)
+$cgmapT :: (forall b. Data b =&gt; b -&gt; b) -&gt; ResourcePack -&gt; ResourcePack
+gmapT :: (forall b. Data b =&gt; b -&gt; b) -&gt; ResourcePack -&gt; ResourcePack
+$cgmapQl :: forall r r'.
+(r -&gt; r' -&gt; r)
+-&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; ResourcePack -&gt; r
+gmapQl :: forall r r'.
+(r -&gt; r' -&gt; r)
+-&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; ResourcePack -&gt; r
+$cgmapQr :: forall r r'.
+(r' -&gt; r -&gt; r)
+-&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; ResourcePack -&gt; r
+gmapQr :: forall r r'.
+(r' -&gt; r -&gt; r)
+-&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; ResourcePack -&gt; r
+$cgmapQ :: forall u. (forall d. Data d =&gt; d -&gt; u) -&gt; ResourcePack -&gt; [u]
+gmapQ :: forall u. (forall d. Data d =&gt; d -&gt; u) -&gt; ResourcePack -&gt; [u]
+$cgmapQi :: forall u. Int -&gt; (forall d. Data d =&gt; d -&gt; u) -&gt; ResourcePack -&gt; u
+gmapQi :: forall u. Int -&gt; (forall d. Data d =&gt; d -&gt; u) -&gt; ResourcePack -&gt; u
+$cgmapM :: forall (m :: * -&gt; *).
+Monad m =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; ResourcePack -&gt; m ResourcePack
+gmapM :: forall (m :: * -&gt; *).
+Monad m =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; ResourcePack -&gt; m ResourcePack
+$cgmapMp :: forall (m :: * -&gt; *).
+MonadPlus m =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; ResourcePack -&gt; m ResourcePack
+gmapMp :: forall (m :: * -&gt; *).
+MonadPlus m =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; ResourcePack -&gt; m ResourcePack
+$cgmapMo :: forall (m :: * -&gt; *).
+MonadPlus m =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; ResourcePack -&gt; m ResourcePack
+gmapMo :: forall (m :: * -&gt; *).
+MonadPlus m =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; ResourcePack -&gt; m ResourcePack
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Data</span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Typeable</span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680397018"><span id="local-6989586621680397020"><span class="annot"><span class="annottext">(forall x. ResourcePack -&gt; Rep ResourcePack x)
+-&gt; (forall x. Rep ResourcePack x -&gt; ResourcePack)
+-&gt; Generic ResourcePack
+forall x. Rep ResourcePack x -&gt; ResourcePack
+forall x. ResourcePack -&gt; Rep ResourcePack x
+forall a.
+(forall x. a -&gt; Rep a x) -&gt; (forall x. Rep a x -&gt; a) -&gt; Generic a
+$cfrom :: forall x. ResourcePack -&gt; Rep ResourcePack x
+from :: forall x. ResourcePack -&gt; Rep ResourcePack x
+$cto :: forall x. Rep ResourcePack x -&gt; ResourcePack
+to :: forall x. Rep ResourcePack x -&gt; ResourcePack
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Generic</span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680397023"><span class="annot"><span class="annottext">ResourcePack -&gt; ()
+(ResourcePack -&gt; ()) -&gt; NFData ResourcePack
+forall a. (a -&gt; ()) -&gt; NFData a
+$crnf :: ResourcePack -&gt; ()
+rnf :: ResourcePack -&gt; ()
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var">NFData</span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680397036"><span id="local-6989586621680397040"><span class="annot"><span class="annottext">ResourcePack -&gt; ResourcePack -&gt; Bool
+(ResourcePack -&gt; ResourcePack -&gt; Bool)
+-&gt; (ResourcePack -&gt; ResourcePack -&gt; Bool) -&gt; Eq ResourcePack
+forall a. (a -&gt; a -&gt; Bool) -&gt; (a -&gt; a -&gt; Bool) -&gt; Eq a
+$c== :: ResourcePack -&gt; ResourcePack -&gt; Bool
+== :: ResourcePack -&gt; ResourcePack -&gt; Bool
+$c/= :: ResourcePack -&gt; ResourcePack -&gt; Bool
+/= :: ResourcePack -&gt; ResourcePack -&gt; Bool
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Eq</span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680397046"><span id="local-6989586621680397050"><span id="local-6989586621680397054"><span id="local-6989586621680397058"><span id="local-6989586621680397061"><span id="local-6989586621680397064"><span id="local-6989586621680397067"><span class="annot"><span class="annottext">Eq ResourcePack
+Eq ResourcePack =&gt;
+(ResourcePack -&gt; ResourcePack -&gt; Ordering)
+-&gt; (ResourcePack -&gt; ResourcePack -&gt; Bool)
+-&gt; (ResourcePack -&gt; ResourcePack -&gt; Bool)
+-&gt; (ResourcePack -&gt; ResourcePack -&gt; Bool)
+-&gt; (ResourcePack -&gt; ResourcePack -&gt; Bool)
+-&gt; (ResourcePack -&gt; ResourcePack -&gt; ResourcePack)
+-&gt; (ResourcePack -&gt; ResourcePack -&gt; ResourcePack)
+-&gt; Ord ResourcePack
+ResourcePack -&gt; ResourcePack -&gt; Bool
+ResourcePack -&gt; ResourcePack -&gt; Ordering
+ResourcePack -&gt; ResourcePack -&gt; ResourcePack
+forall a.
+Eq a =&gt;
+(a -&gt; a -&gt; Ordering)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; Ord a
+$ccompare :: ResourcePack -&gt; ResourcePack -&gt; Ordering
+compare :: ResourcePack -&gt; ResourcePack -&gt; Ordering
+$c&lt; :: ResourcePack -&gt; ResourcePack -&gt; Bool
+&lt; :: ResourcePack -&gt; ResourcePack -&gt; Bool
+$c&lt;= :: ResourcePack -&gt; ResourcePack -&gt; Bool
+&lt;= :: ResourcePack -&gt; ResourcePack -&gt; Bool
+$c&gt; :: ResourcePack -&gt; ResourcePack -&gt; Bool
+&gt; :: ResourcePack -&gt; ResourcePack -&gt; Bool
+$c&gt;= :: ResourcePack -&gt; ResourcePack -&gt; Bool
+&gt;= :: ResourcePack -&gt; ResourcePack -&gt; Bool
+$cmax :: ResourcePack -&gt; ResourcePack -&gt; ResourcePack
+max :: ResourcePack -&gt; ResourcePack -&gt; ResourcePack
+$cmin :: ResourcePack -&gt; ResourcePack -&gt; ResourcePack
+min :: ResourcePack -&gt; ResourcePack -&gt; ResourcePack
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Ord</span></span></span></span></span></span></span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-79"></span><span>  </span><span class="hs-keyword">deriving</span><span> </span><span class="hs-special">(</span><span id="local-6989586621680397070"><span class="annot"><span class="annottext">ResourcePack -&gt; Builder
+(ResourcePack -&gt; Builder) -&gt; Pack ResourcePack
+forall a. (a -&gt; Builder) -&gt; Pack a
+$cpack :: ResourcePack -&gt; Builder
+pack :: ResourcePack -&gt; Builder
+</span><a href="M.Pack.Internal.Types.html#Pack"><span class="hs-identifier hs-var hs-var hs-var hs-var">Pack</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680397083"><span class="annot"><span class="annottext">(forall (st :: ZeroBitType) r. Parser st r ResourcePack)
+-&gt; Unpack ResourcePack
+forall (st :: ZeroBitType) r. Parser st r ResourcePack
+forall a. (forall (st :: ZeroBitType) r. Parser st r a) -&gt; Unpack a
+$cunpack :: forall (st :: ZeroBitType) r. Parser st r ResourcePack
+unpack :: forall (st :: ZeroBitType) r. Parser st r ResourcePack
+</span><a href="M.Pack.Internal.Types.html#Unpack"><span class="hs-identifier hs-var hs-var hs-var hs-var">Unpack</span></a></span></span><span class="hs-special">)</span><span>
+</span><span id="line-80"></span><span>
+</span><span id="line-81"></span><span class="hs-keyword">newtype</span><span> </span><span id="Ping"><span class="annot"><a href="M.V769.I.html#Ping"><span class="hs-identifier hs-var">Ping</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="Ping"><span class="annot"><a href="M.V769.I.html#Ping"><span class="hs-identifier hs-var">Ping</span></a></span></span><span>
+</span><span id="line-82"></span><span>  </span><span class="hs-special">{</span><span id="id"><span class="annot"><span class="annottext">Ping -&gt; Int32
+</span><a href="M.V769.I.html#id"><span class="hs-identifier hs-var hs-var">id</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Int32</span></span><span class="hs-special">}</span><span>
+</span><span id="line-83"></span><span>  </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">newtype</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621680397098"><span id="local-6989586621680397103"><span id="local-6989586621680397107"><span class="annot"><span class="annottext">Int -&gt; Ping -&gt; String -&gt; String
+[Ping] -&gt; String -&gt; String
+Ping -&gt; String
+(Int -&gt; Ping -&gt; String -&gt; String)
+-&gt; (Ping -&gt; String) -&gt; ([Ping] -&gt; String -&gt; String) -&gt; Show Ping
+forall a.
+(Int -&gt; a -&gt; String -&gt; String)
+-&gt; (a -&gt; String) -&gt; ([a] -&gt; String -&gt; String) -&gt; Show a
+$cshowsPrec :: Int -&gt; Ping -&gt; String -&gt; String
+showsPrec :: Int -&gt; Ping -&gt; String -&gt; String
+$cshow :: Ping -&gt; String
+show :: Ping -&gt; String
+$cshowList :: [Ping] -&gt; String -&gt; String
+showList :: [Ping] -&gt; String -&gt; String
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Show</span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680397112"><span id="local-6989586621680397117"><span id="local-6989586621680397121"><span id="local-6989586621680397125"><span class="annot"><span class="annottext">ReadPrec [Ping]
+ReadPrec Ping
+Int -&gt; ReadS Ping
+ReadS [Ping]
+(Int -&gt; ReadS Ping)
+-&gt; ReadS [Ping] -&gt; ReadPrec Ping -&gt; ReadPrec [Ping] -&gt; Read Ping
+forall a.
+(Int -&gt; ReadS a)
+-&gt; ReadS [a] -&gt; ReadPrec a -&gt; ReadPrec [a] -&gt; Read a
+$creadsPrec :: Int -&gt; ReadS Ping
+readsPrec :: Int -&gt; ReadS Ping
+$creadList :: ReadS [Ping]
+readList :: ReadS [Ping]
+$creadPrec :: ReadPrec Ping
+readPrec :: ReadPrec Ping
+$creadListPrec :: ReadPrec [Ping]
+readListPrec :: ReadPrec [Ping]
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Read</span></span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680397130"><span class="annot"><span class="annottext">Ping -&gt; ()
+(Ping -&gt; ()) -&gt; NFData Ping
+forall a. (a -&gt; ()) -&gt; NFData a
+$crnf :: Ping -&gt; ()
+rnf :: Ping -&gt; ()
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var">NFData</span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680397136"><span id="local-6989586621680397141"><span class="annot"><span class="annottext">Ping -&gt; Ping -&gt; Bool
+(Ping -&gt; Ping -&gt; Bool) -&gt; (Ping -&gt; Ping -&gt; Bool) -&gt; Eq Ping
+forall a. (a -&gt; a -&gt; Bool) -&gt; (a -&gt; a -&gt; Bool) -&gt; Eq a
+$c== :: Ping -&gt; Ping -&gt; Bool
+== :: Ping -&gt; Ping -&gt; Bool
+$c/= :: Ping -&gt; Ping -&gt; Bool
+/= :: Ping -&gt; Ping -&gt; Bool
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Eq</span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680397148"><span id="local-6989586621680397153"><span id="local-6989586621680397157"><span id="local-6989586621680397161"><span id="local-6989586621680397165"><span id="local-6989586621680397169"><span id="local-6989586621680397173"><span class="annot"><span class="annottext">Eq Ping
+Eq Ping =&gt;
+(Ping -&gt; Ping -&gt; Ordering)
+-&gt; (Ping -&gt; Ping -&gt; Bool)
+-&gt; (Ping -&gt; Ping -&gt; Bool)
+-&gt; (Ping -&gt; Ping -&gt; Bool)
+-&gt; (Ping -&gt; Ping -&gt; Bool)
+-&gt; (Ping -&gt; Ping -&gt; Ping)
+-&gt; (Ping -&gt; Ping -&gt; Ping)
+-&gt; Ord Ping
+Ping -&gt; Ping -&gt; Bool
+Ping -&gt; Ping -&gt; Ordering
+Ping -&gt; Ping -&gt; Ping
+forall a.
+Eq a =&gt;
+(a -&gt; a -&gt; Ordering)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; Ord a
+$ccompare :: Ping -&gt; Ping -&gt; Ordering
+compare :: Ping -&gt; Ping -&gt; Ordering
+$c&lt; :: Ping -&gt; Ping -&gt; Bool
+&lt; :: Ping -&gt; Ping -&gt; Bool
+$c&lt;= :: Ping -&gt; Ping -&gt; Bool
+&lt;= :: Ping -&gt; Ping -&gt; Bool
+$c&gt; :: Ping -&gt; Ping -&gt; Bool
+&gt; :: Ping -&gt; Ping -&gt; Bool
+$c&gt;= :: Ping -&gt; Ping -&gt; Bool
+&gt;= :: Ping -&gt; Ping -&gt; Bool
+$cmax :: Ping -&gt; Ping -&gt; Ping
+max :: Ping -&gt; Ping -&gt; Ping
+$cmin :: Ping -&gt; Ping -&gt; Ping
+min :: Ping -&gt; Ping -&gt; Ping
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Ord</span></span></span></span></span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680397178"><span class="annot"><span class="annottext">Ping -&gt; Builder
+(Ping -&gt; Builder) -&gt; Pack Ping
+forall a. (a -&gt; Builder) -&gt; Pack a
+$cpack :: Ping -&gt; Builder
+pack :: Ping -&gt; Builder
+</span><a href="M.Pack.Internal.Types.html#Pack"><span class="hs-identifier hs-var hs-var hs-var hs-var">Pack</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680397184"><span class="annot"><span class="annottext">(forall (st :: ZeroBitType) r. Parser st r Ping) -&gt; Unpack Ping
+forall (st :: ZeroBitType) r. Parser st r Ping
+forall a. (forall (st :: ZeroBitType) r. Parser st r a) -&gt; Unpack a
+$cunpack :: forall (st :: ZeroBitType) r. Parser st r Ping
+unpack :: forall (st :: ZeroBitType) r. Parser st r Ping
+</span><a href="M.Pack.Internal.Types.html#Unpack"><span class="hs-identifier hs-var hs-var hs-var hs-var">Unpack</span></a></span></span><span class="hs-special">)</span><span>
+</span><span id="line-84"></span><span>  </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">stock</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621680397192"><span id="local-6989586621680397196"><span id="local-6989586621680397199"><span id="local-6989586621680397201"><span id="local-6989586621680397203"><span id="local-6989586621680397209"><span id="local-6989586621680397214"><span id="local-6989586621680397217"><span id="local-6989586621680397220"><span id="local-6989586621680397223"><span id="local-6989586621680397226"><span id="local-6989586621680397229"><span id="local-6989586621680397234"><span id="local-6989586621680397239"><span class="annot"><span class="annottext">Typeable Ping
+Typeable Ping =&gt;
+(forall (c :: * -&gt; *).
+ (forall d b. Data d =&gt; c (d -&gt; b) -&gt; d -&gt; c b)
+ -&gt; (forall g. g -&gt; c g) -&gt; Ping -&gt; c Ping)
+-&gt; (forall (c :: * -&gt; *).
+    (forall b r. Data b =&gt; c (b -&gt; r) -&gt; c r)
+    -&gt; (forall r. r -&gt; c r) -&gt; Constr -&gt; c Ping)
+-&gt; (Ping -&gt; Constr)
+-&gt; (Ping -&gt; DataType)
+-&gt; (forall (t :: * -&gt; *) (c :: * -&gt; *).
+    Typeable t =&gt;
+    (forall d. Data d =&gt; c (t d)) -&gt; Maybe (c Ping))
+-&gt; (forall (t :: * -&gt; * -&gt; *) (c :: * -&gt; *).
+    Typeable t =&gt;
+    (forall d e. (Data d, Data e) =&gt; c (t d e)) -&gt; Maybe (c Ping))
+-&gt; ((forall b. Data b =&gt; b -&gt; b) -&gt; Ping -&gt; Ping)
+-&gt; (forall r r'.
+    (r -&gt; r' -&gt; r) -&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; Ping -&gt; r)
+-&gt; (forall r r'.
+    (r' -&gt; r -&gt; r) -&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; Ping -&gt; r)
+-&gt; (forall u. (forall d. Data d =&gt; d -&gt; u) -&gt; Ping -&gt; [u])
+-&gt; (forall u. Int -&gt; (forall d. Data d =&gt; d -&gt; u) -&gt; Ping -&gt; u)
+-&gt; (forall (m :: * -&gt; *).
+    Monad m =&gt;
+    (forall d. Data d =&gt; d -&gt; m d) -&gt; Ping -&gt; m Ping)
+-&gt; (forall (m :: * -&gt; *).
+    MonadPlus m =&gt;
+    (forall d. Data d =&gt; d -&gt; m d) -&gt; Ping -&gt; m Ping)
+-&gt; (forall (m :: * -&gt; *).
+    MonadPlus m =&gt;
+    (forall d. Data d =&gt; d -&gt; m d) -&gt; Ping -&gt; m Ping)
+-&gt; Data Ping
+Ping -&gt; Constr
+Ping -&gt; DataType
+(forall b. Data b =&gt; b -&gt; b) -&gt; Ping -&gt; Ping
+forall a.
+Typeable a =&gt;
+(forall (c :: * -&gt; *).
+ (forall d b. Data d =&gt; c (d -&gt; b) -&gt; d -&gt; c b)
+ -&gt; (forall g. g -&gt; c g) -&gt; a -&gt; c a)
+-&gt; (forall (c :: * -&gt; *).
+    (forall b r. Data b =&gt; c (b -&gt; r) -&gt; c r)
+    -&gt; (forall r. r -&gt; c r) -&gt; Constr -&gt; c a)
+-&gt; (a -&gt; Constr)
+-&gt; (a -&gt; DataType)
+-&gt; (forall (t :: * -&gt; *) (c :: * -&gt; *).
+    Typeable t =&gt;
+    (forall d. Data d =&gt; c (t d)) -&gt; Maybe (c a))
+-&gt; (forall (t :: * -&gt; * -&gt; *) (c :: * -&gt; *).
+    Typeable t =&gt;
+    (forall d e. (Data d, Data e) =&gt; c (t d e)) -&gt; Maybe (c a))
+-&gt; ((forall b. Data b =&gt; b -&gt; b) -&gt; a -&gt; a)
+-&gt; (forall r r'.
+    (r -&gt; r' -&gt; r) -&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; a -&gt; r)
+-&gt; (forall r r'.
+    (r' -&gt; r -&gt; r) -&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; a -&gt; r)
+-&gt; (forall u. (forall d. Data d =&gt; d -&gt; u) -&gt; a -&gt; [u])
+-&gt; (forall u. Int -&gt; (forall d. Data d =&gt; d -&gt; u) -&gt; a -&gt; u)
+-&gt; (forall (m :: * -&gt; *).
+    Monad m =&gt;
+    (forall d. Data d =&gt; d -&gt; m d) -&gt; a -&gt; m a)
+-&gt; (forall (m :: * -&gt; *).
+    MonadPlus m =&gt;
+    (forall d. Data d =&gt; d -&gt; m d) -&gt; a -&gt; m a)
+-&gt; (forall (m :: * -&gt; *).
+    MonadPlus m =&gt;
+    (forall d. Data d =&gt; d -&gt; m d) -&gt; a -&gt; m a)
+-&gt; Data a
+forall u. Int -&gt; (forall d. Data d =&gt; d -&gt; u) -&gt; Ping -&gt; u
+forall u. (forall d. Data d =&gt; d -&gt; u) -&gt; Ping -&gt; [u]
+forall r r'.
+(r -&gt; r' -&gt; r) -&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; Ping -&gt; r
+forall r r'.
+(r' -&gt; r -&gt; r) -&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; Ping -&gt; r
+forall (m :: * -&gt; *).
+Monad m =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; Ping -&gt; m Ping
+forall (m :: * -&gt; *).
+MonadPlus m =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; Ping -&gt; m Ping
+forall (c :: * -&gt; *).
+(forall b r. Data b =&gt; c (b -&gt; r) -&gt; c r)
+-&gt; (forall r. r -&gt; c r) -&gt; Constr -&gt; c Ping
+forall (c :: * -&gt; *).
+(forall d b. Data d =&gt; c (d -&gt; b) -&gt; d -&gt; c b)
+-&gt; (forall g. g -&gt; c g) -&gt; Ping -&gt; c Ping
+forall (t :: * -&gt; *) (c :: * -&gt; *).
+Typeable t =&gt;
+(forall d. Data d =&gt; c (t d)) -&gt; Maybe (c Ping)
+forall (t :: * -&gt; * -&gt; *) (c :: * -&gt; *).
+Typeable t =&gt;
+(forall d e. (Data d, Data e) =&gt; c (t d e)) -&gt; Maybe (c Ping)
+$cgfoldl :: forall (c :: * -&gt; *).
+(forall d b. Data d =&gt; c (d -&gt; b) -&gt; d -&gt; c b)
+-&gt; (forall g. g -&gt; c g) -&gt; Ping -&gt; c Ping
+gfoldl :: forall (c :: * -&gt; *).
+(forall d b. Data d =&gt; c (d -&gt; b) -&gt; d -&gt; c b)
+-&gt; (forall g. g -&gt; c g) -&gt; Ping -&gt; c Ping
+$cgunfold :: forall (c :: * -&gt; *).
+(forall b r. Data b =&gt; c (b -&gt; r) -&gt; c r)
+-&gt; (forall r. r -&gt; c r) -&gt; Constr -&gt; c Ping
+gunfold :: forall (c :: * -&gt; *).
+(forall b r. Data b =&gt; c (b -&gt; r) -&gt; c r)
+-&gt; (forall r. r -&gt; c r) -&gt; Constr -&gt; c Ping
+$ctoConstr :: Ping -&gt; Constr
+toConstr :: Ping -&gt; Constr
+$cdataTypeOf :: Ping -&gt; DataType
+dataTypeOf :: Ping -&gt; DataType
+$cdataCast1 :: forall (t :: * -&gt; *) (c :: * -&gt; *).
+Typeable t =&gt;
+(forall d. Data d =&gt; c (t d)) -&gt; Maybe (c Ping)
+dataCast1 :: forall (t :: * -&gt; *) (c :: * -&gt; *).
+Typeable t =&gt;
+(forall d. Data d =&gt; c (t d)) -&gt; Maybe (c Ping)
+$cdataCast2 :: forall (t :: * -&gt; * -&gt; *) (c :: * -&gt; *).
+Typeable t =&gt;
+(forall d e. (Data d, Data e) =&gt; c (t d e)) -&gt; Maybe (c Ping)
+dataCast2 :: forall (t :: * -&gt; * -&gt; *) (c :: * -&gt; *).
+Typeable t =&gt;
+(forall d e. (Data d, Data e) =&gt; c (t d e)) -&gt; Maybe (c Ping)
+$cgmapT :: (forall b. Data b =&gt; b -&gt; b) -&gt; Ping -&gt; Ping
+gmapT :: (forall b. Data b =&gt; b -&gt; b) -&gt; Ping -&gt; Ping
+$cgmapQl :: forall r r'.
+(r -&gt; r' -&gt; r) -&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; Ping -&gt; r
+gmapQl :: forall r r'.
+(r -&gt; r' -&gt; r) -&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; Ping -&gt; r
+$cgmapQr :: forall r r'.
+(r' -&gt; r -&gt; r) -&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; Ping -&gt; r
+gmapQr :: forall r r'.
+(r' -&gt; r -&gt; r) -&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; Ping -&gt; r
+$cgmapQ :: forall u. (forall d. Data d =&gt; d -&gt; u) -&gt; Ping -&gt; [u]
+gmapQ :: forall u. (forall d. Data d =&gt; d -&gt; u) -&gt; Ping -&gt; [u]
+$cgmapQi :: forall u. Int -&gt; (forall d. Data d =&gt; d -&gt; u) -&gt; Ping -&gt; u
+gmapQi :: forall u. Int -&gt; (forall d. Data d =&gt; d -&gt; u) -&gt; Ping -&gt; u
+$cgmapM :: forall (m :: * -&gt; *).
+Monad m =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; Ping -&gt; m Ping
+gmapM :: forall (m :: * -&gt; *).
+Monad m =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; Ping -&gt; m Ping
+$cgmapMp :: forall (m :: * -&gt; *).
+MonadPlus m =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; Ping -&gt; m Ping
+gmapMp :: forall (m :: * -&gt; *).
+MonadPlus m =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; Ping -&gt; m Ping
+$cgmapMo :: forall (m :: * -&gt; *).
+MonadPlus m =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; Ping -&gt; m Ping
+gmapMo :: forall (m :: * -&gt; *).
+MonadPlus m =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; Ping -&gt; m Ping
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Data</span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Typeable</span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680397244"><span id="local-6989586621680397246"><span class="annot"><span class="annottext">(forall x. Ping -&gt; Rep Ping x)
+-&gt; (forall x. Rep Ping x -&gt; Ping) -&gt; Generic Ping
+forall x. Rep Ping x -&gt; Ping
+forall x. Ping -&gt; Rep Ping x
+forall a.
+(forall x. a -&gt; Rep a x) -&gt; (forall x. Rep a x -&gt; a) -&gt; Generic a
+$cfrom :: forall x. Ping -&gt; Rep Ping x
+from :: forall x. Ping -&gt; Rep Ping x
+$cto :: forall x. Rep Ping x -&gt; Ping
+to :: forall x. Rep Ping x -&gt; Ping
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Generic</span></span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-85"></span><span>
+</span><span id="line-86"></span><span class="hs-comment">-- Set up default instances for all data types</span><span>
+</span><span id="line-87"></span><span class="hs-identifier">setdefaultderives</span><span>
+</span><span id="line-88"></span><span class="hs-identifier">addproperderives</span><span> </span><span class="hs-special">[</span><span class="hs-special">''</span><span class="hs-identifier">NFData</span><span class="hs-special">,</span><span> </span><span class="hs-special">''</span><span class="hs-identifier">Typeable</span><span class="hs-special">,</span><span> </span><span class="hs-special">''</span><span class="hs-identifier">Show</span><span class="hs-special">,</span><span> </span><span class="hs-special">''</span><span class="hs-identifier">Eq</span><span class="hs-special">]</span><span>
+</span><span id="line-89"></span><span>
+</span><span id="line-90"></span><span id="DisplayedSkinParts"><span id="local-6989586621680397249"><span id="local-6989586621680397251"><span id="local-6989586621680397253"><span id="local-6989586621680397261"><span id="local-6989586621680397272"><span id="local-6989586621680397276"><span id="local-6989586621680397279"><span id="local-6989586621680397289"><span id="local-6989586621680397293"><span id="local-6989586621680397300"><span id="DisplayedSkinParts"><span id="hat"><span id="rightpants"><span id="leftpants"><span id="rightsleeve"><span id="leftsleeve"><span id="jacket"><span id="cape"></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span><span class="">[pkmacro|
+data DisplayedSkinParts {
+  cape :: Bool,
+  jacket :: Bool,
+  leftsleeve :: Bool,
+  rightsleeve :: Bool,
+  leftpants :: Bool,
+  rightpants :: Bool,
+  hat :: Bool,
+}
+|]</span><span>
+</span><span id="line-101"></span><span>
+</span><span id="line-102"></span><span class="hs-keyword">instance</span><span>
+</span><span id="line-103"></span><span>  </span><span id="local-6989586621680395546"><span id="local-6989586621680397370"><span id="local-6989586621680397380"><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">Bits</span></span><span> </span><span class="annot"><a href="#local-6989586621680395546"><span class="hs-identifier hs-type">i</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Integral</span></span><span> </span><span class="annot"><a href="#local-6989586621680395546"><span class="hs-identifier hs-type">i</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#Pack"><span class="hs-identifier hs-type">Pack</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680395546"><span class="hs-identifier hs-type">i</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#Unpack"><span class="hs-identifier hs-type">Unpack</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680395546"><span class="hs-identifier hs-type">i</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=&gt;</span><span>
+</span><span id="line-104"></span><span>  </span><span class="annot"><a href="M.Pack.Internal.Bit.html#Bitreppable"><span class="hs-identifier hs-type">Bitreppable</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680395546"><span class="hs-identifier hs-type">i</span></a></span><span> </span><span class="annot"><a href="M.V769.I.html#DisplayedSkinParts"><span class="hs-identifier hs-type">DisplayedSkinParts</span></a></span></span></span></span><span>
+</span><span id="line-105"></span></pre></body></html>

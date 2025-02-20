@@ -1,0 +1,69 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span class="hs-comment">-- |</span><span>
+</span><span id="line-2"></span><span class="hs-comment">-- Module: M.IO.Tick</span><span>
+</span><span id="line-3"></span><span class="hs-comment">-- Description: Timing control for periodic operations</span><span>
+</span><span id="line-4"></span><span class="hs-comment">-- Copyright: (c) axionbuster, 2025</span><span>
+</span><span id="line-5"></span><span class="hs-comment">-- License: BSD-3-Clause</span><span>
+</span><span id="line-6"></span><span class="hs-comment">--</span><span>
+</span><span id="line-7"></span><span class="hs-comment">-- This module provides functionality for running actions at controlled intervals</span><span>
+</span><span id="line-8"></span><span class="hs-comment">-- with adaptive timing adjustments.</span><span>
+</span><span id="line-9"></span><span class="hs-keyword">module</span><span> </span><span class="annot"><a href="M.IO.Tick.html"><span class="hs-identifier">M.IO.Tick</span></a></span><span>
+</span><span id="line-10"></span><span>  </span><span class="hs-special">(</span><span> </span><span class="annot"><span class="hs-comment">-- * Timing Control</span></span><span>
+</span><span id="line-11"></span><span>    </span><span class="annot"><a href="M.IO.Tick.html#tick"><span class="hs-identifier">tick</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-12"></span><span>  </span><span class="hs-special">)</span><span>
+</span><span id="line-13"></span><span class="hs-keyword">where</span><span>
+</span><span id="line-14"></span><span>
+</span><span id="line-15"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Control.Monad</span></span><span>
+</span><span id="line-16"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Functor</span></span><span>
+</span><span id="line-17"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Effectful</span></span><span>
+</span><span id="line-18"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Effectful.Concurrent</span></span><span>
+</span><span id="line-19"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Effectful.Concurrent.STM</span></span><span>
+</span><span id="line-20"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Effectful.State.Static.Local</span></span><span>
+</span><span id="line-21"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">GHC.Clock</span></span><span>
+</span><span id="line-22"></span><span>
+</span><span id="line-23"></span><span class="hs-comment">-- | Executes an action periodically with adaptive timing control.</span><span>
+</span><span id="line-24"></span><span class="hs-comment">--</span><span>
+</span><span id="line-25"></span><span class="hs-comment">-- The function ensures the action runs at a target frequency by adjusting</span><span>
+</span><span id="line-26"></span><span class="hs-comment">-- delays between executions based on execution time.</span><span>
+</span><span id="line-27"></span><span class="hs-comment">--</span><span>
+</span><span id="line-28"></span><span class="hs-comment">-- @</span><span>
+</span><span id="line-29"></span><span class="hs-comment">-- tick ratevar action    -- Runs \'action\' at frequency specified by rateVar (in Hz)</span><span>
+</span><span id="line-30"></span><span class="hs-comment">-- @</span><span>
+</span><span id="line-31"></span><span id="local-6989586621680373540"><span id="local-6989586621680373545"><span class="annot"><a href="M.IO.Tick.html#tick"><span class="hs-identifier hs-type">tick</span></a></span><span> </span><span class="hs-glyph">::</span><span>
+</span><span id="line-32"></span><span>  </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">IOE</span></span><span> </span><span class="annot"><span class="hs-operator hs-type">:&gt;</span></span><span> </span><span class="annot"><a href="#local-6989586621680373540"><span class="hs-identifier hs-type">es</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Concurrent</span></span><span> </span><span class="annot"><span class="hs-operator hs-type">:&gt;</span></span><span> </span><span class="annot"><a href="#local-6989586621680373540"><span class="hs-identifier hs-type">es</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=&gt;</span><span>
+</span><span id="line-33"></span><span>  </span><span class="annot"><span class="hs-comment">-- | Target frequency in Hz (stored in 'TVar')</span></span><span>
+</span><span id="line-34"></span><span>  </span><span class="annot"><span class="hs-identifier hs-type">TVar</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Double</span></span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-35"></span><span>  </span><span class="annot"><span class="hs-comment">-- | Action to execute periodically</span></span><span>
+</span><span id="line-36"></span><span>  </span><span class="annot"><span class="hs-identifier hs-type">Eff</span></span><span> </span><span class="annot"><a href="#local-6989586621680373540"><span class="hs-identifier hs-type">es</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-37"></span><span>  </span><span class="annot"><span class="hs-identifier hs-type">Eff</span></span><span> </span><span class="annot"><a href="#local-6989586621680373540"><span class="hs-identifier hs-type">es</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680373545"><span class="hs-identifier hs-type">b</span></a></span></span></span><span>
+</span><span id="line-38"></span><span id="tick"><span class="annot"><span class="annottext">tick :: forall (es :: [Effect]) b.
+(IOE :&gt; es, Concurrent :&gt; es) =&gt;
+TVar Double -&gt; Eff es () -&gt; Eff es b
+</span><a href="M.IO.Tick.html#tick"><span class="hs-identifier hs-var hs-var">tick</span></a></span></span><span> </span><span id="local-6989586621680373624"><span class="annot"><span class="annottext">TVar Double
+</span><a href="#local-6989586621680373624"><span class="hs-identifier hs-var">tr</span></a></span></span><span> </span><span id="local-6989586621680373625"><span class="annot"><span class="annottext">Eff es ()
+</span><a href="#local-6989586621680373625"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-39"></span><span>  </span><span id="local-6989586621680373626"><span class="annot"><a href="#local-6989586621680373626"><span class="hs-identifier hs-var">a</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">IO Double -&gt; Eff es Double
+forall a. IO a -&gt; Eff es a
+forall (m :: * -&gt; *) a. MonadIO m =&gt; IO a -&gt; m a
+</span><span class="hs-identifier hs-var">liftIO</span></span><span> </span><span class="annot"><span class="annottext">IO Double
+</span><span class="hs-identifier hs-var">getMonotonicTime</span></span><span> </span><span class="hs-comment">-- s</span><span>
+</span><span id="line-40"></span><span>  </span><span class="annot"><span class="hs-identifier hs-type">evalState</span></span><span> </span><span class="annot"><a href="#local-6989586621680373626"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-41"></span><span>    </span><span class="annot"><span class="hs-identifier hs-type">forever</span></span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-42"></span><span>      </span><span class="annot"><span class="hs-identifier hs-type">raise</span></span><span> </span><span class="annot"><a href="#local-6989586621680373625"><span class="hs-identifier hs-type">f</span></a></span><span>
+</span><span id="line-43"></span><span>      </span><span id="local-6989586621680373632"><span class="annot"><a href="#local-6989586621680373632"><span class="hs-identifier hs-var">t0</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="hs-identifier hs-type">get</span></span><span>
+</span><span id="line-44"></span><span>      </span><span id="local-6989586621680373634"><span class="annot"><a href="#local-6989586621680373634"><span class="hs-identifier hs-var">t1</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="hs-identifier hs-type">liftIO</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">getMonotonicTime</span></span><span>
+</span><span id="line-45"></span><span>      </span><span id="local-6989586621680373635"><span class="annot"><a href="#local-6989586621680373635"><span class="hs-identifier hs-var">wa</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="hs-identifier hs-type">readTVarIO</span></span><span> </span><span class="annot"><a href="#local-6989586621680373624"><span class="hs-identifier hs-type">tr</span></a></span><span> </span><span class="annot"><span class="hs-operator hs-type">&lt;&amp;&gt;</span></span><span> </span><span class="hs-glyph">\</span><span id="local-6989586621680373638"><span class="annot"><span class="annottext">Double
+</span><a href="#local-6989586621680373638"><span class="hs-identifier hs-var">t</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Double -&gt; Double -&gt; Double
+forall a. Ord a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-identifier hs-var">max</span></span><span> </span><span class="annot"><span class="annottext">Double
+</span><span class="hs-number">0</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Double -&gt; Double
+forall a. Fractional a =&gt; a -&gt; a
+</span><span class="hs-identifier hs-var">recip</span></span><span> </span><span class="annot"><span class="annottext">Double
+</span><a href="#local-6989586621680373638"><span class="hs-identifier hs-var">t</span></a></span><span> </span><span class="annot"><span class="annottext">Double -&gt; Double -&gt; Double
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-glyph hs-var">-</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Double
+</span><a href="#local-6989586621680373634"><span class="hs-identifier hs-var">t1</span></a></span><span> </span><span class="annot"><span class="annottext">Double -&gt; Double -&gt; Double
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-glyph hs-var">-</span></span><span> </span><span class="annot"><span class="annottext">Double
+</span><a href="#local-6989586621680373632"><span class="hs-identifier hs-var">t0</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-46"></span><span>      </span><span class="annot"><span class="hs-identifier hs-type">threadDelay</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">ceiling</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-number">1e6</span></span><span> </span><span class="annot"><span class="hs-operator hs-type">*</span></span><span> </span><span class="annot"><a href="#local-6989586621680373635"><span class="hs-identifier hs-type">wa</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span> </span><span class="hs-comment">-- 1e6 us = s</span><span>
+</span><span id="line-47"></span></pre></body></html>

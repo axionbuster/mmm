@@ -1,0 +1,63 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span class="hs-comment">-- |</span><span>
+</span><span id="line-2"></span><span class="hs-comment">-- Module: M.IO.Internal.Zlib</span><span>
+</span><span id="line-3"></span><span class="hs-comment">-- Description: Safe zlib decompression utilities</span><span>
+</span><span id="line-4"></span><span class="hs-comment">-- Copyright: (c) axionbuster, 2025</span><span>
+</span><span id="line-5"></span><span class="hs-comment">-- License: BSD-3-Clause</span><span>
+</span><span id="line-6"></span><span class="hs-comment">--</span><span>
+</span><span id="line-7"></span><span class="hs-comment">-- Provides safe decompression functionality for zlib-compressed data</span><span>
+</span><span id="line-8"></span><span class="hs-comment">-- with length validation and error handling.</span><span>
+</span><span id="line-9"></span><span class="hs-keyword">module</span><span> </span><span class="annot"><a href="M.IO.Internal.Zlib.html"><span class="hs-identifier">M.IO.Internal.Zlib</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="M.IO.Internal.Zlib.html#safedecomp"><span class="hs-identifier">safedecomp</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-10"></span><span>
+</span><span id="line-11"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Codec.Compression.Zlib</span></span><span>
+</span><span id="line-12"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.ByteString</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">ByteString</span></span><span class="hs-special">)</span><span>
+</span><span id="line-13"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.ByteString</span></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">B</span></span><span>
+</span><span id="line-14"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.ByteString.Lazy</span></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">BL</span></span><span>
+</span><span id="line-15"></span><span>
+</span><span id="line-16"></span><span class="annot"><span class="hs-comment">-- | length-checked decompression of zlib-compressed data under 'IO'</span></span><span>
+</span><span id="line-17"></span><span class="annot"><a href="M.IO.Internal.Zlib.html#safedecomp"><span class="hs-identifier hs-type">safedecomp</span></a></span><span> </span><span class="hs-glyph">::</span><span>
+</span><span id="line-18"></span><span>  </span><span class="annot"><span class="hs-comment">-- | expected length of decompressed data</span></span><span>
+</span><span id="line-19"></span><span>  </span><span class="annot"><span class="hs-identifier hs-type">Int</span></span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-20"></span><span>  </span><span class="annot"><span class="hs-comment">-- | compressed data</span></span><span>
+</span><span id="line-21"></span><span>  </span><span class="annot"><span class="hs-identifier hs-type">ByteString</span></span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-22"></span><span>  </span><span class="annot"><span class="hs-comment">-- | decompressed data</span></span><span>
+</span><span id="line-23"></span><span>  </span><span class="annot"><span class="hs-identifier hs-type">IO</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">ByteString</span></span><span>
+</span><span id="line-24"></span><span id="safedecomp"><span class="annot"><span class="annottext">safedecomp :: Int -&gt; ByteString -&gt; IO ByteString
+</span><a href="M.IO.Internal.Zlib.html#safedecomp"><span class="hs-identifier hs-var hs-var">safedecomp</span></a></span></span><span> </span><span id="local-6989586621680373458"><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621680373458"><span class="hs-identifier hs-var">l</span></a></span></span><span> </span><span id="local-6989586621680373459"><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621680373459"><span class="hs-identifier hs-var">comp</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-25"></span><span>  </span><span class="hs-keyword">let</span><span> </span><span id="local-6989586621680373460"><span class="annot"><span class="annottext">n :: Int64
+</span><a href="#local-6989586621680373460"><span class="hs-identifier hs-var hs-var">n</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int64
+forall a b. (Integral a, Num b) =&gt; a -&gt; b
+</span><span class="hs-identifier hs-var">fromIntegral</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621680373458"><span class="hs-identifier hs-var">l</span></a></span><span>
+</span><span id="line-26"></span><span>      </span><span id="local-6989586621680373461"><span class="annot"><span class="annottext">d :: ByteString
+</span><a href="#local-6989586621680373461"><span class="hs-identifier hs-var hs-var">d</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int64 -&gt; ByteString -&gt; ByteString
+</span><span class="hs-identifier hs-var">BL.take</span></span><span> </span><span class="annot"><span class="annottext">Int64
+</span><a href="#local-6989586621680373460"><span class="hs-identifier hs-var">n</span></a></span><span> </span><span class="annot"><span class="annottext">(ByteString -&gt; ByteString) -&gt; ByteString -&gt; ByteString
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">ByteString -&gt; ByteString
+</span><span class="hs-identifier hs-var">decompress</span></span><span> </span><span class="annot"><span class="annottext">(ByteString -&gt; ByteString) -&gt; ByteString -&gt; ByteString
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">ByteString -&gt; ByteString
+</span><span class="hs-identifier hs-var">BL.fromStrict</span></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621680373459"><span class="hs-identifier hs-var">comp</span></a></span><span>
+</span><span id="line-27"></span><span>  </span><span class="hs-keyword">if</span><span> </span><span class="annot"><span class="annottext">ByteString -&gt; Int64
+</span><span class="hs-identifier hs-var">BL.length</span></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621680373461"><span class="hs-identifier hs-var">d</span></a></span><span> </span><span class="annot"><span class="annottext">Int64 -&gt; Int64 -&gt; Bool
+forall a. Eq a =&gt; a -&gt; a -&gt; Bool
+</span><span class="hs-operator hs-var">/=</span></span><span> </span><span class="annot"><span class="annottext">Int64
+</span><a href="#local-6989586621680373460"><span class="hs-identifier hs-var">n</span></a></span><span>
+</span><span id="line-28"></span><span>    </span><span class="hs-keyword">then</span><span> </span><span class="annot"><span class="annottext">String -&gt; IO ByteString
+forall a. String -&gt; IO a
+forall (m :: * -&gt; *) a. MonadFail m =&gt; String -&gt; m a
+</span><span class="hs-identifier hs-var">fail</span></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;safedecomp: wrong length&quot;</span></span><span>
+</span><span id="line-29"></span><span>    </span><span class="hs-keyword">else</span><span> </span><span class="annot"><span class="annottext">ByteString -&gt; IO ByteString
+forall a. a -&gt; IO a
+forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><span class="hs-identifier hs-var">pure</span></span><span> </span><span class="annot"><span class="annottext">(ByteString -&gt; IO ByteString) -&gt; ByteString -&gt; IO ByteString
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">ByteString -&gt; ByteString
+</span><span class="hs-identifier hs-var">B.toStrict</span></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621680373461"><span class="hs-identifier hs-var">d</span></a></span><span>
+</span><span id="line-30"></span></pre></body></html>

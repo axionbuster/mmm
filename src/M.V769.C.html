@@ -1,0 +1,109 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span class="hs-pragma">{-# OPTIONS_GHC -Wno-missing-export-lists #-}</span><span>
+</span><span id="line-2"></span><span>
+</span><span id="line-3"></span><span class="hs-comment">-- |</span><span>
+</span><span id="line-4"></span><span class="hs-comment">-- Module: M.V769.C</span><span>
+</span><span id="line-5"></span><span class="hs-comment">-- Description: Protocol configuration state packets (AI-generated)</span><span>
+</span><span id="line-6"></span><span class="hs-comment">-- Copyright: (c) axionbuster, 2025</span><span>
+</span><span id="line-7"></span><span class="hs-comment">-- License: BSD-3-Clause</span><span>
+</span><span id="line-8"></span><span class="hs-comment">--</span><span>
+</span><span id="line-9"></span><span class="hs-comment">-- Defines packet structures for the configuration state of protocol version 769,</span><span>
+</span><span id="line-10"></span><span class="hs-comment">-- including client and server capabilities negotiation, resource pack management,</span><span>
+</span><span id="line-11"></span><span class="hs-comment">-- and server feature flags.</span><span>
+</span><span id="line-12"></span><span class="hs-keyword">module</span><span> </span><span class="annot"><a href="M.V769.C.html"><span class="hs-identifier">M.V769.C</span></a></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-13"></span><span>
+</span><span id="line-14"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Control.DeepSeq</span></span><span>
+</span><span id="line-15"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.ByteString</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">ByteString</span></span><span class="hs-special">)</span><span>
+</span><span id="line-16"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Data</span></span><span>
+</span><span id="line-17"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Int</span></span><span>
+</span><span id="line-18"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Text</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">Text</span></span><span class="hs-special">)</span><span>
+</span><span id="line-19"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Vector</span></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">V</span></span><span>
+</span><span id="line-20"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Word</span></span><span>
+</span><span id="line-21"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="M.LEB.html"><span class="hs-identifier">M.LEB</span></a></span><span>
+</span><span id="line-22"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="M.Pack.html"><span class="hs-identifier">M.Pack</span></a></span><span>
+</span><span id="line-23"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="M.PkMacro.html"><span class="hs-identifier">M.PkMacro</span></a></span><span>
+</span><span id="line-24"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="M.V769.I.html"><span class="hs-identifier">M.V769.I</span></a></span><span>
+</span><span id="line-25"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Prelude</span></span><span> </span><span class="hs-keyword">hiding</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">id</span></span><span class="hs-special">)</span><span>
+</span><span id="line-26"></span><span>
+</span><span id="line-27"></span><span class="hs-comment">-- Set up default instances for all data types</span><span>
+</span><span id="line-28"></span><span class="hs-identifier">setdefaultderives</span><span>
+</span><span id="line-29"></span><span class="hs-identifier">addproperderives</span><span> </span><span class="hs-special">[</span><span class="hs-special">''</span><span class="hs-identifier">NFData</span><span class="hs-special">,</span><span> </span><span class="hs-special">''</span><span class="hs-identifier">Typeable</span><span class="hs-special">,</span><span> </span><span class="hs-special">''</span><span class="hs-identifier">Show</span><span class="hs-special">,</span><span> </span><span class="hs-special">''</span><span class="hs-identifier">Eq</span><span class="hs-special">]</span><span>
+</span><span id="line-30"></span><span>
+</span><span id="line-31"></span><span class="hs-comment">-- Clientbound packets</span><span>
+</span><span id="line-32"></span><span id="ResourcePackResponse"><span id="Pong"><span id="AcknowledgeFinishConfiguration"><span id="CookieResponse"><span id="ClientInformationConfiguration"><span id="ServerLinks"><span id="CustomReportDetails"><span id="KnownPacks"><span id="UpdateTags"><span id="FeatureFlags"><span id="Transfer"><span id="StoreCookie"><span id="RemoveResourcePack"><span id="RegistryData"><span id="ResetChat"><span id="FinishConfiguration"><span id="Disconnect"><span id="CookieRequest"><span id="ClientInformationConfiguration__"><span id="ServerLinks__"><span id="CustomReportDetails__"><span id="KnownPacks__"><span id="UpdateTags__"><span id="FeatureFlags__"><span id="local-6989586621680397562"><span id="local-6989586621680397564"><span id="local-6989586621680397566"><span id="local-6989586621680397574"><span id="local-6989586621680397581"><span id="local-6989586621680397585"><span id="local-6989586621680397588"><span id="local-6989586621680397593"><span id="local-6989586621680397597"><span id="local-6989586621680397604"><span id="local-6989586621680397611"><span id="local-6989586621680397613"><span id="local-6989586621680397615"><span id="local-6989586621680397623"><span id="local-6989586621680397628"><span id="local-6989586621680397632"><span id="local-6989586621680397635"><span id="local-6989586621680397639"><span id="local-6989586621680397643"><span id="local-6989586621680397650"><span id="local-6989586621680397657"><span id="local-6989586621680397659"><span id="local-6989586621680397661"><span id="local-6989586621680397669"><span id="local-6989586621680397671"><span id="local-6989586621680397675"><span id="local-6989586621680397678"><span id="local-6989586621680397680"><span id="local-6989586621680397684"><span id="local-6989586621680397691"><span id="local-6989586621680397698"><span id="local-6989586621680397700"><span id="local-6989586621680397702"><span id="local-6989586621680397710"><span id="local-6989586621680397716"><span id="local-6989586621680397720"><span id="local-6989586621680397723"><span id="local-6989586621680397728"><span id="local-6989586621680397732"><span id="local-6989586621680397739"><span id="local-6989586621680397746"><span id="local-6989586621680397748"><span id="local-6989586621680397750"><span id="local-6989586621680397758"><span id="local-6989586621680397765"><span id="local-6989586621680397767"><span id="local-6989586621680397769"><span id="local-6989586621680397777"><span id="local-6989586621680397794"><span id="local-6989586621680397798"><span id="local-6989586621680397801"><span id="local-6989586621680397817"><span id="local-6989586621680397821"><span id="local-6989586621680397823"><span id="local-6989586621680397825"><span id="local-6989586621680397833"><span id="local-6989586621680397840"><span id="local-6989586621680397842"><span id="local-6989586621680397844"><span id="local-6989586621680397852"><span id="local-6989586621680397858"><span id="local-6989586621680397862"><span id="local-6989586621680397865"><span id="local-6989586621680397870"><span id="local-6989586621680397874"><span id="local-6989586621680397876"><span id="local-6989586621680397878"><span id="local-6989586621680397886"><span id="local-6989586621680397893"><span id="local-6989586621680397895"><span id="local-6989586621680397897"><span id="local-6989586621680397905"><span id="local-6989586621680397910"><span id="local-6989586621680397914"><span id="local-6989586621680397917"><span id="local-6989586621680397921"><span id="local-6989586621680397925"><span id="local-6989586621680397927"><span id="local-6989586621680397929"><span id="local-6989586621680397937"><span id="local-6989586621680397944"><span id="local-6989586621680397946"><span id="local-6989586621680397948"><span id="local-6989586621680397956"><span id="local-6989586621680397960"><span id="local-6989586621680397964"><span id="local-6989586621680397967"><span id="local-6989586621680397970"><span id="local-6989586621680397974"><span id="local-6989586621680397976"><span id="local-6989586621680397978"><span id="local-6989586621680397986"><span id="local-6989586621680397993"><span id="local-6989586621680397995"><span id="local-6989586621680397997"><span id="local-6989586621680398005"><span id="local-6989586621680398009"><span id="local-6989586621680398013"><span id="local-6989586621680398016"><span id="local-6989586621680398019"><span id="local-6989586621680398023"><span id="local-6989586621680398025"><span id="local-6989586621680398027"><span id="local-6989586621680398035"><span id="local-6989586621680398042"><span id="local-6989586621680398044"><span id="local-6989586621680398046"><span id="local-6989586621680398054"><span id="local-6989586621680398059"><span id="local-6989586621680398063"><span id="local-6989586621680398066"><span id="local-6989586621680398070"><span id="local-6989586621680398074"><span id="local-6989586621680398076"><span id="local-6989586621680398078"><span id="local-6989586621680398086"><span id="local-6989586621680398092"><span id="local-6989586621680398096"><span id="local-6989586621680398099"><span id="local-6989586621680398104"><span id="local-6989586621680398108"><span id="local-6989586621680398115"><span id="local-6989586621680398122"><span id="local-6989586621680398124"><span id="local-6989586621680398126"><span id="local-6989586621680398134"><span id="local-6989586621680398139"><span id="local-6989586621680398143"><span id="local-6989586621680398146"><span id="local-6989586621680398150"><span id="local-6989586621680398154"><span id="local-6989586621680398161"><span id="local-6989586621680398168"><span id="local-6989586621680398170"><span id="local-6989586621680398172"><span id="local-6989586621680398180"><span id="local-6989586621680398182"><span id="local-6989586621680398186"><span id="local-6989586621680398189"><span id="local-6989586621680398191"><span id="local-6989586621680398195"><span id="local-6989586621680398202"><span id="local-6989586621680398209"><span id="local-6989586621680398211"><span id="local-6989586621680398213"><span id="local-6989586621680398221"><span id="local-6989586621680398225"><span id="local-6989586621680398229"><span id="local-6989586621680398232"><span id="local-6989586621680398235"><span id="local-6989586621680398239"><span id="local-6989586621680398246"><span id="local-6989586621680398253"><span id="local-6989586621680398255"><span id="local-6989586621680398257"><span id="local-6989586621680398265"><span id="local-6989586621680398267"><span id="local-6989586621680398271"><span id="local-6989586621680398274"><span id="local-6989586621680398276"><span id="local-6989586621680398280"><span id="local-6989586621680398287"><span id="local-6989586621680398294"><span id="local-6989586621680398296"><span id="local-6989586621680398298"><span id="local-6989586621680398306"><span id="local-6989586621680398308"><span id="local-6989586621680398312"><span id="local-6989586621680398315"><span id="local-6989586621680398317"><span id="local-6989586621680398321"><span id="local-6989586621680398328"><span id="local-6989586621680398335"><span id="local-6989586621680398337"><span id="local-6989586621680398339"><span id="local-6989586621680398347"><span id="local-6989586621680398351"><span id="local-6989586621680398355"><span id="local-6989586621680398358"><span id="local-6989586621680398361"><span id="local-6989586621680398365"><span id="local-6989586621680398372"><span id="local-6989586621680398379"><span id="local-6989586621680398381"><span id="local-6989586621680398383"><span id="local-6989586621680398391"><span id="local-6989586621680398395"><span id="local-6989586621680398399"><span id="local-6989586621680398402"><span id="local-6989586621680398405"><span id="local-6989586621680398409"><span id="local-6989586621680398416"><span id="local-6989586621680398423"><span id="local-6989586621680398439"><span id="local-6989586621680398451"><span id="local-6989586621680398457"><span id="local-6989586621680398461"><span id="local-6989586621680398467"><span id="local-6989586621680398471"><span id="local-6989586621680398477"><span id="local-6989586621680398481"><span id="local-6989586621680398487"><span id="local-6989586621680398491"><span id="local-6989586621680398497"><span id="ResourcePackResponse"><span id="status"><span id="Pong"><span id="id"><span id="AcknowledgeFinishConfiguration"><span id="CookieResponse"><span id="value"><span id="key"><span id="ClientInformationConfiguration__"><span id="particlestatus__"><span id="allowserverlistings__"><span id="enabletextfiltering__"><span id="mainhandright__"><span id="displayedskinparts__"><span id="chatcolors__"><span id="chatmode__"><span id="viewdistance__"><span id="locale__"><span id="ClientInformationConfiguration"><span id="particlestatus"><span id="allowserverlistings"><span id="enabletextfiltering"><span id="mainhandright"><span id="displayedskinparts"><span id="chatcolors"><span id="chatmode"><span id="viewdistance"><span id="locale"><span id="ServerLinks__"><span id="links__"><span id="ServerLinks"><span id="links"><span id="CustomReportDetails__"><span id="details__"><span id="CustomReportDetails"><span id="details"><span id="KnownPacks__"><span id="packs__"><span id="KnownPacks"><span id="packs"><span id="UpdateTags__"><span id="tags__"><span id="UpdateTags"><span id="tags"><span id="FeatureFlags__"><span id="flags__"><span id="FeatureFlags"><span id="flags"><span id="Transfer"><span id="serverport"><span id="serveraddress"><span id="StoreCookie"><span id="value"><span id="key"><span id="RemoveResourcePack"><span id="RegistryData"><span id="data_"><span id="ResetChat"><span id="FinishConfiguration"><span id="Disconnect"><span id="reason"><span id="CookieRequest"><span id="key"></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span><span class="">[pkmacro|
+data CookieRequest {
+  key :: Text,
+}
+
+data Disconnect {
+  reason :: Text,
+}
+
+data FinishConfiguration {}
+
+data ResetChat {}
+
+data RegistryData {
+  data_ :: ByteString,
+}
+
+data RemoveResourcePack {}
+
+data StoreCookie {
+  key :: Text,
+  value :: Text,
+}
+
+data Transfer {
+  serveraddress :: Text,
+  serverport :: Word16,
+}
+
+data FeatureFlags {
+  flags :: V.Vector Text via V.Vector Identifier,
+}
+
+data UpdateTags {
+  tags :: ByteString via TakeRest,
+}
+
+data KnownPacks {
+  packs :: ByteString via TakeRest,
+}
+
+data CustomReportDetails {
+  details :: ByteString via TakeRest,
+}
+
+data ServerLinks {
+  links :: V.Vector Text via V.Vector Identifier,
+}
+
+-- Serverbound packets
+data ClientInformationConfiguration {
+  locale :: Text,
+  viewdistance :: Int8,
+  chatmode :: ChatMode via EnumIndex VarInt ChatMode,
+  chatcolors :: Bool,
+  displayedskinparts :: DisplayedSkinParts via Bitwise Word8 DisplayedSkinParts,
+  mainhandright :: Bool,
+  enabletextfiltering :: Bool,
+  allowserverlistings :: Bool,
+  particlestatus :: ParticleStatus via EnumIndex VarInt ParticleStatus,
+}
+
+data CookieResponse {
+  key :: Text,
+  value :: Text,
+}
+
+data AcknowledgeFinishConfiguration {}
+
+data Pong {
+  id :: Int64,
+}
+
+data ResourcePackResponse {
+  status :: VarInt,
+}
+|]</span><span>
+</span><span id="line-109"></span></pre></body></html>

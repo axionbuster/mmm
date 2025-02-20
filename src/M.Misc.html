@@ -1,0 +1,360 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span id="local-6989586621680391313"><span id="local-6989586621680391314"></span></span><span class="hs-comment">-- |</span><span>
+</span><span id="line-2"></span><span class="hs-comment">-- Module: M.Misc</span><span>
+</span><span id="line-3"></span><span class="hs-comment">-- Description: Common miscellaneous types for Minecraft protocol</span><span>
+</span><span id="line-4"></span><span class="hs-comment">-- Copyright: (c) axionbuster, 2025</span><span>
+</span><span id="line-5"></span><span class="hs-comment">-- License: BSD-3-Clause</span><span>
+</span><span id="line-6"></span><span class="hs-comment">--</span><span>
+</span><span id="line-7"></span><span class="hs-comment">-- Defines common types used across the Minecraft protocol implementation,</span><span>
+</span><span id="line-8"></span><span class="hs-comment">-- including teleportation flags and sound events.</span><span>
+</span><span id="line-9"></span><span class="hs-keyword">module</span><span> </span><span class="annot"><a href="M.Misc.html"><span class="hs-identifier">M.Misc</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="M.Misc.html#TeleportFlags"><span class="hs-identifier">TeleportFlags</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span> </span><span class="annot"><a href="M.Misc.html#SoundEvent"><span class="hs-identifier">SoundEvent</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-10"></span><span>
+</span><span id="line-11"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Control.DeepSeq</span></span><span>
+</span><span id="line-12"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Bits</span></span><span>
+</span><span id="line-13"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Data</span></span><span>
+</span><span id="line-14"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Hashable</span></span><span>
+</span><span id="line-15"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Text</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">Text</span></span><span class="hs-special">)</span><span>
+</span><span id="line-16"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">GHC.Generics</span></span><span>
+</span><span id="line-17"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Language.Haskell.TH.Syntax</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">Lift</span></span><span class="hs-special">)</span><span>
+</span><span id="line-18"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="M.Pack.html"><span class="hs-identifier">M.Pack</span></a></span><span>
+</span><span id="line-19"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="M.PkMacro.html"><span class="hs-identifier">M.PkMacro</span></a></span><span>
+</span><span id="line-20"></span><span>
+</span><span id="line-21"></span><span class="hs-comment">-- | flags for teleporting an entity</span><span>
+</span><span id="line-22"></span><span class="hs-comment">--</span><span>
+</span><span id="line-23"></span><span class="hs-comment">-- 16+ bits</span><span>
+</span><span id="line-24"></span><span class="hs-keyword">data</span><span> </span><span id="TeleportFlags"><span class="annot"><a href="M.Misc.html#TeleportFlags"><span class="hs-identifier hs-var">TeleportFlags</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="TeleportFlags"><span class="annot"><a href="M.Misc.html#TeleportFlags"><span class="hs-identifier hs-var">TeleportFlags</span></a></span></span><span>
+</span><span id="line-25"></span><span>  </span><span class="hs-special">{</span><span> </span><span id="tprelx"><span class="annot"><span class="annottext">TeleportFlags -&gt; Bool
+</span><a href="M.Misc.html#tprelx"><span class="hs-identifier hs-var hs-var">tprelx</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Bool</span></span><span class="hs-special">,</span><span>
+</span><span id="line-26"></span><span>    </span><span id="tprely"><span class="annot"><span class="annottext">TeleportFlags -&gt; Bool
+</span><a href="M.Misc.html#tprely"><span class="hs-identifier hs-var hs-var">tprely</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Bool</span></span><span class="hs-special">,</span><span>
+</span><span id="line-27"></span><span>    </span><span id="tprelz"><span class="annot"><span class="annottext">TeleportFlags -&gt; Bool
+</span><a href="M.Misc.html#tprelz"><span class="hs-identifier hs-var hs-var">tprelz</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Bool</span></span><span class="hs-special">,</span><span>
+</span><span id="line-28"></span><span>    </span><span id="tprelyaw"><span class="annot"><span class="annottext">TeleportFlags -&gt; Bool
+</span><a href="M.Misc.html#tprelyaw"><span class="hs-identifier hs-var hs-var">tprelyaw</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Bool</span></span><span class="hs-special">,</span><span>
+</span><span id="line-29"></span><span>    </span><span id="tprelpitch"><span class="annot"><span class="annottext">TeleportFlags -&gt; Bool
+</span><a href="M.Misc.html#tprelpitch"><span class="hs-identifier hs-var hs-var">tprelpitch</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Bool</span></span><span class="hs-special">,</span><span>
+</span><span id="line-30"></span><span>    </span><span id="tprelvelx"><span class="annot"><span class="annottext">TeleportFlags -&gt; Bool
+</span><a href="M.Misc.html#tprelvelx"><span class="hs-identifier hs-var hs-var">tprelvelx</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Bool</span></span><span class="hs-special">,</span><span>
+</span><span id="line-31"></span><span>    </span><span id="tprelvely"><span class="annot"><span class="annottext">TeleportFlags -&gt; Bool
+</span><a href="M.Misc.html#tprelvely"><span class="hs-identifier hs-var hs-var">tprelvely</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Bool</span></span><span class="hs-special">,</span><span>
+</span><span id="line-32"></span><span>    </span><span id="tprelvelz"><span class="annot"><span class="annottext">TeleportFlags -&gt; Bool
+</span><a href="M.Misc.html#tprelvelz"><span class="hs-identifier hs-var hs-var">tprelvelz</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Bool</span></span><span class="hs-special">,</span><span>
+</span><span id="line-33"></span><span>    </span><span id="tprelvelyaw"><span class="annot"><span class="annottext">TeleportFlags -&gt; Bool
+</span><a href="M.Misc.html#tprelvelyaw"><span class="hs-identifier hs-var hs-var">tprelvelyaw</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Bool</span></span><span class="hs-special">,</span><span>
+</span><span id="line-34"></span><span>    </span><span class="hs-comment">-- | from The Minecraft Wiki: \&quot;Rotate velocity according to the change in</span><span>
+</span><span id="line-35"></span><span>    </span><span class="hs-comment">-- rotation, before applying the velocity change in this packet. Combining</span><span>
+</span><span id="line-36"></span><span>    </span><span class="hs-comment">-- this with absolute rotation works as expected&#8212;the difference in rotation</span><span>
+</span><span id="line-37"></span><span>    </span><span class="hs-comment">-- is still used.\&quot;</span><span>
+</span><span id="line-38"></span><span>    </span><span id="tprotvelfirst"><span class="annot"><span class="annottext">TeleportFlags -&gt; Bool
+</span><a href="M.Misc.html#tprotvelfirst"><span class="hs-identifier hs-var hs-var">tprotvelfirst</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Bool</span></span><span>
+</span><span id="line-39"></span><span>  </span><span class="hs-special">}</span><span>
+</span><span id="line-40"></span><span>  </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">stock</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621680391342"><span id="local-6989586621680391355"><span class="annot"><span class="annottext">TeleportFlags -&gt; TeleportFlags -&gt; Bool
+(TeleportFlags -&gt; TeleportFlags -&gt; Bool)
+-&gt; (TeleportFlags -&gt; TeleportFlags -&gt; Bool) -&gt; Eq TeleportFlags
+forall a. (a -&gt; a -&gt; Bool) -&gt; (a -&gt; a -&gt; Bool) -&gt; Eq a
+$c== :: TeleportFlags -&gt; TeleportFlags -&gt; Bool
+== :: TeleportFlags -&gt; TeleportFlags -&gt; Bool
+$c/= :: TeleportFlags -&gt; TeleportFlags -&gt; Bool
+/= :: TeleportFlags -&gt; TeleportFlags -&gt; Bool
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Eq</span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680391362"><span id="local-6989586621680391375"><span id="local-6989586621680391387"><span id="local-6989586621680391391"><span id="local-6989586621680391394"><span id="local-6989586621680391397"><span id="local-6989586621680391400"><span class="annot"><span class="annottext">Eq TeleportFlags
+Eq TeleportFlags =&gt;
+(TeleportFlags -&gt; TeleportFlags -&gt; Ordering)
+-&gt; (TeleportFlags -&gt; TeleportFlags -&gt; Bool)
+-&gt; (TeleportFlags -&gt; TeleportFlags -&gt; Bool)
+-&gt; (TeleportFlags -&gt; TeleportFlags -&gt; Bool)
+-&gt; (TeleportFlags -&gt; TeleportFlags -&gt; Bool)
+-&gt; (TeleportFlags -&gt; TeleportFlags -&gt; TeleportFlags)
+-&gt; (TeleportFlags -&gt; TeleportFlags -&gt; TeleportFlags)
+-&gt; Ord TeleportFlags
+TeleportFlags -&gt; TeleportFlags -&gt; Bool
+TeleportFlags -&gt; TeleportFlags -&gt; Ordering
+TeleportFlags -&gt; TeleportFlags -&gt; TeleportFlags
+forall a.
+Eq a =&gt;
+(a -&gt; a -&gt; Ordering)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; Ord a
+$ccompare :: TeleportFlags -&gt; TeleportFlags -&gt; Ordering
+compare :: TeleportFlags -&gt; TeleportFlags -&gt; Ordering
+$c&lt; :: TeleportFlags -&gt; TeleportFlags -&gt; Bool
+&lt; :: TeleportFlags -&gt; TeleportFlags -&gt; Bool
+$c&lt;= :: TeleportFlags -&gt; TeleportFlags -&gt; Bool
+&lt;= :: TeleportFlags -&gt; TeleportFlags -&gt; Bool
+$c&gt; :: TeleportFlags -&gt; TeleportFlags -&gt; Bool
+&gt; :: TeleportFlags -&gt; TeleportFlags -&gt; Bool
+$c&gt;= :: TeleportFlags -&gt; TeleportFlags -&gt; Bool
+&gt;= :: TeleportFlags -&gt; TeleportFlags -&gt; Bool
+$cmax :: TeleportFlags -&gt; TeleportFlags -&gt; TeleportFlags
+max :: TeleportFlags -&gt; TeleportFlags -&gt; TeleportFlags
+$cmin :: TeleportFlags -&gt; TeleportFlags -&gt; TeleportFlags
+min :: TeleportFlags -&gt; TeleportFlags -&gt; TeleportFlags
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Ord</span></span></span></span></span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680391408"><span id="local-6989586621680391423"><span id="local-6989586621680391427"><span class="annot"><span class="annottext">Int -&gt; TeleportFlags -&gt; String -&gt; String
+[TeleportFlags] -&gt; String -&gt; String
+TeleportFlags -&gt; String
+(Int -&gt; TeleportFlags -&gt; String -&gt; String)
+-&gt; (TeleportFlags -&gt; String)
+-&gt; ([TeleportFlags] -&gt; String -&gt; String)
+-&gt; Show TeleportFlags
+forall a.
+(Int -&gt; a -&gt; String -&gt; String)
+-&gt; (a -&gt; String) -&gt; ([a] -&gt; String -&gt; String) -&gt; Show a
+$cshowsPrec :: Int -&gt; TeleportFlags -&gt; String -&gt; String
+showsPrec :: Int -&gt; TeleportFlags -&gt; String -&gt; String
+$cshow :: TeleportFlags -&gt; String
+show :: TeleportFlags -&gt; String
+$cshowList :: [TeleportFlags] -&gt; String -&gt; String
+showList :: [TeleportFlags] -&gt; String -&gt; String
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Show</span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680391432"><span id="local-6989586621680391436"><span id="local-6989586621680391439"><span id="local-6989586621680391476"><span class="annot"><span class="annottext">ReadPrec [TeleportFlags]
+ReadPrec TeleportFlags
+Int -&gt; ReadS TeleportFlags
+ReadS [TeleportFlags]
+(Int -&gt; ReadS TeleportFlags)
+-&gt; ReadS [TeleportFlags]
+-&gt; ReadPrec TeleportFlags
+-&gt; ReadPrec [TeleportFlags]
+-&gt; Read TeleportFlags
+forall a.
+(Int -&gt; ReadS a)
+-&gt; ReadS [a] -&gt; ReadPrec a -&gt; ReadPrec [a] -&gt; Read a
+$creadsPrec :: Int -&gt; ReadS TeleportFlags
+readsPrec :: Int -&gt; ReadS TeleportFlags
+$creadList :: ReadS [TeleportFlags]
+readList :: ReadS [TeleportFlags]
+$creadPrec :: ReadPrec TeleportFlags
+readPrec :: ReadPrec TeleportFlags
+$creadListPrec :: ReadPrec [TeleportFlags]
+readListPrec :: ReadPrec [TeleportFlags]
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Read</span></span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680391483"><span id="local-6989586621680391485"><span class="annot"><span class="annottext">(forall x. TeleportFlags -&gt; Rep TeleportFlags x)
+-&gt; (forall x. Rep TeleportFlags x -&gt; TeleportFlags)
+-&gt; Generic TeleportFlags
+forall x. Rep TeleportFlags x -&gt; TeleportFlags
+forall x. TeleportFlags -&gt; Rep TeleportFlags x
+forall a.
+(forall x. a -&gt; Rep a x) -&gt; (forall x. Rep a x -&gt; a) -&gt; Generic a
+$cfrom :: forall x. TeleportFlags -&gt; Rep TeleportFlags x
+from :: forall x. TeleportFlags -&gt; Rep TeleportFlags x
+$cto :: forall x. Rep TeleportFlags x -&gt; TeleportFlags
+to :: forall x. Rep TeleportFlags x -&gt; TeleportFlags
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Generic</span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680391491"><span id="local-6989586621680391516"><span class="annot"><span class="annottext">(forall (m :: * -&gt; *). Quote m =&gt; TeleportFlags -&gt; m Exp)
+-&gt; (forall (m :: * -&gt; *).
+    Quote m =&gt;
+    TeleportFlags -&gt; Code m TeleportFlags)
+-&gt; Lift TeleportFlags
+forall t.
+(forall (m :: * -&gt; *). Quote m =&gt; t -&gt; m Exp)
+-&gt; (forall (m :: * -&gt; *). Quote m =&gt; t -&gt; Code m t) -&gt; Lift t
+forall (m :: * -&gt; *). Quote m =&gt; TeleportFlags -&gt; m Exp
+forall (m :: * -&gt; *).
+Quote m =&gt;
+TeleportFlags -&gt; Code m TeleportFlags
+$clift :: forall (m :: * -&gt; *). Quote m =&gt; TeleportFlags -&gt; m Exp
+lift :: forall (m :: * -&gt; *). Quote m =&gt; TeleportFlags -&gt; m Exp
+$cliftTyped :: forall (m :: * -&gt; *).
+Quote m =&gt;
+TeleportFlags -&gt; Code m TeleportFlags
+liftTyped :: forall (m :: * -&gt; *).
+Quote m =&gt;
+TeleportFlags -&gt; Code m TeleportFlags
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Lift</span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680391544"><span id="local-6989586621680391557"><span id="local-6989586621680391569"><span id="local-6989586621680391571"><span id="local-6989586621680391573"><span id="local-6989586621680391579"><span id="local-6989586621680391584"><span id="local-6989586621680391587"><span id="local-6989586621680391590"><span id="local-6989586621680391593"><span id="local-6989586621680391596"><span id="local-6989586621680391599"><span id="local-6989586621680391604"><span id="local-6989586621680391609"><span class="annot"><span class="annottext">Typeable TeleportFlags
+Typeable TeleportFlags =&gt;
+(forall (c :: * -&gt; *).
+ (forall d b. Data d =&gt; c (d -&gt; b) -&gt; d -&gt; c b)
+ -&gt; (forall g. g -&gt; c g) -&gt; TeleportFlags -&gt; c TeleportFlags)
+-&gt; (forall (c :: * -&gt; *).
+    (forall b r. Data b =&gt; c (b -&gt; r) -&gt; c r)
+    -&gt; (forall r. r -&gt; c r) -&gt; Constr -&gt; c TeleportFlags)
+-&gt; (TeleportFlags -&gt; Constr)
+-&gt; (TeleportFlags -&gt; DataType)
+-&gt; (forall (t :: * -&gt; *) (c :: * -&gt; *).
+    Typeable t =&gt;
+    (forall d. Data d =&gt; c (t d)) -&gt; Maybe (c TeleportFlags))
+-&gt; (forall (t :: * -&gt; * -&gt; *) (c :: * -&gt; *).
+    Typeable t =&gt;
+    (forall d e. (Data d, Data e) =&gt; c (t d e))
+    -&gt; Maybe (c TeleportFlags))
+-&gt; ((forall b. Data b =&gt; b -&gt; b) -&gt; TeleportFlags -&gt; TeleportFlags)
+-&gt; (forall r r'.
+    (r -&gt; r' -&gt; r)
+    -&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; TeleportFlags -&gt; r)
+-&gt; (forall r r'.
+    (r' -&gt; r -&gt; r)
+    -&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; TeleportFlags -&gt; r)
+-&gt; (forall u. (forall d. Data d =&gt; d -&gt; u) -&gt; TeleportFlags -&gt; [u])
+-&gt; (forall u.
+    Int -&gt; (forall d. Data d =&gt; d -&gt; u) -&gt; TeleportFlags -&gt; u)
+-&gt; (forall (m :: * -&gt; *).
+    Monad m =&gt;
+    (forall d. Data d =&gt; d -&gt; m d) -&gt; TeleportFlags -&gt; m TeleportFlags)
+-&gt; (forall (m :: * -&gt; *).
+    MonadPlus m =&gt;
+    (forall d. Data d =&gt; d -&gt; m d) -&gt; TeleportFlags -&gt; m TeleportFlags)
+-&gt; (forall (m :: * -&gt; *).
+    MonadPlus m =&gt;
+    (forall d. Data d =&gt; d -&gt; m d) -&gt; TeleportFlags -&gt; m TeleportFlags)
+-&gt; Data TeleportFlags
+TeleportFlags -&gt; Constr
+TeleportFlags -&gt; DataType
+(forall b. Data b =&gt; b -&gt; b) -&gt; TeleportFlags -&gt; TeleportFlags
+forall a.
+Typeable a =&gt;
+(forall (c :: * -&gt; *).
+ (forall d b. Data d =&gt; c (d -&gt; b) -&gt; d -&gt; c b)
+ -&gt; (forall g. g -&gt; c g) -&gt; a -&gt; c a)
+-&gt; (forall (c :: * -&gt; *).
+    (forall b r. Data b =&gt; c (b -&gt; r) -&gt; c r)
+    -&gt; (forall r. r -&gt; c r) -&gt; Constr -&gt; c a)
+-&gt; (a -&gt; Constr)
+-&gt; (a -&gt; DataType)
+-&gt; (forall (t :: * -&gt; *) (c :: * -&gt; *).
+    Typeable t =&gt;
+    (forall d. Data d =&gt; c (t d)) -&gt; Maybe (c a))
+-&gt; (forall (t :: * -&gt; * -&gt; *) (c :: * -&gt; *).
+    Typeable t =&gt;
+    (forall d e. (Data d, Data e) =&gt; c (t d e)) -&gt; Maybe (c a))
+-&gt; ((forall b. Data b =&gt; b -&gt; b) -&gt; a -&gt; a)
+-&gt; (forall r r'.
+    (r -&gt; r' -&gt; r) -&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; a -&gt; r)
+-&gt; (forall r r'.
+    (r' -&gt; r -&gt; r) -&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; a -&gt; r)
+-&gt; (forall u. (forall d. Data d =&gt; d -&gt; u) -&gt; a -&gt; [u])
+-&gt; (forall u. Int -&gt; (forall d. Data d =&gt; d -&gt; u) -&gt; a -&gt; u)
+-&gt; (forall (m :: * -&gt; *).
+    Monad m =&gt;
+    (forall d. Data d =&gt; d -&gt; m d) -&gt; a -&gt; m a)
+-&gt; (forall (m :: * -&gt; *).
+    MonadPlus m =&gt;
+    (forall d. Data d =&gt; d -&gt; m d) -&gt; a -&gt; m a)
+-&gt; (forall (m :: * -&gt; *).
+    MonadPlus m =&gt;
+    (forall d. Data d =&gt; d -&gt; m d) -&gt; a -&gt; m a)
+-&gt; Data a
+forall u. Int -&gt; (forall d. Data d =&gt; d -&gt; u) -&gt; TeleportFlags -&gt; u
+forall u. (forall d. Data d =&gt; d -&gt; u) -&gt; TeleportFlags -&gt; [u]
+forall r r'.
+(r -&gt; r' -&gt; r)
+-&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; TeleportFlags -&gt; r
+forall r r'.
+(r' -&gt; r -&gt; r)
+-&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; TeleportFlags -&gt; r
+forall (m :: * -&gt; *).
+Monad m =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; TeleportFlags -&gt; m TeleportFlags
+forall (m :: * -&gt; *).
+MonadPlus m =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; TeleportFlags -&gt; m TeleportFlags
+forall (c :: * -&gt; *).
+(forall b r. Data b =&gt; c (b -&gt; r) -&gt; c r)
+-&gt; (forall r. r -&gt; c r) -&gt; Constr -&gt; c TeleportFlags
+forall (c :: * -&gt; *).
+(forall d b. Data d =&gt; c (d -&gt; b) -&gt; d -&gt; c b)
+-&gt; (forall g. g -&gt; c g) -&gt; TeleportFlags -&gt; c TeleportFlags
+forall (t :: * -&gt; *) (c :: * -&gt; *).
+Typeable t =&gt;
+(forall d. Data d =&gt; c (t d)) -&gt; Maybe (c TeleportFlags)
+forall (t :: * -&gt; * -&gt; *) (c :: * -&gt; *).
+Typeable t =&gt;
+(forall d e. (Data d, Data e) =&gt; c (t d e))
+-&gt; Maybe (c TeleportFlags)
+$cgfoldl :: forall (c :: * -&gt; *).
+(forall d b. Data d =&gt; c (d -&gt; b) -&gt; d -&gt; c b)
+-&gt; (forall g. g -&gt; c g) -&gt; TeleportFlags -&gt; c TeleportFlags
+gfoldl :: forall (c :: * -&gt; *).
+(forall d b. Data d =&gt; c (d -&gt; b) -&gt; d -&gt; c b)
+-&gt; (forall g. g -&gt; c g) -&gt; TeleportFlags -&gt; c TeleportFlags
+$cgunfold :: forall (c :: * -&gt; *).
+(forall b r. Data b =&gt; c (b -&gt; r) -&gt; c r)
+-&gt; (forall r. r -&gt; c r) -&gt; Constr -&gt; c TeleportFlags
+gunfold :: forall (c :: * -&gt; *).
+(forall b r. Data b =&gt; c (b -&gt; r) -&gt; c r)
+-&gt; (forall r. r -&gt; c r) -&gt; Constr -&gt; c TeleportFlags
+$ctoConstr :: TeleportFlags -&gt; Constr
+toConstr :: TeleportFlags -&gt; Constr
+$cdataTypeOf :: TeleportFlags -&gt; DataType
+dataTypeOf :: TeleportFlags -&gt; DataType
+$cdataCast1 :: forall (t :: * -&gt; *) (c :: * -&gt; *).
+Typeable t =&gt;
+(forall d. Data d =&gt; c (t d)) -&gt; Maybe (c TeleportFlags)
+dataCast1 :: forall (t :: * -&gt; *) (c :: * -&gt; *).
+Typeable t =&gt;
+(forall d. Data d =&gt; c (t d)) -&gt; Maybe (c TeleportFlags)
+$cdataCast2 :: forall (t :: * -&gt; * -&gt; *) (c :: * -&gt; *).
+Typeable t =&gt;
+(forall d e. (Data d, Data e) =&gt; c (t d e))
+-&gt; Maybe (c TeleportFlags)
+dataCast2 :: forall (t :: * -&gt; * -&gt; *) (c :: * -&gt; *).
+Typeable t =&gt;
+(forall d e. (Data d, Data e) =&gt; c (t d e))
+-&gt; Maybe (c TeleportFlags)
+$cgmapT :: (forall b. Data b =&gt; b -&gt; b) -&gt; TeleportFlags -&gt; TeleportFlags
+gmapT :: (forall b. Data b =&gt; b -&gt; b) -&gt; TeleportFlags -&gt; TeleportFlags
+$cgmapQl :: forall r r'.
+(r -&gt; r' -&gt; r)
+-&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; TeleportFlags -&gt; r
+gmapQl :: forall r r'.
+(r -&gt; r' -&gt; r)
+-&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; TeleportFlags -&gt; r
+$cgmapQr :: forall r r'.
+(r' -&gt; r -&gt; r)
+-&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; TeleportFlags -&gt; r
+gmapQr :: forall r r'.
+(r' -&gt; r -&gt; r)
+-&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; TeleportFlags -&gt; r
+$cgmapQ :: forall u. (forall d. Data d =&gt; d -&gt; u) -&gt; TeleportFlags -&gt; [u]
+gmapQ :: forall u. (forall d. Data d =&gt; d -&gt; u) -&gt; TeleportFlags -&gt; [u]
+$cgmapQi :: forall u. Int -&gt; (forall d. Data d =&gt; d -&gt; u) -&gt; TeleportFlags -&gt; u
+gmapQi :: forall u. Int -&gt; (forall d. Data d =&gt; d -&gt; u) -&gt; TeleportFlags -&gt; u
+$cgmapM :: forall (m :: * -&gt; *).
+Monad m =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; TeleportFlags -&gt; m TeleportFlags
+gmapM :: forall (m :: * -&gt; *).
+Monad m =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; TeleportFlags -&gt; m TeleportFlags
+$cgmapMp :: forall (m :: * -&gt; *).
+MonadPlus m =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; TeleportFlags -&gt; m TeleportFlags
+gmapMp :: forall (m :: * -&gt; *).
+MonadPlus m =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; TeleportFlags -&gt; m TeleportFlags
+$cgmapMo :: forall (m :: * -&gt; *).
+MonadPlus m =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; TeleportFlags -&gt; m TeleportFlags
+gmapMo :: forall (m :: * -&gt; *).
+MonadPlus m =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; TeleportFlags -&gt; m TeleportFlags
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Data</span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Typeable</span></span><span class="hs-special">)</span><span>
+</span><span id="line-41"></span><span>  </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">anyclass</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621680391621"><span id="local-6989586621680391628"><span class="annot"><span class="annottext">Eq TeleportFlags
+Eq TeleportFlags =&gt;
+(Int -&gt; TeleportFlags -&gt; Int)
+-&gt; (TeleportFlags -&gt; Int) -&gt; Hashable TeleportFlags
+Int -&gt; TeleportFlags -&gt; Int
+TeleportFlags -&gt; Int
+forall a. Eq a =&gt; (Int -&gt; a -&gt; Int) -&gt; (a -&gt; Int) -&gt; Hashable a
+$chashWithSalt :: Int -&gt; TeleportFlags -&gt; Int
+hashWithSalt :: Int -&gt; TeleportFlags -&gt; Int
+$chash :: TeleportFlags -&gt; Int
+hash :: TeleportFlags -&gt; Int
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Hashable</span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680391658"><span class="annot"><span class="annottext">TeleportFlags -&gt; ()
+(TeleportFlags -&gt; ()) -&gt; NFData TeleportFlags
+forall a. (a -&gt; ()) -&gt; NFData a
+$crnf :: TeleportFlags -&gt; ()
+rnf :: TeleportFlags -&gt; ()
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var">NFData</span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-42"></span><span>
+</span><span id="line-43"></span><span class="hs-comment">-- | do NOT use 8-bit packing for this type.</span><span>
+</span><span id="line-44"></span><span class="hs-comment">-- use a type that is at least 16 bits wide</span><span>
+</span><span id="line-45"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621680391265"><span id="local-6989586621680391696"><span id="local-6989586621680391706"><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">Bits</span></span><span> </span><span class="annot"><a href="#local-6989586621680391265"><span class="hs-identifier hs-type">i</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Integral</span></span><span> </span><span class="annot"><a href="#local-6989586621680391265"><span class="hs-identifier hs-type">i</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#Pack"><span class="hs-identifier hs-type">Pack</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680391265"><span class="hs-identifier hs-type">i</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#Unpack"><span class="hs-identifier hs-type">Unpack</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680391265"><span class="hs-identifier hs-type">i</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="M.Pack.Internal.Bit.html#Bitreppable"><span class="hs-identifier hs-type">Bitreppable</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680391265"><span class="hs-identifier hs-type">i</span></a></span><span> </span><span class="annot"><a href="M.Misc.html#TeleportFlags"><span class="hs-identifier hs-type">TeleportFlags</span></a></span></span></span></span><span>
+</span><span id="line-46"></span><span>
+</span><span id="line-47"></span><span class="hs-identifier">setdefaultderives</span><span>
+</span><span id="line-48"></span><span class="hs-identifier">addproperderives</span><span> </span><span class="hs-special">[</span><span class="hs-special">''</span><span class="hs-identifier">NFData</span><span class="hs-special">,</span><span> </span><span class="hs-special">''</span><span class="hs-identifier">Typeable</span><span class="hs-special">,</span><span> </span><span class="hs-special">''</span><span class="hs-identifier">Show</span><span class="hs-special">,</span><span> </span><span class="hs-special">''</span><span class="hs-identifier">Eq</span><span class="hs-special">]</span><span>
+</span><span id="line-49"></span><span>
+</span><span id="line-50"></span><span id="SoundEvent"><span id="SoundEvent__"><span id="local-6989586621680391761"><span id="local-6989586621680391763"><span id="local-6989586621680391765"><span id="local-6989586621680391773"><span id="local-6989586621680391780"><span id="local-6989586621680391782"><span id="local-6989586621680391784"><span id="local-6989586621680391792"><span id="local-6989586621680391800"><span id="local-6989586621680391804"><span id="local-6989586621680391807"><span id="local-6989586621680391814"><span id="local-6989586621680391818"><span id="local-6989586621680391827"><span id="SoundEvent__"><span id="fixedrange__"><span id="soundname__"><span id="SoundEvent"><span id="fixedrange"><span id="soundname"></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span><span class="">[pkmacro|
+  data SoundEvent {
+    soundname :: Text via Identifier,
+    fixedrange :: Maybe Float,
+  }
+  |]</span><span>
+</span><span id="line-56"></span></pre></body></html>

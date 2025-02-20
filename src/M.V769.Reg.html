@@ -1,0 +1,279 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span class="hs-comment">-- |</span><span>
+</span><span id="line-2"></span><span class="hs-comment">-- Module: M.V769.Reg</span><span>
+</span><span id="line-3"></span><span class="hs-comment">-- Description: Protocol version 769 packet state registrations</span><span>
+</span><span id="line-4"></span><span class="hs-comment">-- Copyright: (c) axionbuster, 2025</span><span>
+</span><span id="line-5"></span><span class="hs-comment">-- License: BSD-3-Clause</span><span>
+</span><span id="line-6"></span><span class="hs-comment">--</span><span>
+</span><span id="line-7"></span><span class="hs-comment">-- Defines packet state registrations for protocol version 769 using Template Haskell.</span><span>
+</span><span id="line-8"></span><span class="hs-comment">-- This module maps packet types to their numeric codes for different connection states:</span><span>
+</span><span id="line-9"></span><span class="hs-comment">-- 'handshake', 'status', 'login', 'configuration' and 'play'.</span><span>
+</span><span id="line-10"></span><span class="hs-comment">--</span><span>
+</span><span id="line-11"></span><span class="hs-comment">-- == States</span><span>
+</span><span id="line-12"></span><span class="hs-comment">--</span><span>
+</span><span id="line-13"></span><span class="hs-comment">-- * Handshake - Initial connection handshake</span><span>
+</span><span id="line-14"></span><span class="hs-comment">-- * Status - Server status/ping</span><span>
+</span><span id="line-15"></span><span class="hs-comment">-- * Login - Authentication and encryption</span><span>
+</span><span id="line-16"></span><span class="hs-comment">-- * Configuration - Server/client capability exchange</span><span>
+</span><span id="line-17"></span><span class="hs-comment">-- * Play - Main game state</span><span>
+</span><span id="line-18"></span><span class="hs-comment">--</span><span>
+</span><span id="line-19"></span><span class="hs-comment">-- Each state defines bidirectional packet mappings using the 'states' quasi-quoter.</span><span>
+</span><span id="line-20"></span><span class="hs-comment">-- Packet definitions include receive (client-&gt;server) and send (server-&gt;client) codes.</span><span>
+</span><span id="line-21"></span><span class="hs-keyword">module</span><span> </span><span class="annot"><a href="M.V769.Reg.html"><span class="hs-identifier">M.V769.Reg</span></a></span><span>
+</span><span id="line-22"></span><span>  </span><span class="hs-special">(</span><span> </span><span class="annot"><a href="M.V769.Reg.html#handshake"><span class="hs-identifier">handshake</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-23"></span><span>    </span><span class="annot"><a href="M.V769.Reg.html#status"><span class="hs-identifier">status</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-24"></span><span>    </span><span class="annot"><a href="M.V769.Reg.html#login"><span class="hs-identifier">login</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-25"></span><span>    </span><span class="annot"><a href="M.V769.Reg.html#configuration"><span class="hs-identifier">configuration</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-26"></span><span>    </span><span class="annot"><a href="M.V769.Reg.html#play"><span class="hs-identifier">play</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-27"></span><span>    </span><span class="annot"><a href="M.IO.TH.html#ParserStates"><span class="hs-identifier">ParserStates</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span>
+</span><span id="line-28"></span><span>  </span><span class="hs-special">)</span><span>
+</span><span id="line-29"></span><span class="hs-keyword">where</span><span>
+</span><span id="line-30"></span><span>
+</span><span id="line-31"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="M.IO.TH.html"><span class="hs-identifier">M.IO.TH</span></a></span><span>
+</span><span id="line-32"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="M.V769.C.html"><span class="hs-identifier">M.V769.C</span></a></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">C</span></span><span>
+</span><span id="line-33"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="M.V769.H.html"><span class="hs-identifier">M.V769.H</span></a></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">H</span></span><span>
+</span><span id="line-34"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="M.V769.I.html"><span class="hs-identifier">M.V769.I</span></a></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">I</span></span><span>
+</span><span id="line-35"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="M.V769.L.html"><span class="hs-identifier">M.V769.L</span></a></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">L</span></span><span>
+</span><span id="line-36"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="M.V769.P.html"><span class="hs-identifier">M.V769.P</span></a></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">P</span></span><span>
+</span><span id="line-37"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="M.V769.S.html"><span class="hs-identifier">M.V769.S</span></a></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">S</span></span><span>
+</span><span id="line-38"></span><span>
+</span><span id="line-39"></span><span id="handshake"></span><span class="">[states|
+  -- name
+  handshake
+  -- name:hex recv:hex send
+  H.HandshakePacket::0
+  |]</span><span>
+</span><span id="line-45"></span><span>
+</span><span id="line-46"></span><span id="status"></span><span class="">[states|
+  -- name
+  status
+  -- name:hex recv:hex send
+  S.StatusRequest:0:
+  S.StatusResponse::0
+  I.KeepAlive::1  -- Now using shared KeepAlive type
+  |]</span><span>
+</span><span id="line-54"></span><span>
+</span><span id="line-55"></span><span id="login"></span><span class="">[states|
+  -- name
+  login
+  -- name:hex recv:hex send
+  L.LoginStart:0:
+  L.LoginDisconnect::0
+  L.EncryptionRequest::1
+  L.LoginSuccess::2
+  L.LoginPluginRequest::3
+  L.LoginPluginResponse:2:
+  L.LoginAcknowledged:3:
+  L.EncryptionResponse:1:
+  |]</span><span>
+</span><span id="line-68"></span><span>
+</span><span id="line-69"></span><span id="configuration"></span><span class="">[states|
+  -- name
+  configuration
+  -- name:hex recv:hex send
+  C.CookieRequest::0
+  I.PluginMessage:2:1
+  C.Disconnect::2
+  C.FinishConfiguration::3
+  I.KeepAlive:4:4  -- Using shared KeepAlive
+  I.Ping:5:5       -- Using shared Ping type
+  C.ResetChat::6
+  C.RegistryData::7
+  C.RemoveResourcePack::8
+  I.ResourcePack::9
+  C.StoreCookie::a
+  C.Transfer::b
+  C.FeatureFlags::c
+  C.UpdateTags::d
+  C.KnownPacks:7:e
+  C.CustomReportDetails::f
+  C.ServerLinks::10
+
+  C.ClientInformationConfiguration:0:
+  C.CookieResponse:1:
+  C.AcknowledgeFinishConfiguration:3:
+  C.ResourcePackResponse:6:
+  |]</span><span>
+</span><span id="line-96"></span><span>
+</span><span id="line-97"></span><span id="play"></span><span class="">[states|
+  -- name
+  play
+  -- name:hex recv:hex send
+  P.BundleDelimiter::0
+  P.SpawnEntity::1
+  P.SpawnExperienceOrb::2
+  P.EntityAnimation::3
+  P.AwardStatistics::4
+  P.AcknowledgeBlockChange::5
+  P.SetBlockDestroyStage::6
+  P.BlockEntityData::7
+  P.BlockAction::8
+  P.BlockUpdate::9
+  P.BossBar::a
+  P.ChangeDifficulty::b
+  P.ChunkBatchFinished::c
+  P.ChunkBatchStarted::d
+  P.ChunkBiomes::e
+  P.ClearTitles::f
+  P.CommandSuggestionsResponse::10
+  P.Commands::11
+  P.CloseContainer::12
+  P.SetContainerContent::13
+  P.SetContainerProperty::14
+  P.SetContainerSlot::15
+  P.CookieRequest::16
+  P.SetCooldown::17
+  P.ChatSuggestions::18
+  I.PluginMessage:14:19
+  P.DamageEvent::1a
+  P.DebugSample::1b
+  P.DeleteMessage::1c
+  P.Disconnect::1d
+  P.DisguisedChatMessage::1e
+  P.EntityEvent::1f
+  P.TeleportEntity::20
+  P.Explosion::21
+  P.UnloadChunk::22
+  P.GameEvent::23
+  P.OpenHorseScreen::24
+  P.HurtAnimation::25
+  P.InitializeWorldBorder::26
+  I.KeepAlive:1a:27
+  P.ChunkDataAndUpdateLight::28
+  P.WorldEvent::29
+  P.ParticleEffect::2a
+  P.UpdateLight::2b
+  P.Login::2c
+  P.MapData::2d
+  P.MerchantOffers::2e
+  P.UpdateEntityPosition::2f
+  P.UpdateEntityPositionAndRotation::30
+  P.MoveMinecartAlongTrack::31
+  P.UpdateEntityRotation::32
+  P.MoveVehicle::33
+  P.OpenBook::34
+  P.OpenScreen::35
+  P.OpenSignEditor::36
+  P.PlayPing::37
+  P.PlayPingResponse::38
+  P.PlaceGhostRecipe::39
+  P.ClientboundPlayerAbilities::3a
+  P.PlayerChatMessage::3b
+  P.EndCombat::3c
+  P.EnterCombat::3d
+  P.CombatDeath::3e
+  P.PlayerInfoRemove::3f
+  P.PlayerInfoUpdate::40
+  P.LookAt::41
+  P.SynchronizePlayerPosition::42
+  P.PlayerRotation::43
+  P.RecipeBookAdd::44
+  P.RecipeBookRemove::45
+  P.RecipeBookSettings::46
+  P.RemoveEntities::47
+  P.RemoveEntityEffect::48
+  P.ResetScore::49
+  P.RemoveResourcePack::4a
+  P.AddResourcePack::4b
+  P.Respawn::4c
+  P.SetHeadRotation::4d
+  P.UpdateSectionBlocks::4e
+  P.SelectAdvancementsTab::4f
+  P.ServerData::50
+  P.SetActionBarText::51
+  P.SetBorderCenter::52
+  P.SetBorderLerpSize::53
+  P.SetBorderSize::54
+  P.SetBorderWarningDelay::55
+  P.SetBorderWarningDistance::56
+  P.SetCamera::57
+  P.SetCenterChunk::58
+  P.SetRenderDistance::59
+  P.SetCursorItem::5a
+  P.SetDefaultSpawnPosition::5b
+  P.DisplayObjective::5c
+  P.SetEntityMetadata::5d
+  P.LinkEntities::5e
+  P.SetEntityVelocity::5f
+  P.SetEquipment::60
+  P.SetExperience::61
+  P.SetHealth::62
+  P.SetHeldItem::63
+  P.UpdateObjectives::64
+  P.SetPassengers::65
+  P.SetPlayerInventorySlot::66
+  P.UpdateTeams::67
+  P.UpdateScore::68
+  P.SetSimulationDistance::69
+  P.SetSubtitleText::6a
+  P.UpdateTime::6b
+  P.SetTitleText::6c
+  P.SetTitleAnimationTimes::6d
+  P.EntitySoundEffect::6e
+  P.SoundEffect::6f
+  P.StartConfiguration::70
+  P.StopSound::71
+  P.StoreCookie::72
+  P.SetTabListHeaderAndFooter::73
+
+  P.ConfirmTeleportation:0:
+  P.QueryBlockEntityTag:1:
+  P.BundleItemSelected:2:
+  P.ServerboundChangeDifficulty:3:
+  P.AcknowledgeMessage:4:
+  P.ServerboundChatCommand:5:
+  P.SignedChatCommand:6:
+  P.ChatMessage:7:
+  P.PlayerSession:8:
+  P.ChunkBatchReceived:9:
+  P.ClientStatus:a:
+  P.ClientTickEnd:b:
+  P.ClientInformationPlay:c:
+  P.CommandSuggestionsRequest:d:
+  P.AcknowledgeConfiguration:e:
+  P.ClickContainerButton:f:
+  P.ClickContainer:10:
+  P.CloseContainerServerbound:11:
+  P.ChangeContainerSlotState:12:
+  P.CookieResponsePlay:13:
+  P.DebugSampleSubscription:15:
+  P.EditBook:16:
+  P.QueryEntityTag:17:
+  P.Interact:18:
+  P.JigsawGenerate:19:
+  P.LockDifficulty:1b:
+  P.SetPlayerPosition:1c:
+  P.SetPlayerPositionAndRotation:1d:
+  P.SetPlayerRotation:1e:
+  P.SetPlayerMovementFlags:1f:
+  P.MoveVehicleServerbound:20:
+  P.PaddleBoat:21:
+  P.PickItemFromBlock:22:
+  P.PickItemFromEntity:23:
+  P.PingRequestPlay:24:
+  P.PlaceRecipe:25:
+  P.ServerboundPlayerAbilities:26:
+  P.PlayerAction:27:
+  P.PlayerCommand:28:
+  P.PlayerInput:29:
+  P.PlayerLoaded:2a:
+  P.PongPlay:2b:
+  P.ChangeRecipeBookSettings:2c:
+  P.SetSeenRecipe:2d:
+  P.RenameItem:2e:
+  P.ResourcePackResponsePlay:2f:
+  P.SeenAdvancements:30:
+  P.SelectTrade:31:
+  P.SetBeaconEffect:32:
+  P.SetHeldItemServerbound:33:
+  P.ProgramCommandBlock:34:
+  P.ProgramCommandBlockMinecart:35:
+  P.SetCreativeModeSlot:36:
+  P.ProgramJigsawBlock:37:
+  P.ProgramStructureBlock:38:
+  P.UpdateSign:39:
+  P.SwingArm:3a:
+  P.TeleportToEntity:3b:
+  P.UseItemOn:3c:
+  P.UseItem:3d:
+  |]</span><span>
+</span><span id="line-279"></span></pre></body></html>

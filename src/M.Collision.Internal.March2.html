@@ -1,0 +1,366 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span class="hs-comment">-- |</span><span>
+</span><span id="line-2"></span><span class="hs-comment">-- Module: M.Collision.Internal.March2</span><span>
+</span><span id="line-3"></span><span class="hs-comment">-- Description: Grid-based ray marching implementation using digital differential analyzer</span><span>
+</span><span id="line-4"></span><span class="hs-comment">-- Copyright: (c) axionbuster, 2025</span><span>
+</span><span id="line-5"></span><span class="hs-comment">-- License: BSD-3-Clause</span><span>
+</span><span id="line-6"></span><span class="hs-comment">--</span><span>
+</span><span id="line-7"></span><span class="hs-comment">-- Alternative implementation of ray marching algorithm focused on performance.</span><span>
+</span><span id="line-8"></span><span class="hs-keyword">module</span><span> </span><span class="annot"><a href="M.Collision.Internal.March2.html"><span class="hs-identifier">M.Collision.Internal.March2</span></a></span><span>
+</span><span id="line-9"></span><span>  </span><span class="hs-special">(</span><span> </span><span class="annot"><a href="M.Collision.Internal.March2.html#VHit"><span class="hs-identifier">VHit</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span>
+</span><span id="line-10"></span><span>    </span><span class="annot"><a href="M.Collision.Internal.March2.html#isnotahit"><span class="hs-identifier">isnotahit</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-11"></span><span>    </span><span class="annot"><a href="M.Collision.Internal.March2.html#isahit"><span class="hs-identifier">isahit</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-12"></span><span>    </span><span class="annot"><a href="M.Collision.Internal.March2.html#march"><span class="hs-identifier">march</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-13"></span><span>  </span><span class="hs-special">)</span><span>
+</span><span id="line-14"></span><span class="hs-keyword">where</span><span>
+</span><span id="line-15"></span><span>
+</span><span id="line-16"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Control.Lens</span></span><span>
+</span><span id="line-17"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Int</span></span><span>
+</span><span id="line-18"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Debug.Trace</span></span><span>
+</span><span id="line-19"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Linear</span></span><span>
+</span><span id="line-20"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Text.Printf</span></span><span>
+</span><span id="line-21"></span><span>
+</span><span id="line-22"></span><span class="annot"><span class="hs-comment">-- | voxel hit data structure. may encode hit or no hit.</span></span><span>
+</span><span id="line-23"></span><span class="hs-keyword">data</span><span> </span><span id="VHit"><span class="annot"><a href="M.Collision.Internal.March2.html#VHit"><span class="hs-identifier hs-var">VHit</span></a></span></span><span> </span><span id="local-6989586621680369231"><span class="annot"><a href="#local-6989586621680369231"><span class="hs-identifier hs-type">i</span></a></span></span><span> </span><span id="local-6989586621680369232"><span class="annot"><a href="#local-6989586621680369232"><span class="hs-identifier hs-type">a</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="VHit"><span class="annot"><a href="M.Collision.Internal.March2.html#VHit"><span class="hs-identifier hs-var">VHit</span></a></span></span><span>
+</span><span id="line-24"></span><span>  </span><span class="hs-special">{</span><span> </span><span class="hs-comment">-- | finite nonnegative float on hit; otherwise</span><span>
+</span><span id="line-25"></span><span>    </span><span class="hs-comment">-- will be positive infinity and there will be</span><span>
+</span><span id="line-26"></span><span>    </span><span class="hs-comment">-- no hit (and the other fields will be</span><span>
+</span><span id="line-27"></span><span>    </span><span class="hs-comment">-- defined, but meaningless and unspecified)</span><span>
+</span><span id="line-28"></span><span>    </span><span id="vhittim"><span class="annot"><span class="annottext">forall i a. VHit i a -&gt; a
+</span><a href="M.Collision.Internal.March2.html#vhittim"><span class="hs-identifier hs-var hs-var">vhittim</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-glyph">!</span><span class="annot"><a href="#local-6989586621680369232"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-29"></span><span>    </span><span class="annot"><span class="hs-comment">-- | integer coordinate location of where it hit</span></span><span>
+</span><span id="line-30"></span><span>    </span><span id="vhitloc"><span class="annot"><span class="annottext">forall i a. VHit i a -&gt; V3 i
+</span><a href="M.Collision.Internal.March2.html#vhitloc"><span class="hs-identifier hs-var hs-var">vhitloc</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-glyph">!</span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">V3</span></span><span> </span><span class="annot"><a href="#local-6989586621680369231"><span class="hs-identifier hs-type">i</span></a></span><span class="hs-special">)</span><span class="hs-special">,</span><span>
+</span><span id="line-31"></span><span>    </span><span class="hs-comment">-- | the normal vectors (signum; opposite to</span><span>
+</span><span id="line-32"></span><span>    </span><span class="hs-comment">-- the displacement)</span><span>
+</span><span id="line-33"></span><span>    </span><span id="vhitnor"><span class="annot"><span class="annottext">forall i a. VHit i a -&gt; V3 i
+</span><a href="M.Collision.Internal.March2.html#vhitnor"><span class="hs-identifier hs-var hs-var">vhitnor</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-glyph">!</span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">V3</span></span><span> </span><span class="annot"><a href="#local-6989586621680369231"><span class="hs-identifier hs-type">i</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-34"></span><span>  </span><span class="hs-special">}</span><span>
+</span><span id="line-35"></span><span>  </span><span class="hs-keyword">deriving</span><span> </span><span class="hs-special">(</span><span id="local-6989586621680369355"><span id="local-6989586621680369361"><span class="annot"><span class="annottext">VHit i a -&gt; VHit i a -&gt; Bool
+(VHit i a -&gt; VHit i a -&gt; Bool)
+-&gt; (VHit i a -&gt; VHit i a -&gt; Bool) -&gt; Eq (VHit i a)
+forall a. (a -&gt; a -&gt; Bool) -&gt; (a -&gt; a -&gt; Bool) -&gt; Eq a
+forall i a. (Eq a, Eq i) =&gt; VHit i a -&gt; VHit i a -&gt; Bool
+$c== :: forall i a. (Eq a, Eq i) =&gt; VHit i a -&gt; VHit i a -&gt; Bool
+== :: VHit i a -&gt; VHit i a -&gt; Bool
+$c/= :: forall i a. (Eq a, Eq i) =&gt; VHit i a -&gt; VHit i a -&gt; Bool
+/= :: VHit i a -&gt; VHit i a -&gt; Bool
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Eq</span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680369368"><span id="local-6989586621680369375"><span id="local-6989586621680369379"><span class="annot"><span class="annottext">Int -&gt; VHit i a -&gt; String -&gt; String
+[VHit i a] -&gt; String -&gt; String
+VHit i a -&gt; String
+(Int -&gt; VHit i a -&gt; String -&gt; String)
+-&gt; (VHit i a -&gt; String)
+-&gt; ([VHit i a] -&gt; String -&gt; String)
+-&gt; Show (VHit i a)
+forall a.
+(Int -&gt; a -&gt; String -&gt; String)
+-&gt; (a -&gt; String) -&gt; ([a] -&gt; String -&gt; String) -&gt; Show a
+forall i a. (Show a, Show i) =&gt; Int -&gt; VHit i a -&gt; String -&gt; String
+forall i a. (Show a, Show i) =&gt; [VHit i a] -&gt; String -&gt; String
+forall i a. (Show a, Show i) =&gt; VHit i a -&gt; String
+$cshowsPrec :: forall i a. (Show a, Show i) =&gt; Int -&gt; VHit i a -&gt; String -&gt; String
+showsPrec :: Int -&gt; VHit i a -&gt; String -&gt; String
+$cshow :: forall i a. (Show a, Show i) =&gt; VHit i a -&gt; String
+show :: VHit i a -&gt; String
+$cshowList :: forall i a. (Show a, Show i) =&gt; [VHit i a] -&gt; String -&gt; String
+showList :: [VHit i a] -&gt; String -&gt; String
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Show</span></span></span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-36"></span><span>
+</span><span id="line-37"></span><span class="annot"><span class="hs-comment">-- | decide if something is not a hit</span></span><span>
+</span><span id="line-38"></span><span id="local-6989586621680369251"><span id="local-6989586621680369252"><span class="annot"><a href="M.Collision.Internal.March2.html#isnotahit"><span class="hs-identifier hs-type">isnotahit</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">RealFloat</span></span><span> </span><span class="annot"><a href="#local-6989586621680369251"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="M.Collision.Internal.March2.html#VHit"><span class="hs-identifier hs-type">VHit</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680369252"><span class="hs-identifier hs-type">i</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680369251"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Bool</span></span></span></span><span>
+</span><span id="line-39"></span><span id="isnotahit"><span class="annot"><span class="annottext">isnotahit :: forall a i. RealFloat a =&gt; VHit i a -&gt; Bool
+</span><a href="M.Collision.Internal.March2.html#isnotahit"><span class="hs-identifier hs-var hs-var">isnotahit</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">a -&gt; Bool
+forall a. RealFloat a =&gt; a -&gt; Bool
+</span><span class="hs-identifier hs-var">isInfinite</span></span><span> </span><span class="annot"><span class="annottext">(a -&gt; Bool) -&gt; (VHit i a -&gt; a) -&gt; VHit i a -&gt; Bool
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">VHit i a -&gt; a
+forall i a. VHit i a -&gt; a
+</span><a href="M.Collision.Internal.March2.html#vhittim"><span class="hs-identifier hs-var">vhittim</span></a></span><span>
+</span><span id="line-40"></span><span>
+</span><span id="line-41"></span><span class="annot"><span class="hs-comment">-- | decide if something is a hit</span></span><span>
+</span><span id="line-42"></span><span id="local-6989586621680369387"><span id="local-6989586621680369388"><span class="annot"><a href="M.Collision.Internal.March2.html#isahit"><span class="hs-identifier hs-type">isahit</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">RealFloat</span></span><span> </span><span class="annot"><a href="#local-6989586621680369387"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="M.Collision.Internal.March2.html#VHit"><span class="hs-identifier hs-type">VHit</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680369388"><span class="hs-identifier hs-type">i</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680369387"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Bool</span></span></span></span><span>
+</span><span id="line-43"></span><span id="isahit"><span class="annot"><span class="annottext">isahit :: forall a i. RealFloat a =&gt; VHit i a -&gt; Bool
+</span><a href="M.Collision.Internal.March2.html#isahit"><span class="hs-identifier hs-var hs-var">isahit</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Bool -&gt; Bool
+</span><span class="hs-identifier hs-var">not</span></span><span> </span><span class="annot"><span class="annottext">(Bool -&gt; Bool) -&gt; (VHit i a -&gt; Bool) -&gt; VHit i a -&gt; Bool
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">VHit i a -&gt; Bool
+forall a i. RealFloat a =&gt; VHit i a -&gt; Bool
+</span><a href="M.Collision.Internal.March2.html#isnotahit"><span class="hs-identifier hs-var">isnotahit</span></a></span><span>
+</span><span id="line-44"></span><span>
+</span><span id="line-45"></span><span class="hs-comment">-- | march along an integer grid using a digital differential</span><span>
+</span><span id="line-46"></span><span class="hs-comment">-- analyzer (DDA)-based algorithm</span><span>
+</span><span id="line-47"></span><span id="local-6989586621680369261"><span id="local-6989586621680369262"><span id="local-6989586621680369263"><span class="annot"><a href="M.Collision.Internal.March2.html#march"><span class="hs-identifier hs-type">march</span></a></span><span> </span><span class="hs-glyph">::</span><span>
+</span><span id="line-48"></span><span>  </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">RealFloat</span></span><span> </span><span class="annot"><a href="#local-6989586621680369261"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Integral</span></span><span> </span><span class="annot"><a href="#local-6989586621680369262"><span class="hs-identifier hs-type">i</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Monad</span></span><span> </span><span class="annot"><a href="#local-6989586621680369263"><span class="hs-identifier hs-type">m</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=&gt;</span><span>
+</span><span id="line-49"></span><span>  </span><span class="annot"><span class="hs-comment">-- | test for stoppage ('True' to stop)</span></span><span>
+</span><span id="line-50"></span><span>  </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">V3</span></span><span> </span><span class="annot"><a href="#local-6989586621680369262"><span class="hs-identifier hs-type">i</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621680369263"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Bool</span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-51"></span><span>  </span><span class="annot"><span class="hs-comment">-- | direction, any physical dimension</span></span><span>
+</span><span id="line-52"></span><span>  </span><span class="annot"><span class="hs-identifier hs-type">V3</span></span><span> </span><span class="annot"><a href="#local-6989586621680369261"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-53"></span><span>  </span><span class="annot"><span class="hs-comment">-- | initial position, dimensionless</span></span><span>
+</span><span id="line-54"></span><span>  </span><span class="annot"><span class="hs-identifier hs-type">V3</span></span><span> </span><span class="annot"><a href="#local-6989586621680369261"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-55"></span><span>  </span><span class="annot"><span class="hs-comment">-- | number of iterations (maximum)</span></span><span>
+</span><span id="line-56"></span><span>  </span><span class="annot"><span class="hs-identifier hs-type">Int</span></span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-57"></span><span>  </span><span class="annot"><span class="hs-comment">-- | hit information (success or failure)</span></span><span>
+</span><span id="line-58"></span><span>  </span><span class="annot"><a href="#local-6989586621680369263"><span class="hs-identifier hs-type">m</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="M.Collision.Internal.March2.html#VHit"><span class="hs-identifier hs-type">VHit</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680369262"><span class="hs-identifier hs-type">i</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680369261"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span></span></span></span><span>
+</span><span id="line-59"></span><span id="march"><span class="annot"><span class="annottext">march :: forall a i (m :: * -&gt; *).
+(RealFloat a, Integral i, Monad m) =&gt;
+(V3 i -&gt; m Bool) -&gt; V3 a -&gt; V3 a -&gt; Int -&gt; m (VHit i a)
+</span><a href="M.Collision.Internal.March2.html#march"><span class="hs-identifier hs-var hs-var">march</span></a></span></span><span> </span><span id="local-6989586621680369483"><span class="annot"><span class="annottext">V3 i -&gt; m Bool
+</span><a href="#local-6989586621680369483"><span class="hs-identifier hs-var">test</span></a></span></span><span> </span><span id="local-6989586621680369484"><span class="annot"><span class="annottext">V3 a
+</span><a href="#local-6989586621680369484"><span class="hs-identifier hs-var">ray</span></a></span></span><span> </span><span id="local-6989586621680369485"><span class="annot"><span class="annottext">V3 a
+</span><a href="#local-6989586621680369485"><span class="hs-identifier hs-var">pos0</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">V3 a -&gt; V3 i -&gt; V3 i -&gt; a -&gt; Int -&gt; m (VHit i a)
+</span><a href="#local-6989586621680369486"><span class="hs-identifier hs-var">go</span></a></span><span> </span><span class="annot"><span class="annottext">V3 a
+</span><a href="#local-6989586621680369487"><span class="hs-identifier hs-var">dis0</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">a -&gt; i
+forall b. Integral b =&gt; a -&gt; b
+forall a b. (RealFrac a, Integral b) =&gt; a -&gt; b
+</span><span class="hs-identifier hs-var">floor</span></span><span> </span><span class="annot"><span class="annottext">(a -&gt; i) -&gt; V3 a -&gt; V3 i
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-operator hs-var">&lt;$&gt;</span></span><span> </span><span class="annot"><span class="annottext">V3 a
+</span><a href="#local-6989586621680369485"><span class="hs-identifier hs-var">pos0</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">V3 i
+</span><span class="hs-number">0</span></span><span> </span><span class="annot"><span class="annottext">a
+</span><span class="hs-number">0</span></span><span>
+</span><span id="line-60"></span><span>  </span><span class="hs-keyword">where</span><span>
+</span><span id="line-61"></span><span>    </span><span class="hs-comment">-- prevent NaNs. for the comparison in finding 'closest'</span><span>
+</span><span id="line-62"></span><span>    </span><span class="hs-comment">-- NaNs need to have no influence and therefore actually</span><span>
+</span><span id="line-63"></span><span>    </span><span class="hs-comment">-- must be Infinity.</span><span>
+</span><span id="line-64"></span><span>    </span><span id="local-6989586621680369531"><span class="annot"><span class="annottext">mul1 :: m b -&gt; m b -&gt; m b
+</span><a href="#local-6989586621680369531"><span class="hs-identifier hs-var hs-var">mul1</span></a></span></span><span> </span><span id="local-6989586621680369532"><span class="annot"><span class="annottext">m b
+</span><a href="#local-6989586621680369532"><span class="hs-identifier hs-var">p</span></a></span></span><span> </span><span id="local-6989586621680369533"><span class="annot"><span class="annottext">m b
+</span><a href="#local-6989586621680369533"><span class="hs-identifier hs-var">q</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-65"></span><span>      </span><span class="hs-special">[</span><span> </span><span class="hs-keyword">if</span><span> </span><span class="annot"><span class="annottext">b -&gt; Bool
+forall a. RealFloat a =&gt; a -&gt; Bool
+</span><span class="hs-identifier hs-var">isInfinite</span></span><span> </span><span class="annot"><span class="annottext">b
+</span><a href="#local-6989586621680369534"><span class="hs-identifier hs-var">a</span></a></span><span> </span><span class="annot"><span class="annottext">Bool -&gt; Bool -&gt; Bool
+</span><span class="hs-operator hs-var">||</span></span><span> </span><span class="annot"><span class="annottext">b -&gt; Bool
+forall a. RealFloat a =&gt; a -&gt; Bool
+</span><span class="hs-identifier hs-var">isInfinite</span></span><span> </span><span class="annot"><span class="annottext">b
+</span><a href="#local-6989586621680369536"><span class="hs-identifier hs-var">b</span></a></span><span>
+</span><span id="line-66"></span><span>          </span><span class="hs-keyword">then</span><span> </span><span class="annot"><span class="annottext">b
+</span><span class="hs-number">1</span></span><span> </span><span class="annot"><span class="annottext">b -&gt; b -&gt; b
+forall a. Fractional a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">/</span></span><span> </span><span class="annot"><span class="annottext">b
+</span><span class="hs-number">0</span></span><span>
+</span><span id="line-67"></span><span>          </span><span class="hs-keyword">else</span><span> </span><span class="annot"><span class="annottext">b
+</span><a href="#local-6989586621680369534"><span class="hs-identifier hs-var">a</span></a></span><span> </span><span class="annot"><span class="annottext">b -&gt; b -&gt; b
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">*</span></span><span> </span><span class="annot"><span class="annottext">b
+</span><a href="#local-6989586621680369536"><span class="hs-identifier hs-var">b</span></a></span><span>
+</span><span id="line-68"></span><span>      </span><span class="hs-glyph">|</span><span> </span><span id="local-6989586621680369534"><span class="annot"><span class="annottext">b
+</span><a href="#local-6989586621680369534"><span class="hs-identifier hs-var">a</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">m b
+</span><a href="#local-6989586621680369532"><span class="hs-identifier hs-var">p</span></a></span><span>
+</span><span id="line-69"></span><span>      </span><span class="hs-glyph">|</span><span> </span><span id="local-6989586621680369536"><span class="annot"><span class="annottext">b
+</span><a href="#local-6989586621680369536"><span class="hs-identifier hs-var">b</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">m b
+</span><a href="#local-6989586621680369533"><span class="hs-identifier hs-var">q</span></a></span><span>
+</span><span id="line-70"></span><span>      </span><span class="hs-special">]</span><span>
+</span><span id="line-71"></span><span>    </span><span class="hs-comment">-- ////// dimensional analysis //////</span><span>
+</span><span id="line-72"></span><span>    </span><span class="hs-comment">--</span><span>
+</span><span id="line-73"></span><span>    </span><span class="hs-comment">-- . dimensions of &quot;pos&quot; and &quot;pos0&quot;</span><span>
+</span><span id="line-74"></span><span>    </span><span class="hs-comment">--</span><span>
+</span><span id="line-75"></span><span>    </span><span class="hs-comment">-- by comparing these three expressions:</span><span>
+</span><span id="line-76"></span><span>    </span><span class="hs-comment">--  dis0 = rcp `mul1` ... pos0 ...</span><span>
+</span><span id="line-77"></span><span>    </span><span class="hs-comment">--       = [X] * [L]</span><span>
+</span><span id="line-78"></span><span>    </span><span class="hs-comment">--  rcp  = [X]</span><span>
+</span><span id="line-79"></span><span>    </span><span class="hs-comment">--  dis' = dis + [1] `mul1` rcp</span><span>
+</span><span id="line-80"></span><span>    </span><span class="hs-comment">--       = [X] * [L] + [X]</span><span>
+</span><span id="line-81"></span><span>    </span><span class="hs-comment">-- we can deduce that</span><span>
+</span><span id="line-82"></span><span>    </span><span class="hs-comment">--  [X] = [X] * [L]</span><span>
+</span><span id="line-83"></span><span>    </span><span class="hs-comment">-- which has two solutions:</span><span>
+</span><span id="line-84"></span><span>    </span><span class="hs-comment">--  [X] = [0] (meaningless)</span><span>
+</span><span id="line-85"></span><span>    </span><span class="hs-comment">--  [L] = [1]</span><span>
+</span><span id="line-86"></span><span>    </span><span class="hs-comment">-- which makes sense given that our algorithm</span><span>
+</span><span id="line-87"></span><span>    </span><span class="hs-comment">-- works on 1x1x1 voxels.</span><span>
+</span><span id="line-88"></span><span>    </span><span class="hs-comment">--</span><span>
+</span><span id="line-89"></span><span>    </span><span class="hs-comment">-- . dimensions of &quot;ray&quot;</span><span>
+</span><span id="line-90"></span><span>    </span><span class="hs-comment">--</span><span>
+</span><span id="line-91"></span><span>    </span><span class="hs-comment">-- if [L] = [1] then we are free in our choice</span><span>
+</span><span id="line-92"></span><span>    </span><span class="hs-comment">-- of [X], the dimensions of rcp. and the definition</span><span>
+</span><span id="line-93"></span><span>    </span><span class="hs-comment">-- of rcp is</span><span>
+</span><span id="line-94"></span><span>    </span><span class="hs-comment">--  rcp = recip ray</span><span>
+</span><span id="line-95"></span><span>    </span><span class="hs-comment">-- so ray has [1]/[X] dimensions. thus ray is</span><span>
+</span><span id="line-96"></span><span>    </span><span class="hs-comment">-- compatible with any physical dimensions.</span><span>
+</span><span id="line-97"></span><span>    </span><span id="local-6989586621680369487"><span class="annot"><span class="annottext">dis0 :: V3 a
+</span><a href="#local-6989586621680369487"><span class="hs-identifier hs-var hs-var">dis0</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-98"></span><span>      </span><span class="annot"><span class="annottext">V3 a
+</span><a href="#local-6989586621680369539"><span class="hs-identifier hs-var">rcp</span></a></span><span>
+</span><span id="line-99"></span><span>        </span><span class="annot"><span class="annottext">V3 a -&gt; V3 a -&gt; V3 a
+forall {b} {m :: * -&gt; *}.
+(RealFloat b, MonadZip m) =&gt;
+m b -&gt; m b -&gt; m b
+</span><a href="#local-6989586621680369531"><span class="hs-operator hs-var">`mul1`</span></a></span><span> </span><span class="annot"><span class="annottext">V3 a -&gt; V3 a
+forall a. Num a =&gt; a -&gt; a
+</span><span class="hs-identifier hs-var">abs</span></span><span>
+</span><span id="line-100"></span><span>          </span><span class="hs-special">(</span><span> </span><span class="annot"><span class="annottext">(a -&gt; a) -&gt; V3 a -&gt; V3 a
+forall a b. (a -&gt; b) -&gt; V3 a -&gt; V3 b
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-identifier hs-var">fmap</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">forall a b. (Integral a, Num b) =&gt; a -&gt; b
+</span><span class="hs-identifier hs-var">fromIntegral</span></span><span> </span><span class="hs-glyph">@</span><span class="annot"><span class="hs-identifier hs-type">Int64</span></span><span> </span><span class="annot"><span class="annottext">(Int64 -&gt; a) -&gt; (a -&gt; Int64) -&gt; a -&gt; a
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">a -&gt; Int64
+forall b. Integral b =&gt; a -&gt; b
+forall a b. (RealFrac a, Integral b) =&gt; a -&gt; b
+</span><span class="hs-identifier hs-var">floor</span></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">V3 a
+</span><a href="#local-6989586621680369485"><span class="hs-identifier hs-var">pos0</span></a></span><span>
+</span><span id="line-101"></span><span>              </span><span class="annot"><span class="annottext">V3 a -&gt; V3 a -&gt; V3 a
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-glyph hs-var">-</span></span><span> </span><span class="annot"><span class="annottext">V3 a
+</span><a href="#local-6989586621680369485"><span class="hs-identifier hs-var">pos0</span></a></span><span>
+</span><span id="line-102"></span><span>              </span><span class="annot"><span class="annottext">V3 a -&gt; V3 a -&gt; V3 a
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">+</span></span><span> </span><span class="annot"><span class="annottext">V3 a -&gt; V3 a
+forall a. Num a =&gt; a -&gt; a
+</span><span class="hs-identifier hs-var">signum</span></span><span> </span><span class="annot"><span class="annottext">V3 a
+</span><a href="#local-6989586621680369484"><span class="hs-identifier hs-var">ray</span></a></span><span>
+</span><span id="line-103"></span><span>          </span><span class="hs-special">)</span><span>
+</span><span id="line-104"></span><span>    </span><span id="local-6989586621680369539"><span class="annot"><span class="annottext">rcp :: V3 a
+</span><a href="#local-6989586621680369539"><span class="hs-identifier hs-var hs-var">rcp</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">V3 a -&gt; V3 a
+forall a. Fractional a =&gt; a -&gt; a
+</span><span class="hs-identifier hs-var">recip</span></span><span> </span><span class="annot"><span class="annottext">V3 a
+</span><a href="#local-6989586621680369484"><span class="hs-identifier hs-var">ray</span></a></span><span>
+</span><span id="line-105"></span><span>    </span><span id="local-6989586621680369544"><span class="annot"><span class="annottext">sgn :: V3 i
+</span><a href="#local-6989586621680369544"><span class="hs-identifier hs-var hs-var">sgn</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">a -&gt; i
+forall b. Integral b =&gt; a -&gt; b
+forall a b. (RealFrac a, Integral b) =&gt; a -&gt; b
+</span><span class="hs-identifier hs-var">floor</span></span><span> </span><span class="annot"><span class="annottext">(a -&gt; i) -&gt; V3 a -&gt; V3 i
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-operator hs-var">&lt;$&gt;</span></span><span> </span><span class="annot"><span class="annottext">V3 a -&gt; V3 a
+forall a. Num a =&gt; a -&gt; a
+</span><span class="hs-identifier hs-var">signum</span></span><span> </span><span class="annot"><span class="annottext">V3 a
+</span><a href="#local-6989586621680369484"><span class="hs-identifier hs-var">ray</span></a></span><span>
+</span><span id="line-106"></span><span>    </span><span id="local-6989586621680369486"><span class="annot"><span class="annottext">go :: V3 a -&gt; V3 i -&gt; V3 i -&gt; a -&gt; Int -&gt; m (VHit i a)
+</span><a href="#local-6989586621680369486"><span class="hs-identifier hs-var hs-var">go</span></a></span></span><span> </span><span id="local-6989586621680369545"><span class="annot"><span class="annottext">V3 a
+</span><a href="#local-6989586621680369545"><span class="hs-identifier hs-var">dis</span></a></span></span><span> </span><span id="local-6989586621680369546"><span class="annot"><span class="annottext">V3 i
+</span><a href="#local-6989586621680369546"><span class="hs-identifier hs-var">pos</span></a></span></span><span> </span><span id="local-6989586621680369547"><span class="annot"><span class="annottext">V3 i
+</span><a href="#local-6989586621680369547"><span class="hs-identifier hs-var">closest0</span></a></span></span><span> </span><span id="local-6989586621680369548"><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621680369548"><span class="hs-identifier hs-var">time0</span></a></span></span><span> </span><span id="local-6989586621680369549"><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621680369549"><span class="hs-identifier hs-var">iter</span></a></span></span><span>
+</span><span id="line-107"></span><span>      </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621680369549"><span class="hs-identifier hs-var">iter</span></a></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Bool
+forall a. Ord a =&gt; a -&gt; a -&gt; Bool
+</span><span class="hs-operator hs-var">&gt;=</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">0</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-108"></span><span>          </span><span id="local-6989586621680369550"><span class="annot"><a href="#local-6989586621680369550"><span class="hs-identifier hs-var">t</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">V3 i -&gt; m Bool
+</span><a href="#local-6989586621680369483"><span class="hs-identifier hs-var">test</span></a></span><span> </span><span class="annot"><span class="annottext">V3 i
+</span><a href="#local-6989586621680369546"><span class="hs-identifier hs-var">pos</span></a></span><span>
+</span><span id="line-109"></span><span>          </span><span class="hs-keyword">if</span><span> </span><span class="annot"><a href="#local-6989586621680369550"><span class="hs-identifier hs-type">t</span></a></span><span>
+</span><span id="line-110"></span><span>            </span><span class="hs-keyword">then</span><span> </span><span class="annot"><span class="hs-identifier hs-type">pure</span></span><span> </span><span class="annot"><span class="hs-operator hs-type">$</span></span><span> </span><span class="annot"><a href="M.Collision.Internal.March2.html#VHit"><span class="hs-identifier hs-type">VHit</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680369548"><span class="hs-identifier hs-type">time0</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680369546"><span class="hs-identifier hs-type">pos</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">-</span><span class="annot"><a href="#local-6989586621680369544"><span class="hs-identifier hs-type">sgn</span></a></span><span> </span><span class="annot"><span class="hs-operator hs-type">*</span></span><span> </span><span class="annot"><a href="#local-6989586621680369547"><span class="hs-identifier hs-type">closest0</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-111"></span><span>            </span><span class="hs-keyword">else</span><span>
+</span><span id="line-112"></span><span>              </span><span class="hs-comment">-- for each of x, y, and z coordinates,</span><span>
+</span><span id="line-113"></span><span>              </span><span class="hs-comment">-- decide if it's the &quot;closest&quot; one among</span><span>
+</span><span id="line-114"></span><span>              </span><span class="hs-comment">-- the other coordinates to the respective</span><span>
+</span><span id="line-115"></span><span>              </span><span class="hs-comment">-- next voxel boundary. there could be many</span><span>
+</span><span id="line-116"></span><span>              </span><span class="hs-comment">-- simultaneous advancements, though, which</span><span>
+</span><span id="line-117"></span><span>              </span><span class="hs-comment">-- is handled smoothly with no issue.</span><span>
+</span><span id="line-118"></span><span>              </span><span class="hs-keyword">let</span><span> </span><span id="local-6989586621680369551"><span class="annot"><a href="#local-6989586621680369551"><span class="hs-identifier hs-var hs-var">closest</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-119"></span><span>                    </span><span class="hs-special">[</span><span> </span><span class="annot"><span class="annottext">Int -&gt; i
+forall a b. (Integral a, Num b) =&gt; a -&gt; b
+</span><span class="hs-identifier hs-var">fromIntegral</span></span><span> </span><span class="annot"><span class="annottext">(Int -&gt; i) -&gt; Int -&gt; i
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">Bool -&gt; Int
+forall a. Enum a =&gt; a -&gt; Int
+</span><span class="hs-identifier hs-var">fromEnum</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621680369553"><span class="hs-identifier hs-var">a</span></a></span><span> </span><span class="annot"><span class="annottext">a -&gt; a -&gt; Bool
+forall a. Ord a =&gt; a -&gt; a -&gt; Bool
+</span><span class="hs-operator hs-var">&lt;=</span></span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621680369555"><span class="hs-identifier hs-var">b</span></a></span><span> </span><span class="annot"><span class="annottext">Bool -&gt; Bool -&gt; Bool
+</span><span class="hs-operator hs-var">&amp;&amp;</span></span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621680369553"><span class="hs-identifier hs-var">a</span></a></span><span> </span><span class="annot"><span class="annottext">a -&gt; a -&gt; Bool
+forall a. Ord a =&gt; a -&gt; a -&gt; Bool
+</span><span class="hs-operator hs-var">&lt;=</span></span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621680369557"><span class="hs-identifier hs-var">c</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-120"></span><span>                    </span><span class="hs-glyph">|</span><span> </span><span id="local-6989586621680369553"><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621680369553"><span class="hs-identifier hs-var">a</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">V3 a
+</span><a href="#local-6989586621680369545"><span class="hs-identifier hs-var">dis</span></a></span><span>
+</span><span id="line-121"></span><span>                    </span><span class="hs-glyph">|</span><span> </span><span id="local-6989586621680369555"><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621680369555"><span class="hs-identifier hs-var">b</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">V3 a
+</span><a href="#local-6989586621680369545"><span class="hs-identifier hs-var">dis</span></a></span><span> </span><span class="annot"><span class="annottext">V3 a -&gt; Getting (V3 a) (V3 a) (V3 a) -&gt; V3 a
+forall s a. s -&gt; Getting a s a -&gt; a
+</span><span class="hs-operator hs-var">^.</span></span><span> </span><span class="annot"><span class="annottext">Getting (V3 a) (V3 a) (V3 a)
+Lens' (V3 a) (V3 a)
+forall (t :: * -&gt; *) a. R3 t =&gt; Lens' (t a) (V3 a)
+</span><span class="hs-identifier hs-var">_yzx</span></span><span>
+</span><span id="line-122"></span><span>                    </span><span class="hs-glyph">|</span><span> </span><span id="local-6989586621680369557"><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621680369557"><span class="hs-identifier hs-var">c</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">V3 a
+</span><a href="#local-6989586621680369545"><span class="hs-identifier hs-var">dis</span></a></span><span> </span><span class="annot"><span class="annottext">V3 a -&gt; Getting (V3 a) (V3 a) (V3 a) -&gt; V3 a
+forall s a. s -&gt; Getting a s a -&gt; a
+</span><span class="hs-operator hs-var">^.</span></span><span> </span><span class="annot"><span class="annottext">Getting (V3 a) (V3 a) (V3 a)
+Lens' (V3 a) (V3 a)
+forall (t :: * -&gt; *) a. R3 t =&gt; Lens' (t a) (V3 a)
+</span><span class="hs-identifier hs-var">_zxy</span></span><span>
+</span><span id="line-123"></span><span>                    </span><span class="hs-special">]</span><span>
+</span><span id="line-124"></span><span>                  </span><span id="local-6989586621680369561"><span class="annot"><a href="#local-6989586621680369561"><span class="hs-identifier hs-var hs-var">fclosest</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">i -&gt; a
+forall a b. (Integral a, Num b) =&gt; a -&gt; b
+</span><span class="hs-identifier hs-var">fromIntegral</span></span><span> </span><span class="annot"><span class="annottext">(i -&gt; a) -&gt; V3 i -&gt; V3 a
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-operator hs-var">&lt;$&gt;</span></span><span> </span><span class="annot"><span class="annottext">V3 i
+</span><a href="#local-6989586621680369551"><span class="hs-identifier hs-var">closest</span></a></span><span>
+</span><span id="line-125"></span><span>               </span><span class="hs-keyword">in</span><span> </span><span class="annot"><a href="#local-6989586621680369486"><span class="hs-identifier hs-type">go</span></a></span><span>
+</span><span id="line-126"></span><span>                    </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621680369545"><span class="hs-identifier hs-type">dis</span></a></span><span> </span><span class="annot"><span class="hs-operator hs-type">+</span></span><span> </span><span class="annot"><a href="#local-6989586621680369561"><span class="hs-identifier hs-type">fclosest</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680369531"><span class="hs-operator hs-type">`mul1`</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680369539"><span class="hs-identifier hs-type">rcp</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-127"></span><span>                    </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621680369546"><span class="hs-identifier hs-type">pos</span></a></span><span> </span><span class="annot"><span class="hs-operator hs-type">+</span></span><span> </span><span class="annot"><a href="#local-6989586621680369551"><span class="hs-identifier hs-type">closest</span></a></span><span> </span><span class="annot"><span class="hs-operator hs-type">*</span></span><span> </span><span class="annot"><a href="#local-6989586621680369544"><span class="hs-identifier hs-type">sgn</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-128"></span><span>                    </span><span class="annot"><a href="#local-6989586621680369551"><span class="hs-identifier hs-type">closest</span></a></span><span>
+</span><span id="line-129"></span><span>                    </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621680369548"><span class="hs-identifier hs-type">time0</span></a></span><span> </span><span class="annot"><span class="hs-operator hs-type">+</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">minimum</span></span><span> </span><span class="annot"><a href="#local-6989586621680369545"><span class="hs-identifier hs-type">dis</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-130"></span><span>                    </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621680369549"><span class="hs-identifier hs-type">iter</span></a></span><span> </span><span class="annot"><span class="hs-glyph hs-type">-</span></span><span> </span><span class="annot"><span class="hs-number">1</span></span><span class="hs-special">)</span><span>
+</span><span id="line-131"></span><span>      </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="annottext">Bool
+</span><span class="hs-identifier hs-var">otherwise</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">VHit i a -&gt; m (VHit i a)
+forall a. a -&gt; m a
+forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><span class="hs-identifier hs-var">pure</span></span><span> </span><span class="annot"><span class="annottext">(VHit i a -&gt; m (VHit i a)) -&gt; VHit i a -&gt; m (VHit i a)
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">a -&gt; V3 i -&gt; V3 i -&gt; VHit i a
+forall i a. a -&gt; V3 i -&gt; V3 i -&gt; VHit i a
+</span><a href="M.Collision.Internal.March2.html#VHit"><span class="hs-identifier hs-var">VHit</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">a
+</span><span class="hs-number">1</span></span><span> </span><span class="annot"><span class="annottext">a -&gt; a -&gt; a
+forall a. Fractional a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">/</span></span><span> </span><span class="annot"><span class="annottext">a
+</span><span class="hs-number">0</span></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">V3 i
+</span><span class="hs-number">0</span></span><span> </span><span class="annot"><span class="annottext">V3 i
+</span><span class="hs-number">0</span></span><span>
+</span><span id="line-132"></span><span>
+</span><span id="line-133"></span><span class="hs-comment">-- debug</span><span>
+</span><span id="line-134"></span><span>
+</span><span id="line-135"></span><span class="annot"><a href="M.Collision.Internal.March2.html#_march2tester"><span class="hs-identifier hs-type">_march2tester</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">V3</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Int</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">IO</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Bool</span></span><span>
+</span><span id="line-136"></span><span id="_march2tester"><span class="annot"><span class="annottext">_march2tester :: V3 Int -&gt; IO Bool
+</span><a href="M.Collision.Internal.March2.html#_march2tester"><span class="hs-identifier hs-var hs-var">_march2tester</span></a></span></span><span> </span><span id="local-6989586621680369564"><span class="annot"><span class="annottext">V3 Int
+</span><a href="#local-6989586621680369564"><span class="hs-identifier hs-var">v</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Bool
+</span><span class="hs-identifier hs-var">False</span></span><span> </span><span class="annot"><span class="annottext">Bool -&gt; IO () -&gt; IO Bool
+forall a b. a -&gt; IO b -&gt; IO a
+forall (f :: * -&gt; *) a b. Functor f =&gt; a -&gt; f b -&gt; f a
+</span><span class="hs-operator hs-var">&lt;$</span></span><span> </span><span class="annot"><span class="annottext">String -&gt; IO ()
+</span><span class="hs-identifier hs-var">traceIO</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">String -&gt; String -&gt; String
+forall r. PrintfType r =&gt; String -&gt; r
+</span><span class="hs-identifier hs-var">printf</span></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;v = %s&quot;</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">V3 Int -&gt; String
+forall a. Show a =&gt; a -&gt; String
+</span><span class="hs-identifier hs-var">show</span></span><span> </span><span class="annot"><span class="annottext">V3 Int
+</span><a href="#local-6989586621680369564"><span class="hs-identifier hs-var">v</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-137"></span><span>
+</span><span id="line-138"></span><span class="annot"><a href="M.Collision.Internal.March2.html#_march2tester_distance"><span class="hs-identifier hs-type">_march2tester_distance</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">V3</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Int</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Double</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">V3</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Int</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">IO</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Bool</span></span><span>
+</span><span id="line-139"></span><span id="_march2tester_distance"><span class="annot"><span class="annottext">_march2tester_distance :: V3 Int -&gt; Double -&gt; V3 Int -&gt; IO Bool
+</span><a href="M.Collision.Internal.March2.html#_march2tester_distance"><span class="hs-identifier hs-var hs-var">_march2tester_distance</span></a></span></span><span> </span><span id="local-6989586621680369570"><span class="annot"><span class="annottext">V3 Int
+</span><a href="#local-6989586621680369570"><span class="hs-identifier hs-var">home</span></a></span></span><span> </span><span id="local-6989586621680369571"><span class="annot"><span class="annottext">Double
+</span><a href="#local-6989586621680369571"><span class="hs-identifier hs-var">dst</span></a></span></span><span> </span><span id="local-6989586621680369572"><span class="annot"><span class="annottext">V3 Int
+</span><a href="#local-6989586621680369572"><span class="hs-identifier hs-var">v</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-140"></span><span>  </span><span class="hs-keyword">let</span><span> </span><span id="local-6989586621680369573"><span class="annot"><span class="annottext">h :: V3 Double
+</span><a href="#local-6989586621680369573"><span class="hs-identifier hs-var hs-var">h</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int -&gt; Double
+forall a b. (Integral a, Num b) =&gt; a -&gt; b
+</span><span class="hs-identifier hs-var">fromIntegral</span></span><span> </span><span class="annot"><span class="annottext">(Int -&gt; Double) -&gt; V3 Int -&gt; V3 Double
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-operator hs-var">&lt;$&gt;</span></span><span> </span><span class="annot"><span class="annottext">V3 Int
+</span><a href="#local-6989586621680369570"><span class="hs-identifier hs-var">home</span></a></span><span>
+</span><span id="line-141"></span><span>      </span><span id="local-6989586621680369574"><span class="annot"><span class="annottext">w :: V3 Double
+</span><a href="#local-6989586621680369574"><span class="hs-identifier hs-var hs-var">w</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int -&gt; Double
+forall a b. (Integral a, Num b) =&gt; a -&gt; b
+</span><span class="hs-identifier hs-var">fromIntegral</span></span><span> </span><span class="annot"><span class="annottext">(Int -&gt; Double) -&gt; V3 Int -&gt; V3 Double
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-operator hs-var">&lt;$&gt;</span></span><span> </span><span class="annot"><span class="annottext">V3 Int
+</span><a href="#local-6989586621680369572"><span class="hs-identifier hs-var">v</span></a></span><span>
+</span><span id="line-142"></span><span>   </span><span class="hs-keyword">in</span><span> </span><span class="annot"><span class="annottext">Bool -&gt; IO Bool
+forall a. a -&gt; IO a
+forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><span class="hs-identifier hs-var">pure</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">V3 Double -&gt; V3 Double -&gt; Double
+forall a. Floating a =&gt; V3 a -&gt; V3 a -&gt; a
+forall (f :: * -&gt; *) a. (Metric f, Floating a) =&gt; f a -&gt; f a -&gt; a
+</span><span class="hs-identifier hs-var">distance</span></span><span> </span><span class="annot"><span class="annottext">V3 Double
+</span><a href="#local-6989586621680369573"><span class="hs-identifier hs-var">h</span></a></span><span> </span><span class="annot"><span class="annottext">V3 Double
+</span><a href="#local-6989586621680369574"><span class="hs-identifier hs-var">w</span></a></span><span> </span><span class="annot"><span class="annottext">Double -&gt; Double -&gt; Bool
+forall a. Ord a =&gt; a -&gt; a -&gt; Bool
+</span><span class="hs-operator hs-var">&gt;=</span></span><span> </span><span class="annot"><span class="annottext">Double
+</span><a href="#local-6989586621680369571"><span class="hs-identifier hs-var">dst</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-143"></span></pre></body></html>

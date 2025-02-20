@@ -1,0 +1,77 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span class="hs-pragma">{-# OPTIONS_GHC -Wno-missing-export-lists #-}</span><span>
+</span><span id="line-2"></span><span>
+</span><span id="line-3"></span><span class="hs-comment">-- |</span><span>
+</span><span id="line-4"></span><span class="hs-comment">-- Module: M.V769.L</span><span>
+</span><span id="line-5"></span><span class="hs-comment">-- Description: Protocol login state packets (AI-generated)</span><span>
+</span><span id="line-6"></span><span class="hs-comment">-- Copyright: (c) axionbuster, 2025</span><span>
+</span><span id="line-7"></span><span class="hs-comment">-- License: BSD-3-Clause</span><span>
+</span><span id="line-8"></span><span class="hs-comment">--</span><span>
+</span><span id="line-9"></span><span class="hs-comment">-- Defines packet structures for the login phase of protocol version 769,</span><span>
+</span><span id="line-10"></span><span class="hs-comment">-- handling authentication, encryption setup, and session establishment</span><span>
+</span><span id="line-11"></span><span class="hs-comment">-- between client and server.</span><span>
+</span><span id="line-12"></span><span class="hs-keyword">module</span><span> </span><span class="annot"><a href="M.V769.L.html"><span class="hs-identifier">M.V769.L</span></a></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-13"></span><span>
+</span><span id="line-14"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Control.DeepSeq</span></span><span>
+</span><span id="line-15"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.ByteString</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">ByteString</span></span><span class="hs-special">)</span><span>
+</span><span id="line-16"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Data</span></span><span>
+</span><span id="line-17"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Int</span></span><span>
+</span><span id="line-18"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Text</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">Text</span></span><span class="hs-special">)</span><span>
+</span><span id="line-19"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.UUID.Types</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">UUID</span></span><span class="hs-special">)</span><span>
+</span><span id="line-20"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Vector</span></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">V</span></span><span>
+</span><span id="line-21"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="M.LEB.html"><span class="hs-identifier">M.LEB</span></a></span><span>
+</span><span id="line-22"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="M.Pack.html"><span class="hs-identifier">M.Pack</span></a></span><span>
+</span><span id="line-23"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="M.PkMacro.html"><span class="hs-identifier">M.PkMacro</span></a></span><span>
+</span><span id="line-24"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="M.TODO.html"><span class="hs-identifier">M.TODO</span></a></span><span>
+</span><span id="line-25"></span><span>
+</span><span id="line-26"></span><span class="hs-identifier">setdefaultderives</span><span>
+</span><span id="line-27"></span><span class="hs-identifier">addproperderives</span><span> </span><span class="hs-special">[</span><span class="hs-special">''</span><span class="hs-identifier">NFData</span><span class="hs-special">,</span><span> </span><span class="hs-special">''</span><span class="hs-identifier">Typeable</span><span class="hs-special">,</span><span> </span><span class="hs-special">''</span><span class="hs-identifier">Show</span><span class="hs-special">,</span><span> </span><span class="hs-special">''</span><span class="hs-identifier">Eq</span><span class="hs-special">]</span><span>
+</span><span id="line-28"></span><span>
+</span><span id="line-29"></span><span id="EncryptionResponse"><span id="LoginAcknowledged"><span id="LoginStart"><span id="LoginPluginResponse"><span id="LoginPluginRequest"><span id="LoginSuccess_Property"><span id="LoginSuccess"><span id="EncryptionRequest"><span id="LoginDisconnect"><span id="LoginPluginResponse__"><span id="LoginPluginRequest__"><span id="local-6989586621680399123"><span id="local-6989586621680399125"><span id="local-6989586621680399127"><span id="local-6989586621680399135"><span id="local-6989586621680399142"><span id="local-6989586621680399146"><span id="local-6989586621680399149"><span id="local-6989586621680399154"><span id="local-6989586621680399158"><span id="local-6989586621680399165"><span id="local-6989586621680399172"><span id="local-6989586621680399174"><span id="local-6989586621680399176"><span id="local-6989586621680399184"><span id="local-6989586621680399186"><span id="local-6989586621680399190"><span id="local-6989586621680399193"><span id="local-6989586621680399195"><span id="local-6989586621680399199"><span id="local-6989586621680399206"><span id="local-6989586621680399213"><span id="local-6989586621680399215"><span id="local-6989586621680399217"><span id="local-6989586621680399225"><span id="local-6989586621680399232"><span id="local-6989586621680399236"><span id="local-6989586621680399239"><span id="local-6989586621680399245"><span id="local-6989586621680399249"><span id="local-6989586621680399256"><span id="local-6989586621680399263"><span id="local-6989586621680399265"><span id="local-6989586621680399267"><span id="local-6989586621680399275"><span id="local-6989586621680399282"><span id="local-6989586621680399284"><span id="local-6989586621680399286"><span id="local-6989586621680399294"><span id="local-6989586621680399304"><span id="local-6989586621680399308"><span id="local-6989586621680399311"><span id="local-6989586621680399320"><span id="local-6989586621680399324"><span id="local-6989586621680399326"><span id="local-6989586621680399328"><span id="local-6989586621680399336"><span id="local-6989586621680399343"><span id="local-6989586621680399345"><span id="local-6989586621680399347"><span id="local-6989586621680399355"><span id="local-6989586621680399361"><span id="local-6989586621680399365"><span id="local-6989586621680399368"><span id="local-6989586621680399373"><span id="local-6989586621680399377"><span id="local-6989586621680399379"><span id="local-6989586621680399381"><span id="local-6989586621680399389"><span id="local-6989586621680399397"><span id="local-6989586621680399401"><span id="local-6989586621680399404"><span id="local-6989586621680399411"><span id="local-6989586621680399415"><span id="local-6989586621680399422"><span id="local-6989586621680399429"><span id="local-6989586621680399431"><span id="local-6989586621680399433"><span id="local-6989586621680399441"><span id="local-6989586621680399447"><span id="local-6989586621680399451"><span id="local-6989586621680399454"><span id="local-6989586621680399459"><span id="local-6989586621680399463"><span id="local-6989586621680399470"><span id="local-6989586621680399477"><span id="local-6989586621680399479"><span id="local-6989586621680399481"><span id="local-6989586621680399489"><span id="local-6989586621680399496"><span id="local-6989586621680399500"><span id="local-6989586621680399503"><span id="local-6989586621680399509"><span id="local-6989586621680399513"><span id="local-6989586621680399520"><span id="local-6989586621680399527"><span id="local-6989586621680399529"><span id="local-6989586621680399531"><span id="local-6989586621680399539"><span id="local-6989586621680399544"><span id="local-6989586621680399548"><span id="local-6989586621680399551"><span id="local-6989586621680399555"><span id="local-6989586621680399559"><span id="local-6989586621680399566"><span id="local-6989586621680399573"><span id="local-6989586621680399583"><span id="local-6989586621680399589"><span id="local-6989586621680399597"><span id="EncryptionResponse"><span id="verifytoken"><span id="sharedsecret"><span id="LoginAcknowledged"><span id="LoginStart"><span id="uuid"><span id="name"><span id="LoginPluginResponse__"><span id="data___"><span id="successful__"><span id="messageid__"><span id="LoginPluginResponse"><span id="data_"><span id="successful"><span id="messageid"><span id="LoginPluginRequest__"><span id="data___"><span id="channel__"><span id="messageid__"><span id="LoginPluginRequest"><span id="data_"><span id="channel"><span id="messageid"><span id="LoginSuccess_Property"><span id="signature"><span id="value"><span id="name"><span id="LoginSuccess"><span id="properties"><span id="username"><span id="uuid"><span id="EncryptionRequest"><span id="shouldauthenticate"><span id="verifytoken"><span id="publickey"><span id="serverid"><span id="LoginDisconnect"><span id="reason"></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span><span class="">[pkmacro|
+data LoginDisconnect {
+  reason :: TextComponent,
+}
+
+data EncryptionRequest {
+  serverid :: Text,
+  publickey :: ByteString,
+  verifytoken :: ByteString,
+  shouldauthenticate :: Bool,
+}
+
+data LoginSuccess {
+  uuid :: UUID,
+  username :: Text,
+  properties :: V.Vector LoginSuccess_Property,
+}
+
+data LoginSuccess_Property {
+  name :: Text,
+  value :: Text,
+  signature :: Maybe Text,
+}
+
+data LoginPluginRequest {
+  messageid :: Int32 via LEB Int32,
+  channel :: Text,
+  data_ :: ByteString via TakeRest,
+}
+
+data LoginPluginResponse {
+  messageid :: Int32 via VarInt,
+  successful :: Bool,
+  data_ :: Maybe ByteString,
+}
+
+data LoginStart {
+  name :: Text,
+  uuid :: UUID,
+}
+
+data LoginAcknowledged {}
+
+data EncryptionResponse {
+  sharedsecret :: ByteString,
+  verifytoken :: ByteString,
+}
+|]</span><span>
+</span><span id="line-77"></span></pre></body></html>

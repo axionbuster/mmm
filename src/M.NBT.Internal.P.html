@@ -1,0 +1,790 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span id="local-6989586621680384873"><span id="local-6989586621680384874"></span></span><span class="hs-pragma">{-# OPTIONS_GHC -Wno-orphans #-}</span><span>
+</span><span id="line-2"></span><span>
+</span><span id="line-3"></span><span class="hs-comment">-- |</span><span>
+</span><span id="line-4"></span><span class="hs-comment">-- Module: M.NBT.Internal.P</span><span>
+</span><span id="line-5"></span><span class="hs-comment">-- Description: NBT parsing and serialization</span><span>
+</span><span id="line-6"></span><span class="hs-comment">-- Copyright: (c) axionbuster, 2025</span><span>
+</span><span id="line-7"></span><span class="hs-comment">-- License: BSD-3-Clause</span><span>
+</span><span id="line-8"></span><span class="hs-comment">--</span><span>
+</span><span id="line-9"></span><span class="hs-comment">-- Implements parsing and serialization for NBT data structures,</span><span>
+</span><span id="line-10"></span><span class="hs-comment">-- handling named pairs and tag types.</span><span>
+</span><span id="line-11"></span><span class="hs-keyword">module</span><span> </span><span class="annot"><a href="M.NBT.Internal.P.html"><span class="hs-identifier">M.NBT.Internal.P</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="M.NBT.Internal.P.html#NamedPair"><span class="hs-identifier">NamedPair</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-12"></span><span>
+</span><span id="line-13"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Control.Applicative.Combinators</span></span><span>
+</span><span id="line-14"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Control.DeepSeq</span></span><span>
+</span><span id="line-15"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Control.Monad</span></span><span>
+</span><span id="line-16"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.ByteString</span></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">B</span></span><span>
+</span><span id="line-17"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.ByteString.Builder</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">Builder</span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier">byteString</span></span><span class="hs-special">)</span><span>
+</span><span id="line-18"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Data</span></span><span>
+</span><span id="line-19"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Functor</span></span><span>
+</span><span id="line-20"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.HashMap.Strict</span></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">M</span></span><span>
+</span><span id="line-21"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Int</span></span><span>
+</span><span id="line-22"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Text</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">Text</span></span><span class="hs-special">)</span><span>
+</span><span id="line-23"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Vector</span></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">V</span></span><span>
+</span><span id="line-24"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Vector.Unboxed</span></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">VU</span></span><span>
+</span><span id="line-25"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">FlatParse.Stateful</span></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">F</span></span><span>
+</span><span id="line-26"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">GHC.Generics</span></span><span>
+</span><span id="line-27"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="M.NBT.Internal.JS.html"><span class="hs-identifier">M.NBT.Internal.JS</span></a></span><span>
+</span><span id="line-28"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="M.NBT.Internal.Types.html"><span class="hs-identifier">M.NBT.Internal.Types</span></a></span><span>
+</span><span id="line-29"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="M.Pack.html"><span class="hs-identifier">M.Pack</span></a></span><span>
+</span><span id="line-30"></span><span>
+</span><span id="line-31"></span><span class="hs-comment">-- unpack orphan instance for 'Tg'</span><span>
+</span><span id="line-32"></span><span>
+</span><span id="line-33"></span><span class="hs-comment">-- parser returns parser. use 'join' from Control.Monad to use it</span><span>
+</span><span id="line-34"></span><span>
+</span><span id="line-35"></span><span class="annot"><span class="hs-comment">-- | named pair of a 'Text' and a 'Tg'</span></span><span>
+</span><span id="line-36"></span><span class="hs-keyword">data</span><span> </span><span id="NamedPair"><span class="annot"><a href="M.NBT.Internal.P.html#NamedPair"><span class="hs-identifier hs-var">NamedPair</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="NamedPair"><span class="annot"><a href="M.NBT.Internal.P.html#NamedPair"><span class="hs-identifier hs-var">NamedPair</span></a></span></span><span> </span><span class="hs-glyph">!</span><span class="annot"><span class="hs-identifier hs-type">Text</span></span><span> </span><span class="hs-glyph">!</span><span class="annot"><a href="M.NBT.Internal.Types.html#Tg"><span class="hs-identifier hs-type">Tg</span></a></span><span>
+</span><span id="line-37"></span><span>  </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">stock</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621680384940"><span id="local-6989586621680384946"><span class="annot"><span class="annottext">NamedPair -&gt; NamedPair -&gt; Bool
+(NamedPair -&gt; NamedPair -&gt; Bool)
+-&gt; (NamedPair -&gt; NamedPair -&gt; Bool) -&gt; Eq NamedPair
+forall a. (a -&gt; a -&gt; Bool) -&gt; (a -&gt; a -&gt; Bool) -&gt; Eq a
+$c== :: NamedPair -&gt; NamedPair -&gt; Bool
+== :: NamedPair -&gt; NamedPair -&gt; Bool
+$c/= :: NamedPair -&gt; NamedPair -&gt; Bool
+/= :: NamedPair -&gt; NamedPair -&gt; Bool
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Eq</span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680384953"><span id="local-6989586621680384959"><span id="local-6989586621680384963"><span id="local-6989586621680384967"><span id="local-6989586621680384970"><span id="local-6989586621680384973"><span id="local-6989586621680384976"><span class="annot"><span class="annottext">Eq NamedPair
+Eq NamedPair =&gt;
+(NamedPair -&gt; NamedPair -&gt; Ordering)
+-&gt; (NamedPair -&gt; NamedPair -&gt; Bool)
+-&gt; (NamedPair -&gt; NamedPair -&gt; Bool)
+-&gt; (NamedPair -&gt; NamedPair -&gt; Bool)
+-&gt; (NamedPair -&gt; NamedPair -&gt; Bool)
+-&gt; (NamedPair -&gt; NamedPair -&gt; NamedPair)
+-&gt; (NamedPair -&gt; NamedPair -&gt; NamedPair)
+-&gt; Ord NamedPair
+NamedPair -&gt; NamedPair -&gt; Bool
+NamedPair -&gt; NamedPair -&gt; Ordering
+NamedPair -&gt; NamedPair -&gt; NamedPair
+forall a.
+Eq a =&gt;
+(a -&gt; a -&gt; Ordering)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; Ord a
+$ccompare :: NamedPair -&gt; NamedPair -&gt; Ordering
+compare :: NamedPair -&gt; NamedPair -&gt; Ordering
+$c&lt; :: NamedPair -&gt; NamedPair -&gt; Bool
+&lt; :: NamedPair -&gt; NamedPair -&gt; Bool
+$c&lt;= :: NamedPair -&gt; NamedPair -&gt; Bool
+&lt;= :: NamedPair -&gt; NamedPair -&gt; Bool
+$c&gt; :: NamedPair -&gt; NamedPair -&gt; Bool
+&gt; :: NamedPair -&gt; NamedPair -&gt; Bool
+$c&gt;= :: NamedPair -&gt; NamedPair -&gt; Bool
+&gt;= :: NamedPair -&gt; NamedPair -&gt; Bool
+$cmax :: NamedPair -&gt; NamedPair -&gt; NamedPair
+max :: NamedPair -&gt; NamedPair -&gt; NamedPair
+$cmin :: NamedPair -&gt; NamedPair -&gt; NamedPair
+min :: NamedPair -&gt; NamedPair -&gt; NamedPair
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Ord</span></span></span></span></span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680384984"><span id="local-6989586621680384992"><span id="local-6989586621680384996"><span class="annot"><span class="annottext">Int -&gt; NamedPair -&gt; ShowS
+[NamedPair] -&gt; ShowS
+NamedPair -&gt; String
+(Int -&gt; NamedPair -&gt; ShowS)
+-&gt; (NamedPair -&gt; String)
+-&gt; ([NamedPair] -&gt; ShowS)
+-&gt; Show NamedPair
+forall a.
+(Int -&gt; a -&gt; ShowS) -&gt; (a -&gt; String) -&gt; ([a] -&gt; ShowS) -&gt; Show a
+$cshowsPrec :: Int -&gt; NamedPair -&gt; ShowS
+showsPrec :: Int -&gt; NamedPair -&gt; ShowS
+$cshow :: NamedPair -&gt; String
+show :: NamedPair -&gt; String
+$cshowList :: [NamedPair] -&gt; ShowS
+showList :: [NamedPair] -&gt; ShowS
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Show</span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680385001"><span id="local-6989586621680385005"><span id="local-6989586621680385008"><span id="local-6989586621680385019"><span class="annot"><span class="annottext">ReadPrec [NamedPair]
+ReadPrec NamedPair
+Int -&gt; ReadS NamedPair
+ReadS [NamedPair]
+(Int -&gt; ReadS NamedPair)
+-&gt; ReadS [NamedPair]
+-&gt; ReadPrec NamedPair
+-&gt; ReadPrec [NamedPair]
+-&gt; Read NamedPair
+forall a.
+(Int -&gt; ReadS a)
+-&gt; ReadS [a] -&gt; ReadPrec a -&gt; ReadPrec [a] -&gt; Read a
+$creadsPrec :: Int -&gt; ReadS NamedPair
+readsPrec :: Int -&gt; ReadS NamedPair
+$creadList :: ReadS [NamedPair]
+readList :: ReadS [NamedPair]
+$creadPrec :: ReadPrec NamedPair
+readPrec :: ReadPrec NamedPair
+$creadListPrec :: ReadPrec [NamedPair]
+readListPrec :: ReadPrec [NamedPair]
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Read</span></span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680385026"><span id="local-6989586621680385028"><span class="annot"><span class="annottext">(forall x. NamedPair -&gt; Rep NamedPair x)
+-&gt; (forall x. Rep NamedPair x -&gt; NamedPair) -&gt; Generic NamedPair
+forall x. Rep NamedPair x -&gt; NamedPair
+forall x. NamedPair -&gt; Rep NamedPair x
+forall a.
+(forall x. a -&gt; Rep a x) -&gt; (forall x. Rep a x -&gt; a) -&gt; Generic a
+$cfrom :: forall x. NamedPair -&gt; Rep NamedPair x
+from :: forall x. NamedPair -&gt; Rep NamedPair x
+$cto :: forall x. Rep NamedPair x -&gt; NamedPair
+to :: forall x. Rep NamedPair x -&gt; NamedPair
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Generic</span></span></span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Typeable</span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680385036"><span id="local-6989586621680385042"><span id="local-6989586621680385046"><span id="local-6989586621680385048"><span id="local-6989586621680385050"><span id="local-6989586621680385056"><span id="local-6989586621680385061"><span id="local-6989586621680385064"><span id="local-6989586621680385067"><span id="local-6989586621680385070"><span id="local-6989586621680385073"><span id="local-6989586621680385076"><span id="local-6989586621680385081"><span id="local-6989586621680385086"><span class="annot"><span class="annottext">Typeable NamedPair
+Typeable NamedPair =&gt;
+(forall (c :: * -&gt; *).
+ (forall d b. Data d =&gt; c (d -&gt; b) -&gt; d -&gt; c b)
+ -&gt; (forall g. g -&gt; c g) -&gt; NamedPair -&gt; c NamedPair)
+-&gt; (forall (c :: * -&gt; *).
+    (forall b r. Data b =&gt; c (b -&gt; r) -&gt; c r)
+    -&gt; (forall r. r -&gt; c r) -&gt; Constr -&gt; c NamedPair)
+-&gt; (NamedPair -&gt; Constr)
+-&gt; (NamedPair -&gt; DataType)
+-&gt; (forall (t :: * -&gt; *) (c :: * -&gt; *).
+    Typeable t =&gt;
+    (forall d. Data d =&gt; c (t d)) -&gt; Maybe (c NamedPair))
+-&gt; (forall (t :: * -&gt; * -&gt; *) (c :: * -&gt; *).
+    Typeable t =&gt;
+    (forall d e. (Data d, Data e) =&gt; c (t d e)) -&gt; Maybe (c NamedPair))
+-&gt; ((forall b. Data b =&gt; b -&gt; b) -&gt; NamedPair -&gt; NamedPair)
+-&gt; (forall r r'.
+    (r -&gt; r' -&gt; r)
+    -&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; NamedPair -&gt; r)
+-&gt; (forall r r'.
+    (r' -&gt; r -&gt; r)
+    -&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; NamedPair -&gt; r)
+-&gt; (forall u. (forall d. Data d =&gt; d -&gt; u) -&gt; NamedPair -&gt; [u])
+-&gt; (forall u.
+    Int -&gt; (forall d. Data d =&gt; d -&gt; u) -&gt; NamedPair -&gt; u)
+-&gt; (forall (m :: * -&gt; *).
+    Monad m =&gt;
+    (forall d. Data d =&gt; d -&gt; m d) -&gt; NamedPair -&gt; m NamedPair)
+-&gt; (forall (m :: * -&gt; *).
+    MonadPlus m =&gt;
+    (forall d. Data d =&gt; d -&gt; m d) -&gt; NamedPair -&gt; m NamedPair)
+-&gt; (forall (m :: * -&gt; *).
+    MonadPlus m =&gt;
+    (forall d. Data d =&gt; d -&gt; m d) -&gt; NamedPair -&gt; m NamedPair)
+-&gt; Data NamedPair
+NamedPair -&gt; Constr
+NamedPair -&gt; DataType
+(forall b. Data b =&gt; b -&gt; b) -&gt; NamedPair -&gt; NamedPair
+forall a.
+Typeable a =&gt;
+(forall (c :: * -&gt; *).
+ (forall d b. Data d =&gt; c (d -&gt; b) -&gt; d -&gt; c b)
+ -&gt; (forall g. g -&gt; c g) -&gt; a -&gt; c a)
+-&gt; (forall (c :: * -&gt; *).
+    (forall b r. Data b =&gt; c (b -&gt; r) -&gt; c r)
+    -&gt; (forall r. r -&gt; c r) -&gt; Constr -&gt; c a)
+-&gt; (a -&gt; Constr)
+-&gt; (a -&gt; DataType)
+-&gt; (forall (t :: * -&gt; *) (c :: * -&gt; *).
+    Typeable t =&gt;
+    (forall d. Data d =&gt; c (t d)) -&gt; Maybe (c a))
+-&gt; (forall (t :: * -&gt; * -&gt; *) (c :: * -&gt; *).
+    Typeable t =&gt;
+    (forall d e. (Data d, Data e) =&gt; c (t d e)) -&gt; Maybe (c a))
+-&gt; ((forall b. Data b =&gt; b -&gt; b) -&gt; a -&gt; a)
+-&gt; (forall r r'.
+    (r -&gt; r' -&gt; r) -&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; a -&gt; r)
+-&gt; (forall r r'.
+    (r' -&gt; r -&gt; r) -&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; a -&gt; r)
+-&gt; (forall u. (forall d. Data d =&gt; d -&gt; u) -&gt; a -&gt; [u])
+-&gt; (forall u. Int -&gt; (forall d. Data d =&gt; d -&gt; u) -&gt; a -&gt; u)
+-&gt; (forall (m :: * -&gt; *).
+    Monad m =&gt;
+    (forall d. Data d =&gt; d -&gt; m d) -&gt; a -&gt; m a)
+-&gt; (forall (m :: * -&gt; *).
+    MonadPlus m =&gt;
+    (forall d. Data d =&gt; d -&gt; m d) -&gt; a -&gt; m a)
+-&gt; (forall (m :: * -&gt; *).
+    MonadPlus m =&gt;
+    (forall d. Data d =&gt; d -&gt; m d) -&gt; a -&gt; m a)
+-&gt; Data a
+forall u. Int -&gt; (forall d. Data d =&gt; d -&gt; u) -&gt; NamedPair -&gt; u
+forall u. (forall d. Data d =&gt; d -&gt; u) -&gt; NamedPair -&gt; [u]
+forall r r'.
+(r -&gt; r' -&gt; r)
+-&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; NamedPair -&gt; r
+forall r r'.
+(r' -&gt; r -&gt; r)
+-&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; NamedPair -&gt; r
+forall (m :: * -&gt; *).
+Monad m =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; NamedPair -&gt; m NamedPair
+forall (m :: * -&gt; *).
+MonadPlus m =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; NamedPair -&gt; m NamedPair
+forall (c :: * -&gt; *).
+(forall b r. Data b =&gt; c (b -&gt; r) -&gt; c r)
+-&gt; (forall r. r -&gt; c r) -&gt; Constr -&gt; c NamedPair
+forall (c :: * -&gt; *).
+(forall d b. Data d =&gt; c (d -&gt; b) -&gt; d -&gt; c b)
+-&gt; (forall g. g -&gt; c g) -&gt; NamedPair -&gt; c NamedPair
+forall (t :: * -&gt; *) (c :: * -&gt; *).
+Typeable t =&gt;
+(forall d. Data d =&gt; c (t d)) -&gt; Maybe (c NamedPair)
+forall (t :: * -&gt; * -&gt; *) (c :: * -&gt; *).
+Typeable t =&gt;
+(forall d e. (Data d, Data e) =&gt; c (t d e)) -&gt; Maybe (c NamedPair)
+$cgfoldl :: forall (c :: * -&gt; *).
+(forall d b. Data d =&gt; c (d -&gt; b) -&gt; d -&gt; c b)
+-&gt; (forall g. g -&gt; c g) -&gt; NamedPair -&gt; c NamedPair
+gfoldl :: forall (c :: * -&gt; *).
+(forall d b. Data d =&gt; c (d -&gt; b) -&gt; d -&gt; c b)
+-&gt; (forall g. g -&gt; c g) -&gt; NamedPair -&gt; c NamedPair
+$cgunfold :: forall (c :: * -&gt; *).
+(forall b r. Data b =&gt; c (b -&gt; r) -&gt; c r)
+-&gt; (forall r. r -&gt; c r) -&gt; Constr -&gt; c NamedPair
+gunfold :: forall (c :: * -&gt; *).
+(forall b r. Data b =&gt; c (b -&gt; r) -&gt; c r)
+-&gt; (forall r. r -&gt; c r) -&gt; Constr -&gt; c NamedPair
+$ctoConstr :: NamedPair -&gt; Constr
+toConstr :: NamedPair -&gt; Constr
+$cdataTypeOf :: NamedPair -&gt; DataType
+dataTypeOf :: NamedPair -&gt; DataType
+$cdataCast1 :: forall (t :: * -&gt; *) (c :: * -&gt; *).
+Typeable t =&gt;
+(forall d. Data d =&gt; c (t d)) -&gt; Maybe (c NamedPair)
+dataCast1 :: forall (t :: * -&gt; *) (c :: * -&gt; *).
+Typeable t =&gt;
+(forall d. Data d =&gt; c (t d)) -&gt; Maybe (c NamedPair)
+$cdataCast2 :: forall (t :: * -&gt; * -&gt; *) (c :: * -&gt; *).
+Typeable t =&gt;
+(forall d e. (Data d, Data e) =&gt; c (t d e)) -&gt; Maybe (c NamedPair)
+dataCast2 :: forall (t :: * -&gt; * -&gt; *) (c :: * -&gt; *).
+Typeable t =&gt;
+(forall d e. (Data d, Data e) =&gt; c (t d e)) -&gt; Maybe (c NamedPair)
+$cgmapT :: (forall b. Data b =&gt; b -&gt; b) -&gt; NamedPair -&gt; NamedPair
+gmapT :: (forall b. Data b =&gt; b -&gt; b) -&gt; NamedPair -&gt; NamedPair
+$cgmapQl :: forall r r'.
+(r -&gt; r' -&gt; r)
+-&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; NamedPair -&gt; r
+gmapQl :: forall r r'.
+(r -&gt; r' -&gt; r)
+-&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; NamedPair -&gt; r
+$cgmapQr :: forall r r'.
+(r' -&gt; r -&gt; r)
+-&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; NamedPair -&gt; r
+gmapQr :: forall r r'.
+(r' -&gt; r -&gt; r)
+-&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; NamedPair -&gt; r
+$cgmapQ :: forall u. (forall d. Data d =&gt; d -&gt; u) -&gt; NamedPair -&gt; [u]
+gmapQ :: forall u. (forall d. Data d =&gt; d -&gt; u) -&gt; NamedPair -&gt; [u]
+$cgmapQi :: forall u. Int -&gt; (forall d. Data d =&gt; d -&gt; u) -&gt; NamedPair -&gt; u
+gmapQi :: forall u. Int -&gt; (forall d. Data d =&gt; d -&gt; u) -&gt; NamedPair -&gt; u
+$cgmapM :: forall (m :: * -&gt; *).
+Monad m =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; NamedPair -&gt; m NamedPair
+gmapM :: forall (m :: * -&gt; *).
+Monad m =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; NamedPair -&gt; m NamedPair
+$cgmapMp :: forall (m :: * -&gt; *).
+MonadPlus m =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; NamedPair -&gt; m NamedPair
+gmapMp :: forall (m :: * -&gt; *).
+MonadPlus m =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; NamedPair -&gt; m NamedPair
+$cgmapMo :: forall (m :: * -&gt; *).
+MonadPlus m =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; NamedPair -&gt; m NamedPair
+gmapMo :: forall (m :: * -&gt; *).
+MonadPlus m =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; NamedPair -&gt; m NamedPair
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Data</span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-38"></span><span>  </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">anyclass</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621680385096"><span class="annot"><span class="annottext">NamedPair -&gt; ()
+(NamedPair -&gt; ()) -&gt; NFData NamedPair
+forall a. (a -&gt; ()) -&gt; NFData a
+$crnf :: NamedPair -&gt; ()
+rnf :: NamedPair -&gt; ()
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var">NFData</span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-39"></span><span>
+</span><span id="line-40"></span><span class="hs-comment">-- NamedPair used to be called 'S', hence the 'sp' function name</span><span>
+</span><span id="line-41"></span><span class="annot"><a href="M.NBT.Internal.P.html#sp"><span class="hs-identifier hs-type">sp</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="M.NBT.Internal.P.html#NamedPair"><span class="hs-identifier hs-type">NamedPair</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">Text</span></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="M.NBT.Internal.Types.html#Tg"><span class="hs-identifier hs-type">Tg</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-42"></span><span id="sp"><span class="annot"><span class="annottext">sp :: NamedPair -&gt; (Text, Tg)
+</span><a href="M.NBT.Internal.P.html#sp"><span class="hs-identifier hs-var hs-var">sp</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="M.NBT.Internal.P.html#NamedPair"><span class="hs-identifier hs-type">NamedPair</span></a></span><span> </span><span id="local-6989586621680385117"><span class="annot"><span class="annottext">Text
+</span><a href="#local-6989586621680385117"><span class="hs-identifier hs-var">t</span></a></span></span><span> </span><span id="local-6989586621680385118"><span class="annot"><span class="annottext">Tg
+</span><a href="#local-6989586621680385118"><span class="hs-identifier hs-var">p</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Text
+</span><a href="#local-6989586621680385117"><span class="hs-identifier hs-var">t</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Tg
+</span><a href="#local-6989586621680385118"><span class="hs-identifier hs-var">p</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-43"></span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="M.NBT.Internal.P.html#sp"><span class="hs-pragma hs-type">sp</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-44"></span><span>
+</span><span id="line-45"></span><span class="hs-keyword">instance</span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#Unpack"><span class="hs-identifier hs-type">Unpack</span></a></span><span> </span><span class="annot"><a href="M.NBT.Internal.P.html#NamedPair"><span class="hs-identifier hs-type">NamedPair</span></a></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-46"></span><span>  </span><span id="local-6989586621680385126"><span class="annot"><span class="annottext">unpack :: forall (st :: ZeroBitType) r. Parser st r NamedPair
+</span><a href="#local-6989586621680385126"><span class="hs-identifier hs-var hs-var hs-var">unpack</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Parser st r (Parser st r Tg)
+forall (st :: ZeroBitType) r. Parser st r (Parser st r Tg)
+</span><a href="M.NBT.Internal.P.html#tag"><span class="hs-identifier hs-var">tag</span></a></span><span> </span><span class="annot"><span class="annottext">Parser st r (Parser st r Tg)
+-&gt; (Parser st r Tg -&gt; ParserT st r ParseError NamedPair)
+-&gt; ParserT st r ParseError NamedPair
+forall a b.
+ParserT st r ParseError a
+-&gt; (a -&gt; ParserT st r ParseError b) -&gt; ParserT st r ParseError b
+forall (m :: * -&gt; *) a b. Monad m =&gt; m a -&gt; (a -&gt; m b) -&gt; m b
+</span><span class="hs-operator hs-var">&gt;&gt;=</span></span><span> </span><span class="annot"><span class="annottext">(Text -&gt; Tg -&gt; NamedPair)
+-&gt; ParserT st r ParseError Text
+-&gt; Parser st r Tg
+-&gt; ParserT st r ParseError NamedPair
+forall a b c.
+(a -&gt; b -&gt; c)
+-&gt; ParserT st r ParseError a
+-&gt; ParserT st r ParseError b
+-&gt; ParserT st r ParseError c
+forall (f :: * -&gt; *) a b c.
+Applicative f =&gt;
+(a -&gt; b -&gt; c) -&gt; f a -&gt; f b -&gt; f c
+</span><span class="hs-identifier hs-var">liftA2</span></span><span> </span><span class="annot"><span class="annottext">Text -&gt; Tg -&gt; NamedPair
+</span><a href="M.NBT.Internal.P.html#NamedPair"><span class="hs-identifier hs-var">NamedPair</span></a></span><span> </span><span class="annot"><span class="annottext">ParserT st r ParseError Text
+forall (st :: ZeroBitType) r. Parser st r Text
+</span><a href="M.NBT.Internal.P.html#string0"><span class="hs-identifier hs-var">string0</span></a></span><span>
+</span><span id="line-47"></span><span>  </span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#unpack"><span class="hs-pragma hs-type">unpack</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-48"></span><span>
+</span><span id="line-49"></span><span class="hs-keyword">instance</span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#Unpack"><span class="hs-identifier hs-type">Unpack</span></a></span><span> </span><span class="annot"><a href="M.NBT.Internal.Types.html#Tg"><span class="hs-identifier hs-type">Tg</span></a></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-50"></span><span>  </span><span id="local-6989586621680385134"><span class="annot"><span class="annottext">unpack :: forall (st :: ZeroBitType) r. Parser st r Tg
+</span><a href="M.Pack.Internal.Types.html#unpack"><span class="hs-identifier hs-var hs-var hs-var">unpack</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">ParserT st r ParseError (ParserT st r ParseError Tg)
+-&gt; ParserT st r ParseError Tg
+forall (m :: * -&gt; *) a. Monad m =&gt; m (m a) -&gt; m a
+</span><span class="hs-identifier hs-var">join</span></span><span> </span><span class="annot"><span class="annottext">ParserT st r ParseError (ParserT st r ParseError Tg)
+forall (st :: ZeroBitType) r. Parser st r (Parser st r Tg)
+</span><a href="M.NBT.Internal.P.html#tag"><span class="hs-identifier hs-var">tag</span></a></span><span>
+</span><span id="line-51"></span><span>  </span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#unpack"><span class="hs-pragma hs-type">unpack</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-52"></span><span>
+</span><span id="line-53"></span><span id="local-6989586621680384768"><span id="local-6989586621680384769"><span class="annot"><a href="M.NBT.Internal.P.html#tag"><span class="hs-identifier hs-type">tag</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#Parser"><span class="hs-identifier hs-type">Parser</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680384768"><span class="hs-identifier hs-type">st</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680384769"><span class="hs-identifier hs-type">r</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="M.Pack.Internal.Types.html#Parser"><span class="hs-identifier hs-type">Parser</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680384768"><span class="hs-identifier hs-type">st</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680384769"><span class="hs-identifier hs-type">r</span></a></span><span> </span><span class="annot"><a href="M.NBT.Internal.Types.html#Tg"><span class="hs-identifier hs-type">Tg</span></a></span><span class="hs-special">)</span></span></span><span>
+</span><span id="line-54"></span><span id="tag"><span class="annot"><span class="annottext">tag :: forall (st :: ZeroBitType) r. Parser st r (Parser st r Tg)
+</span><a href="M.NBT.Internal.P.html#tag"><span class="hs-identifier hs-var hs-var">tag</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-55"></span><span>  </span><span class="annot"><span class="annottext">forall a (st :: ZeroBitType) r. Unpack a =&gt; Parser st r a
+</span><a href="M.Pack.Internal.Types.html#unpack"><span class="hs-identifier hs-var">unpack</span></a></span><span> </span><span class="hs-glyph">@</span><span class="annot"><a href="M.NBT.Internal.Types.html#Ty"><span class="hs-identifier hs-type">Ty</span></a></span><span> </span><span class="annot"><span class="annottext">Parser st r Ty
+-&gt; (Ty -&gt; Parser st r Tg)
+-&gt; ParserT st r ParseError (Parser st r Tg)
+forall (f :: * -&gt; *) a b. Functor f =&gt; f a -&gt; (a -&gt; b) -&gt; f b
+</span><span class="hs-operator hs-var">&lt;&amp;&gt;</span></span><span> </span><span class="hs-glyph">\</span><span class="hs-glyph">case</span><span>
+</span><span id="line-56"></span><span>    </span><span class="annot"><span class="annottext">Ty
+</span><a href="M.NBT.Internal.Types.html#TEnd"><span class="hs-identifier hs-var">TEnd</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Tg -&gt; Parser st r Tg
+forall a. a -&gt; ParserT st r ParseError a
+forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><span class="hs-identifier hs-var">pure</span></span><span> </span><span class="annot"><span class="annottext">Tg
+</span><a href="M.NBT.Internal.Types.html#End"><span class="hs-identifier hs-var">End</span></a></span><span>
+</span><span id="line-57"></span><span>    </span><span class="annot"><span class="annottext">Ty
+</span><a href="M.NBT.Internal.Types.html#TByte"><span class="hs-identifier hs-var">TByte</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Int8 -&gt; Tg
+</span><a href="M.NBT.Internal.Types.html#Byte"><span class="hs-identifier hs-var">Byte</span></a></span><span> </span><span class="annot"><span class="annottext">(Int8 -&gt; Tg) -&gt; ParserT st r ParseError Int8 -&gt; Parser st r Tg
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-operator hs-var">&lt;$&gt;</span></span><span> </span><span class="annot"><span class="annottext">ParserT st r ParseError Int8
+forall (st :: ZeroBitType) r. Parser st r Int8
+forall a (st :: ZeroBitType) r. Unpack a =&gt; Parser st r a
+</span><a href="M.Pack.Internal.Types.html#unpack"><span class="hs-identifier hs-var">unpack</span></a></span><span>
+</span><span id="line-58"></span><span>    </span><span class="annot"><span class="annottext">Ty
+</span><a href="M.NBT.Internal.Types.html#TShort"><span class="hs-identifier hs-var">TShort</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Int16 -&gt; Tg
+</span><a href="M.NBT.Internal.Types.html#Short"><span class="hs-identifier hs-var">Short</span></a></span><span> </span><span class="annot"><span class="annottext">(Int16 -&gt; Tg) -&gt; ParserT st r ParseError Int16 -&gt; Parser st r Tg
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-operator hs-var">&lt;$&gt;</span></span><span> </span><span class="annot"><span class="annottext">ParserT st r ParseError Int16
+forall (st :: ZeroBitType) r. Parser st r Int16
+forall a (st :: ZeroBitType) r. Unpack a =&gt; Parser st r a
+</span><a href="M.Pack.Internal.Types.html#unpack"><span class="hs-identifier hs-var">unpack</span></a></span><span>
+</span><span id="line-59"></span><span>    </span><span class="annot"><span class="annottext">Ty
+</span><a href="M.NBT.Internal.Types.html#TInt"><span class="hs-identifier hs-var">TInt</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Int32 -&gt; Tg
+</span><a href="M.NBT.Internal.Types.html#Int"><span class="hs-identifier hs-var">Int</span></a></span><span> </span><span class="annot"><span class="annottext">(Int32 -&gt; Tg) -&gt; ParserT st r ParseError Int32 -&gt; Parser st r Tg
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-operator hs-var">&lt;$&gt;</span></span><span> </span><span class="annot"><span class="annottext">ParserT st r ParseError Int32
+forall (st :: ZeroBitType) r. Parser st r Int32
+forall a (st :: ZeroBitType) r. Unpack a =&gt; Parser st r a
+</span><a href="M.Pack.Internal.Types.html#unpack"><span class="hs-identifier hs-var">unpack</span></a></span><span>
+</span><span id="line-60"></span><span>    </span><span class="annot"><span class="annottext">Ty
+</span><a href="M.NBT.Internal.Types.html#TLong"><span class="hs-identifier hs-var">TLong</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Int64 -&gt; Tg
+</span><a href="M.NBT.Internal.Types.html#Long"><span class="hs-identifier hs-var">Long</span></a></span><span> </span><span class="annot"><span class="annottext">(Int64 -&gt; Tg) -&gt; ParserT st r ParseError Int64 -&gt; Parser st r Tg
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-operator hs-var">&lt;$&gt;</span></span><span> </span><span class="annot"><span class="annottext">ParserT st r ParseError Int64
+forall (st :: ZeroBitType) r. Parser st r Int64
+forall a (st :: ZeroBitType) r. Unpack a =&gt; Parser st r a
+</span><a href="M.Pack.Internal.Types.html#unpack"><span class="hs-identifier hs-var">unpack</span></a></span><span>
+</span><span id="line-61"></span><span>    </span><span class="annot"><span class="annottext">Ty
+</span><a href="M.NBT.Internal.Types.html#TFloat"><span class="hs-identifier hs-var">TFloat</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Float -&gt; Tg
+</span><a href="M.NBT.Internal.Types.html#Float"><span class="hs-identifier hs-var">Float</span></a></span><span> </span><span class="annot"><span class="annottext">(Float -&gt; Tg) -&gt; ParserT st r ParseError Float -&gt; Parser st r Tg
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-operator hs-var">&lt;$&gt;</span></span><span> </span><span class="annot"><span class="annottext">ParserT st r ParseError Float
+forall (st :: ZeroBitType) r. Parser st r Float
+forall a (st :: ZeroBitType) r. Unpack a =&gt; Parser st r a
+</span><a href="M.Pack.Internal.Types.html#unpack"><span class="hs-identifier hs-var">unpack</span></a></span><span>
+</span><span id="line-62"></span><span>    </span><span class="annot"><span class="annottext">Ty
+</span><a href="M.NBT.Internal.Types.html#TDouble"><span class="hs-identifier hs-var">TDouble</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Double -&gt; Tg
+</span><a href="M.NBT.Internal.Types.html#Double"><span class="hs-identifier hs-var">Double</span></a></span><span> </span><span class="annot"><span class="annottext">(Double -&gt; Tg) -&gt; ParserT st r ParseError Double -&gt; Parser st r Tg
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-operator hs-var">&lt;$&gt;</span></span><span> </span><span class="annot"><span class="annottext">ParserT st r ParseError Double
+forall (st :: ZeroBitType) r. Parser st r Double
+forall a (st :: ZeroBitType) r. Unpack a =&gt; Parser st r a
+</span><a href="M.Pack.Internal.Types.html#unpack"><span class="hs-identifier hs-var">unpack</span></a></span><span>
+</span><span id="line-63"></span><span>    </span><span class="annot"><span class="annottext">Ty
+</span><a href="M.NBT.Internal.Types.html#TByteArray"><span class="hs-identifier hs-var">TByteArray</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-64"></span><span>      </span><span class="annot"><span class="annottext">forall a b (st :: ZeroBitType) r.
+(Integral a, Unpack a, Integral b) =&gt;
+Parser st r b
+</span><a href="M.Pack.Internal.Num.html#unpackfi"><span class="hs-identifier hs-var">unpackfi</span></a></span><span> </span><span class="hs-glyph">@</span><span class="annot"><span class="hs-identifier hs-type">Int32</span></span><span>
+</span><span id="line-65"></span><span>        </span><span class="annot"><span class="annottext">Parser st r Int -&gt; (Int -&gt; Parser st r Int) -&gt; Parser st r Int
+forall a b.
+ParserT st r ParseError a
+-&gt; (a -&gt; ParserT st r ParseError b) -&gt; ParserT st r ParseError b
+forall (m :: * -&gt; *) a b. Monad m =&gt; m a -&gt; (a -&gt; m b) -&gt; m b
+</span><span class="hs-operator hs-var">&gt;&gt;=</span></span><span> </span><span class="annot"><span class="annottext">String -&gt; Int -&gt; Parser st r Int
+forall a (st :: ZeroBitType) r.
+(Num a, Ord a, Show a) =&gt;
+String -&gt; a -&gt; Parser st r a
+</span><a href="M.Pack.Internal.Num.html#guardnat"><span class="hs-identifier hs-var">guardnat</span></a></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;Tg.ByteArray length&quot;</span></span><span>
+</span><span id="line-66"></span><span>        </span><span class="annot"><span class="annottext">Parser st r Int -&gt; (Int -&gt; Parser st r Tg) -&gt; Parser st r Tg
+forall a b.
+ParserT st r ParseError a
+-&gt; (a -&gt; ParserT st r ParseError b) -&gt; ParserT st r ParseError b
+forall (m :: * -&gt; *) a b. Monad m =&gt; m a -&gt; (a -&gt; m b) -&gt; m b
+</span><span class="hs-operator hs-var">&gt;&gt;=</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">ByteString -&gt; Tg
+</span><a href="M.NBT.Internal.Types.html#ByteArray"><span class="hs-identifier hs-var">ByteArray</span></a></span><span> </span><span class="annot"><span class="annottext">(ByteString -&gt; Tg)
+-&gt; ParserT st r ParseError ByteString -&gt; Parser st r Tg
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-operator hs-var">&lt;$&gt;</span></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">(ParserT st r ParseError ByteString -&gt; Parser st r Tg)
+-&gt; (Int -&gt; ParserT st r ParseError ByteString)
+-&gt; Int
+-&gt; Parser st r Tg
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">Int -&gt; ParserT st r ParseError ByteString
+forall (st :: ZeroBitType) r e. Int -&gt; ParserT st r e ByteString
+</span><span class="hs-identifier hs-var">F.take</span></span><span>
+</span><span id="line-67"></span><span>    </span><span class="annot"><span class="annottext">Ty
+</span><a href="M.NBT.Internal.Types.html#TString"><span class="hs-identifier hs-var">TString</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Text -&gt; Tg
+</span><a href="M.NBT.Internal.Types.html#String"><span class="hs-identifier hs-var">String</span></a></span><span> </span><span class="annot"><span class="annottext">(Text -&gt; Tg) -&gt; ParserT st r ParseError Text -&gt; Parser st r Tg
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-operator hs-var">&lt;$&gt;</span></span><span> </span><span class="annot"><span class="annottext">ParserT st r ParseError Text
+forall (st :: ZeroBitType) r. Parser st r Text
+</span><a href="M.NBT.Internal.P.html#string0"><span class="hs-identifier hs-var">string0</span></a></span><span>
+</span><span id="line-68"></span><span>    </span><span class="annot"><span class="annottext">Ty
+</span><a href="M.NBT.Internal.Types.html#TList"><span class="hs-identifier hs-var">TList</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-69"></span><span>      </span><span id="local-6989586621680385229"><span class="annot"><a href="#local-6989586621680385229"><span class="hs-identifier hs-var">p</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">ParserT st r ParseError (Parser st r Tg)
+-&gt; ParserT st r ParseError (Parser st r Tg)
+forall (st :: ZeroBitType) r e a.
+ParserT st r e a -&gt; ParserT st r e a
+</span><span class="hs-identifier hs-var">F.lookahead</span></span><span> </span><span class="annot"><span class="annottext">ParserT st r ParseError (Parser st r Tg)
+forall (st :: ZeroBitType) r. Parser st r (Parser st r Tg)
+</span><a href="M.NBT.Internal.P.html#tag"><span class="hs-identifier hs-var">tag</span></a></span><span>
+</span><span id="line-70"></span><span>      </span><span id="local-6989586621680385231"><span class="annot"><a href="#local-6989586621680385231"><span class="hs-identifier hs-var">ty</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#unpack"><span class="hs-identifier hs-type">unpack</span></a></span><span> </span><span class="hs-glyph">@</span><span class="annot"><a href="M.NBT.Internal.Types.html#Ty"><span class="hs-identifier hs-type">Ty</span></a></span><span>
+</span><span id="line-71"></span><span>      </span><span id="local-6989586621680385232"><span class="annot"><a href="#local-6989586621680385232"><span class="hs-identifier hs-var">n</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><a href="M.Pack.Internal.Num.html#unpackfi"><span class="hs-identifier hs-type">unpackfi</span></a></span><span> </span><span class="hs-glyph">@</span><span class="annot"><span class="hs-identifier hs-type">Int32</span></span><span> </span><span class="annot"><span class="hs-operator hs-type">&gt;&gt;=</span></span><span> </span><span class="annot"><a href="M.Pack.Internal.Num.html#guardnat"><span class="hs-identifier hs-type">guardnat</span></a></span><span> </span><span class="annot"><span class="hs-string">&quot;Tg.List length&quot;</span></span><span>
+</span><span id="line-72"></span><span>      </span><span class="hs-keyword">if</span><span> </span><span class="annot"><a href="#local-6989586621680385231"><span class="hs-identifier hs-type">ty</span></a></span><span> </span><span class="annot"><span class="hs-operator hs-type">==</span></span><span> </span><span class="annot"><a href="M.NBT.Internal.Types.html#TEnd"><span class="hs-identifier hs-type">TEnd</span></a></span><span> </span><span class="annot"><span class="hs-operator hs-type">&amp;&amp;</span></span><span> </span><span class="annot"><a href="#local-6989586621680385232"><span class="hs-identifier hs-type">n</span></a></span><span> </span><span class="annot"><span class="hs-operator hs-type">/=</span></span><span> </span><span class="annot"><span class="hs-number">0</span></span><span>
+</span><span id="line-73"></span><span>        </span><span class="hs-keyword">then</span><span> </span><span class="annot"><span class="hs-identifier hs-type">F.err</span></span><span> </span><span class="annot"><span class="hs-string">&quot;only empty lists may have the end tag as element type&quot;</span></span><span>
+</span><span id="line-74"></span><span>        </span><span class="hs-keyword">else</span><span> </span><span class="annot"><a href="M.NBT.Internal.Types.html#List"><span class="hs-identifier hs-type">List</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680385231"><span class="hs-identifier hs-type">ty</span></a></span><span> </span><span class="annot"><span class="hs-operator hs-type">&lt;$&gt;</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">V.replicateM</span></span><span> </span><span class="annot"><a href="#local-6989586621680385232"><span class="hs-identifier hs-type">n</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680385229"><span class="hs-identifier hs-type">p</span></a></span><span>
+</span><span id="line-75"></span><span>    </span><span class="annot"><span class="annottext">Ty
+</span><a href="M.NBT.Internal.Types.html#TCompound"><span class="hs-identifier hs-var">TCompound</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">HashMap Text Tg -&gt; Tg
+</span><a href="M.NBT.Internal.Types.html#Compound"><span class="hs-identifier hs-var">Compound</span></a></span><span> </span><span class="annot"><span class="annottext">(HashMap Text Tg -&gt; Tg)
+-&gt; ([(Text, Tg)] -&gt; HashMap Text Tg) -&gt; [(Text, Tg)] -&gt; Tg
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">[(Text, Tg)] -&gt; HashMap Text Tg
+forall k v. (Eq k, Hashable k) =&gt; [(k, v)] -&gt; HashMap k v
+</span><span class="hs-identifier hs-var">M.fromList</span></span><span> </span><span class="annot"><span class="annottext">([(Text, Tg)] -&gt; Tg)
+-&gt; ParserT st r ParseError [(Text, Tg)] -&gt; Parser st r Tg
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-operator hs-var">&lt;$&gt;</span></span><span> </span><span class="annot"><span class="annottext">ParserT st r ParseError (Text, Tg)
+-&gt; ParserT st r ParseError ()
+-&gt; ParserT st r ParseError [(Text, Tg)]
+forall (m :: * -&gt; *) a end. Alternative m =&gt; m a -&gt; m end -&gt; m [a]
+</span><span class="hs-identifier hs-var">manyTill</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">NamedPair -&gt; (Text, Tg)
+</span><a href="M.NBT.Internal.P.html#sp"><span class="hs-identifier hs-var">sp</span></a></span><span> </span><span class="annot"><span class="annottext">(NamedPair -&gt; (Text, Tg))
+-&gt; ParserT st r ParseError NamedPair
+-&gt; ParserT st r ParseError (Text, Tg)
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-operator hs-var">&lt;$&gt;</span></span><span> </span><span class="annot"><span class="annottext">ParserT st r ParseError NamedPair
+forall (st :: ZeroBitType) r. Parser st r NamedPair
+forall a (st :: ZeroBitType) r. Unpack a =&gt; Parser st r a
+</span><a href="M.Pack.Internal.Types.html#unpack"><span class="hs-identifier hs-var">unpack</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">ParserT st r ParseError ()
+forall {st :: ZeroBitType} {r}. ParserT st r ParseError ()
+</span><a href="#local-6989586621680385242"><span class="hs-identifier hs-var">end</span></a></span><span>
+</span><span id="line-76"></span><span>      </span><span class="hs-keyword">where</span><span>
+</span><span id="line-77"></span><span>        </span><span id="local-6989586621680385242"><span class="annot"><span class="annottext">end :: ParserT st r ParseError ()
+</span><a href="#local-6989586621680385242"><span class="hs-identifier hs-var hs-var">end</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall a (st :: ZeroBitType) r. Unpack a =&gt; Parser st r a
+</span><a href="M.Pack.Internal.Types.html#unpack"><span class="hs-identifier hs-var">unpack</span></a></span><span> </span><span class="hs-glyph">@</span><span class="annot"><a href="M.NBT.Internal.Types.html#Ty"><span class="hs-identifier hs-type">Ty</span></a></span><span> </span><span class="annot"><span class="annottext">Parser st r Ty
+-&gt; (Ty -&gt; ParserT st r ParseError ()) -&gt; ParserT st r ParseError ()
+forall a b.
+ParserT st r ParseError a
+-&gt; (a -&gt; ParserT st r ParseError b) -&gt; ParserT st r ParseError b
+forall (m :: * -&gt; *) a b. Monad m =&gt; m a -&gt; (a -&gt; m b) -&gt; m b
+</span><span class="hs-operator hs-var">&gt;&gt;=</span></span><span> </span><span class="annot"><span class="annottext">Bool -&gt; ParserT st r ParseError ()
+forall (f :: * -&gt; *). Alternative f =&gt; Bool -&gt; f ()
+</span><span class="hs-identifier hs-var">guard</span></span><span> </span><span class="annot"><span class="annottext">(Bool -&gt; ParserT st r ParseError ())
+-&gt; (Ty -&gt; Bool) -&gt; Ty -&gt; ParserT st r ParseError ()
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Ty -&gt; Ty -&gt; Bool
+forall a. Eq a =&gt; a -&gt; a -&gt; Bool
+</span><span class="hs-operator hs-var">==</span></span><span> </span><span class="annot"><span class="annottext">Ty
+</span><a href="M.NBT.Internal.Types.html#TEnd"><span class="hs-identifier hs-var">TEnd</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-78"></span><span>        </span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="#local-6989586621680385242"><span class="hs-pragma hs-type">end</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-79"></span><span>    </span><span class="annot"><span class="annottext">Ty
+</span><a href="M.NBT.Internal.Types.html#TIntArray"><span class="hs-identifier hs-var">TIntArray</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Vector Int32 -&gt; Tg
+</span><a href="M.NBT.Internal.Types.html#IntArray"><span class="hs-identifier hs-var">IntArray</span></a></span><span> </span><span class="annot"><span class="annottext">(Vector Int32 -&gt; Tg)
+-&gt; ParserT st r ParseError (Vector Int32) -&gt; Parser st r Tg
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-operator hs-var">&lt;$&gt;</span></span><span> </span><span class="annot"><span class="annottext">String
+-&gt; ParserT st r ParseError Int32
+-&gt; ParserT st r ParseError (Vector Int32)
+forall a (st :: ZeroBitType) r.
+Unbox a =&gt;
+String -&gt; Parser st r a -&gt; Parser st r (Vector a)
+</span><a href="M.NBT.Internal.P.html#arr0"><span class="hs-identifier hs-var">arr0</span></a></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;Tg.IntArray length&quot;</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">forall a (st :: ZeroBitType) r. Unpack a =&gt; Parser st r a
+</span><a href="M.Pack.Internal.Types.html#unpack"><span class="hs-identifier hs-var">unpack</span></a></span><span> </span><span class="hs-glyph">@</span><span class="annot"><span class="hs-identifier hs-type">Int32</span></span><span class="hs-special">)</span><span>
+</span><span id="line-80"></span><span>    </span><span class="annot"><span class="annottext">Ty
+</span><a href="M.NBT.Internal.Types.html#TLongArray"><span class="hs-identifier hs-var">TLongArray</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Vector Int64 -&gt; Tg
+</span><a href="M.NBT.Internal.Types.html#LongArray"><span class="hs-identifier hs-var">LongArray</span></a></span><span> </span><span class="annot"><span class="annottext">(Vector Int64 -&gt; Tg)
+-&gt; ParserT st r ParseError (Vector Int64) -&gt; Parser st r Tg
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-operator hs-var">&lt;$&gt;</span></span><span> </span><span class="annot"><span class="annottext">String
+-&gt; ParserT st r ParseError Int64
+-&gt; ParserT st r ParseError (Vector Int64)
+forall a (st :: ZeroBitType) r.
+Unbox a =&gt;
+String -&gt; Parser st r a -&gt; Parser st r (Vector a)
+</span><a href="M.NBT.Internal.P.html#arr0"><span class="hs-identifier hs-var">arr0</span></a></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;Tg.LongArray length&quot;</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">forall a (st :: ZeroBitType) r. Unpack a =&gt; Parser st r a
+</span><a href="M.Pack.Internal.Types.html#unpack"><span class="hs-identifier hs-var">unpack</span></a></span><span> </span><span class="hs-glyph">@</span><span class="annot"><span class="hs-identifier hs-type">Int64</span></span><span class="hs-special">)</span><span>
+</span><span id="line-81"></span><span>
+</span><span id="line-82"></span><span id="local-6989586621680384837"><span id="local-6989586621680384838"><span id="local-6989586621680384839"><span class="annot"><a href="M.NBT.Internal.P.html#arr0"><span class="hs-identifier hs-type">arr0</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">VU.Unbox</span></span><span> </span><span class="annot"><a href="#local-6989586621680384837"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">String</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#Parser"><span class="hs-identifier hs-type">Parser</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680384838"><span class="hs-identifier hs-type">st</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680384839"><span class="hs-identifier hs-type">r</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680384837"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#Parser"><span class="hs-identifier hs-type">Parser</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680384838"><span class="hs-identifier hs-type">st</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680384839"><span class="hs-identifier hs-type">r</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">VU.Vector</span></span><span> </span><span class="annot"><a href="#local-6989586621680384837"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span></span></span></span><span>
+</span><span id="line-83"></span><span id="arr0"><span class="annot"><span class="annottext">arr0 :: forall a (st :: ZeroBitType) r.
+Unbox a =&gt;
+String -&gt; Parser st r a -&gt; Parser st r (Vector a)
+</span><a href="M.NBT.Internal.P.html#arr0"><span class="hs-identifier hs-var hs-var">arr0</span></a></span></span><span> </span><span id="local-6989586621680385263"><span class="annot"><span class="annottext">String
+</span><a href="#local-6989586621680385263"><span class="hs-identifier hs-var">n</span></a></span></span><span> </span><span id="local-6989586621680385264"><span class="annot"><span class="annottext">Parser st r a
+</span><a href="#local-6989586621680385264"><span class="hs-identifier hs-var">p</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall a b (st :: ZeroBitType) r.
+(Integral a, Unpack a, Integral b) =&gt;
+Parser st r b
+</span><a href="M.Pack.Internal.Num.html#unpackfi"><span class="hs-identifier hs-var">unpackfi</span></a></span><span> </span><span class="hs-glyph">@</span><span class="annot"><span class="hs-identifier hs-type">Int32</span></span><span> </span><span class="annot"><span class="annottext">Parser st r Int -&gt; (Int -&gt; Parser st r Int) -&gt; Parser st r Int
+forall a b.
+ParserT st r ParseError a
+-&gt; (a -&gt; ParserT st r ParseError b) -&gt; ParserT st r ParseError b
+forall (m :: * -&gt; *) a b. Monad m =&gt; m a -&gt; (a -&gt; m b) -&gt; m b
+</span><span class="hs-operator hs-var">&gt;&gt;=</span></span><span> </span><span class="annot"><span class="annottext">String -&gt; Int -&gt; Parser st r Int
+forall a (st :: ZeroBitType) r.
+(Num a, Ord a, Show a) =&gt;
+String -&gt; a -&gt; Parser st r a
+</span><a href="M.Pack.Internal.Num.html#guardnat"><span class="hs-identifier hs-var">guardnat</span></a></span><span> </span><span class="annot"><span class="annottext">String
+</span><a href="#local-6989586621680385263"><span class="hs-identifier hs-var">n</span></a></span><span> </span><span class="annot"><span class="annottext">Parser st r Int
+-&gt; (Int -&gt; ParserT st r ParseError (Vector a))
+-&gt; ParserT st r ParseError (Vector a)
+forall a b.
+ParserT st r ParseError a
+-&gt; (a -&gt; ParserT st r ParseError b) -&gt; ParserT st r ParseError b
+forall (m :: * -&gt; *) a b. Monad m =&gt; m a -&gt; (a -&gt; m b) -&gt; m b
+</span><span class="hs-operator hs-var">&gt;&gt;=</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int -&gt; Parser st r a -&gt; ParserT st r ParseError (Vector a)
+forall (m :: * -&gt; *) a.
+(Monad m, Unbox a) =&gt;
+Int -&gt; m a -&gt; m (Vector a)
+</span><span class="hs-operator hs-var">`VU.replicateM`</span></span><span> </span><span class="annot"><span class="annottext">Parser st r a
+</span><a href="#local-6989586621680385264"><span class="hs-identifier hs-var">p</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-84"></span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="M.NBT.Internal.P.html#arr0"><span class="hs-pragma hs-type">arr0</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-85"></span><span>
+</span><span id="line-86"></span><span id="local-6989586621680384777"><span id="local-6989586621680384778"><span class="annot"><a href="M.NBT.Internal.P.html#string0"><span class="hs-identifier hs-type">string0</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#Parser"><span class="hs-identifier hs-type">Parser</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680384777"><span class="hs-identifier hs-type">st</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680384778"><span class="hs-identifier hs-type">r</span></a></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Text</span></span></span></span><span>
+</span><span id="line-87"></span><span id="string0"><span class="annot"><span class="annottext">string0 :: forall (st :: ZeroBitType) r. Parser st r Text
+</span><a href="M.NBT.Internal.P.html#string0"><span class="hs-identifier hs-var hs-var">string0</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-88"></span><span>  </span><span class="annot"><span class="annottext">forall a b (st :: ZeroBitType) r.
+(Integral a, Unpack a, Integral b) =&gt;
+Parser st r b
+</span><a href="M.Pack.Internal.Num.html#unpackfi"><span class="hs-identifier hs-var">unpackfi</span></a></span><span> </span><span class="hs-glyph">@</span><span class="annot"><span class="hs-identifier hs-type">Int16</span></span><span>
+</span><span id="line-89"></span><span>    </span><span class="annot"><span class="annottext">Parser st r Int -&gt; (Int -&gt; Parser st r Int) -&gt; Parser st r Int
+forall a b.
+ParserT st r ParseError a
+-&gt; (a -&gt; ParserT st r ParseError b) -&gt; ParserT st r ParseError b
+forall (m :: * -&gt; *) a b. Monad m =&gt; m a -&gt; (a -&gt; m b) -&gt; m b
+</span><span class="hs-operator hs-var">&gt;&gt;=</span></span><span> </span><span class="annot"><span class="annottext">String -&gt; Int -&gt; Parser st r Int
+forall a (st :: ZeroBitType) r.
+(Num a, Ord a, Show a) =&gt;
+String -&gt; a -&gt; Parser st r a
+</span><a href="M.Pack.Internal.Num.html#guardnat"><span class="hs-identifier hs-var">guardnat</span></a></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;Tg.String length&quot;</span></span><span>
+</span><span id="line-90"></span><span>    </span><span class="annot"><span class="annottext">Parser st r Int
+-&gt; (Int -&gt; ParserT st r ParseError Text)
+-&gt; ParserT st r ParseError Text
+forall a b.
+ParserT st r ParseError a
+-&gt; (a -&gt; ParserT st r ParseError b) -&gt; ParserT st r ParseError b
+forall (m :: * -&gt; *) a b. Monad m =&gt; m a -&gt; (a -&gt; m b) -&gt; m b
+</span><span class="hs-operator hs-var">&gt;&gt;=</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">JS -&gt; Text
+</span><a href="M.NBT.Internal.JS.html#getjs"><span class="hs-identifier hs-var">getjs</span></a></span><span> </span><span class="annot"><span class="annottext">(JS -&gt; Text)
+-&gt; ParserT st r ParseError JS -&gt; ParserT st r ParseError Text
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-operator hs-var">&lt;$&gt;</span></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">(ParserT st r ParseError JS -&gt; ParserT st r ParseError Text)
+-&gt; (Int -&gt; ParserT st r ParseError JS)
+-&gt; Int
+-&gt; ParserT st r ParseError Text
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int -&gt; ParserT st r ParseError JS -&gt; ParserT st r ParseError JS
+forall (st :: ZeroBitType) r e a.
+Int -&gt; ParserT st r e a -&gt; ParserT st r e a
+</span><span class="hs-operator hs-var">`F.isolate`</span></span><span> </span><span class="annot"><span class="annottext">ParserT st r ParseError JS
+forall (st :: ZeroBitType) r. Parser st r JS
+</span><a href="M.NBT.Internal.JS.html#fromcesu8p"><span class="hs-identifier hs-var">fromcesu8p</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-91"></span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="M.NBT.Internal.P.html#string0"><span class="hs-pragma hs-type">string0</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-92"></span><span>
+</span><span id="line-93"></span><span class="hs-comment">-- pack</span><span>
+</span><span id="line-94"></span><span>
+</span><span id="line-95"></span><span class="hs-keyword">instance</span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#Pack"><span class="hs-identifier hs-type">Pack</span></a></span><span> </span><span class="annot"><a href="M.NBT.Internal.P.html#NamedPair"><span class="hs-identifier hs-type">NamedPair</span></a></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-96"></span><span>  </span><span id="local-6989586621680385283"><span class="annot"><span class="annottext">pack :: NamedPair -&gt; Builder
+</span><a href="#local-6989586621680385283"><span class="hs-identifier hs-var hs-var hs-var">pack</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="M.NBT.Internal.P.html#NamedPair"><span class="hs-identifier hs-type">NamedPair</span></a></span><span> </span><span id="local-6989586621680385285"><span class="annot"><span class="annottext">Text
+</span><a href="#local-6989586621680385285"><span class="hs-identifier hs-var">t</span></a></span></span><span> </span><span id="local-6989586621680385286"><span class="annot"><span class="annottext">Tg
+</span><a href="#local-6989586621680385286"><span class="hs-identifier hs-var">p</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Ty -&gt; Builder
+forall a. Pack a =&gt; a -&gt; Builder
+</span><a href="M.Pack.Internal.Types.html#pack"><span class="hs-identifier hs-var">pack</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Tg -&gt; Ty
+</span><a href="M.NBT.Internal.Types.html#getty"><span class="hs-identifier hs-var">getty</span></a></span><span> </span><span class="annot"><span class="annottext">Tg
+</span><a href="#local-6989586621680385286"><span class="hs-identifier hs-var">p</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Builder -&gt; Builder -&gt; Builder
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">&lt;&gt;</span></span><span> </span><span class="annot"><span class="annottext">Text -&gt; Builder
+</span><a href="M.NBT.Internal.P.html#spack"><span class="hs-identifier hs-var">spack</span></a></span><span> </span><span class="annot"><span class="annottext">Text
+</span><a href="#local-6989586621680385285"><span class="hs-identifier hs-var">t</span></a></span><span> </span><span class="annot"><span class="annottext">Builder -&gt; Builder -&gt; Builder
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">&lt;&gt;</span></span><span> </span><span class="annot"><span class="annottext">Tg -&gt; Builder
+</span><a href="M.NBT.Internal.P.html#bodypack"><span class="hs-identifier hs-var">bodypack</span></a></span><span> </span><span class="annot"><span class="annottext">Tg
+</span><a href="#local-6989586621680385286"><span class="hs-identifier hs-var">p</span></a></span><span>
+</span><span id="line-97"></span><span>  </span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#pack"><span class="hs-pragma hs-type">pack</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-98"></span><span>
+</span><span id="line-99"></span><span class="annot"><a href="M.NBT.Internal.P.html#spack"><span class="hs-identifier hs-type">spack</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Text</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Builder</span></span><span>
+</span><span id="line-100"></span><span id="spack"><span class="annot"><span class="annottext">spack :: Text -&gt; Builder
+</span><a href="M.NBT.Internal.P.html#spack"><span class="hs-identifier hs-var hs-var">spack</span></a></span></span><span> </span><span id="local-6989586621680385290"><span class="annot"><span class="annottext">Text
+</span><a href="#local-6989586621680385290"><span class="hs-identifier hs-var">s</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-101"></span><span>  </span><span class="hs-keyword">let</span><span> </span><span id="local-6989586621680385291"><span class="annot"><span class="annottext">c :: ByteString
+</span><a href="#local-6989586621680385291"><span class="hs-identifier hs-var hs-var">c</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">JS -&gt; ByteString
+</span><a href="M.NBT.Internal.JS.html#tocesu8"><span class="hs-identifier hs-var">tocesu8</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Text -&gt; JS
+</span><a href="M.NBT.Internal.JS.html#JS"><span class="hs-identifier hs-var">JS</span></a></span><span> </span><span class="annot"><span class="annottext">Text
+</span><a href="#local-6989586621680385290"><span class="hs-identifier hs-var">s</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-102"></span><span>   </span><span class="hs-keyword">in</span><span> </span><span class="annot"><span class="annottext">forall a b. (Integral a, Pack a, Integral b) =&gt; b -&gt; Builder
+</span><a href="M.Pack.Internal.Num.html#packfi"><span class="hs-identifier hs-var">packfi</span></a></span><span> </span><span class="hs-glyph">@</span><span class="annot"><span class="hs-identifier hs-type">Int16</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">ByteString -&gt; Int
+</span><span class="hs-identifier hs-var">B.length</span></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621680385291"><span class="hs-identifier hs-var">c</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Builder -&gt; Builder -&gt; Builder
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">&lt;&gt;</span></span><span> </span><span class="annot"><span class="annottext">ByteString -&gt; Builder
+</span><span class="hs-identifier hs-var">byteString</span></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621680385291"><span class="hs-identifier hs-var">c</span></a></span><span>
+</span><span id="line-103"></span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="M.NBT.Internal.P.html#spack"><span class="hs-pragma hs-type">spack</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-104"></span><span>
+</span><span id="line-105"></span><span class="hs-keyword">instance</span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#Pack"><span class="hs-identifier hs-type">Pack</span></a></span><span> </span><span class="annot"><a href="M.NBT.Internal.Types.html#Tg"><span class="hs-identifier hs-type">Tg</span></a></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-106"></span><span>  </span><span id="local-6989586621680385300"><span class="annot"><span class="annottext">pack :: Tg -&gt; Builder
+</span><a href="M.Pack.Internal.Types.html#pack"><span class="hs-identifier hs-var hs-var hs-var">pack</span></a></span></span><span> </span><span id="local-6989586621680385301"><span class="annot"><span class="annottext">Tg
+</span><a href="#local-6989586621680385301"><span class="hs-identifier hs-var">t</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Ty -&gt; Builder
+forall a. Pack a =&gt; a -&gt; Builder
+</span><a href="M.Pack.Internal.Types.html#pack"><span class="hs-identifier hs-var">pack</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Tg -&gt; Ty
+</span><a href="M.NBT.Internal.Types.html#getty"><span class="hs-identifier hs-var">getty</span></a></span><span> </span><span class="annot"><span class="annottext">Tg
+</span><a href="#local-6989586621680385301"><span class="hs-identifier hs-var">t</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Builder -&gt; Builder -&gt; Builder
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">&lt;&gt;</span></span><span> </span><span class="annot"><span class="annottext">Tg -&gt; Builder
+</span><a href="M.NBT.Internal.P.html#bodypack"><span class="hs-identifier hs-var">bodypack</span></a></span><span> </span><span class="annot"><span class="annottext">Tg
+</span><a href="#local-6989586621680385301"><span class="hs-identifier hs-var">t</span></a></span><span>
+</span><span id="line-107"></span><span>  </span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#pack"><span class="hs-pragma hs-type">pack</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-108"></span><span>
+</span><span id="line-109"></span><span class="annot"><a href="M.NBT.Internal.P.html#bodypack"><span class="hs-identifier hs-type">bodypack</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="M.NBT.Internal.Types.html#Tg"><span class="hs-identifier hs-type">Tg</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Builder</span></span><span>
+</span><span id="line-110"></span><span id="bodypack"><span class="annot"><span class="annottext">bodypack :: Tg -&gt; Builder
+</span><a href="M.NBT.Internal.P.html#bodypack"><span class="hs-identifier hs-var hs-var">bodypack</span></a></span></span><span> </span><span class="annot"><span class="annottext">Tg
+</span><a href="M.NBT.Internal.Types.html#End"><span class="hs-identifier hs-var">End</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Builder
+forall a. Monoid a =&gt; a
+</span><span class="hs-identifier hs-var">mempty</span></span><span>
+</span><span id="line-111"></span><span class="annot"><a href="M.NBT.Internal.P.html#bodypack"><span class="hs-identifier hs-var">bodypack</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="M.NBT.Internal.Types.html#Byte"><span class="hs-identifier hs-type">Byte</span></a></span><span> </span><span id="local-6989586621680385302"><span class="annot"><span class="annottext">Int8
+</span><a href="#local-6989586621680385302"><span class="hs-identifier hs-var">p</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int8 -&gt; Builder
+forall a. Pack a =&gt; a -&gt; Builder
+</span><a href="M.Pack.Internal.Types.html#pack"><span class="hs-identifier hs-var">pack</span></a></span><span> </span><span class="annot"><span class="annottext">Int8
+</span><a href="#local-6989586621680385302"><span class="hs-identifier hs-var">p</span></a></span><span>
+</span><span id="line-112"></span><span class="annot"><a href="M.NBT.Internal.P.html#bodypack"><span class="hs-identifier hs-var">bodypack</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="M.NBT.Internal.Types.html#Short"><span class="hs-identifier hs-type">Short</span></a></span><span> </span><span id="local-6989586621680385303"><span class="annot"><span class="annottext">Int16
+</span><a href="#local-6989586621680385303"><span class="hs-identifier hs-var">p</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int16 -&gt; Builder
+forall a. Pack a =&gt; a -&gt; Builder
+</span><a href="M.Pack.Internal.Types.html#pack"><span class="hs-identifier hs-var">pack</span></a></span><span> </span><span class="annot"><span class="annottext">Int16
+</span><a href="#local-6989586621680385303"><span class="hs-identifier hs-var">p</span></a></span><span>
+</span><span id="line-113"></span><span class="annot"><a href="M.NBT.Internal.P.html#bodypack"><span class="hs-identifier hs-var">bodypack</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="M.NBT.Internal.Types.html#Int"><span class="hs-identifier hs-type">Int</span></a></span><span> </span><span id="local-6989586621680385304"><span class="annot"><span class="annottext">Int32
+</span><a href="#local-6989586621680385304"><span class="hs-identifier hs-var">p</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int32 -&gt; Builder
+forall a. Pack a =&gt; a -&gt; Builder
+</span><a href="M.Pack.Internal.Types.html#pack"><span class="hs-identifier hs-var">pack</span></a></span><span> </span><span class="annot"><span class="annottext">Int32
+</span><a href="#local-6989586621680385304"><span class="hs-identifier hs-var">p</span></a></span><span>
+</span><span id="line-114"></span><span class="annot"><a href="M.NBT.Internal.P.html#bodypack"><span class="hs-identifier hs-var">bodypack</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="M.NBT.Internal.Types.html#Long"><span class="hs-identifier hs-type">Long</span></a></span><span> </span><span id="local-6989586621680385305"><span class="annot"><span class="annottext">Int64
+</span><a href="#local-6989586621680385305"><span class="hs-identifier hs-var">p</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int64 -&gt; Builder
+forall a. Pack a =&gt; a -&gt; Builder
+</span><a href="M.Pack.Internal.Types.html#pack"><span class="hs-identifier hs-var">pack</span></a></span><span> </span><span class="annot"><span class="annottext">Int64
+</span><a href="#local-6989586621680385305"><span class="hs-identifier hs-var">p</span></a></span><span>
+</span><span id="line-115"></span><span class="annot"><a href="M.NBT.Internal.P.html#bodypack"><span class="hs-identifier hs-var">bodypack</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="M.NBT.Internal.Types.html#Float"><span class="hs-identifier hs-type">Float</span></a></span><span> </span><span id="local-6989586621680385306"><span class="annot"><span class="annottext">Float
+</span><a href="#local-6989586621680385306"><span class="hs-identifier hs-var">p</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Float -&gt; Builder
+forall a. Pack a =&gt; a -&gt; Builder
+</span><a href="M.Pack.Internal.Types.html#pack"><span class="hs-identifier hs-var">pack</span></a></span><span> </span><span class="annot"><span class="annottext">Float
+</span><a href="#local-6989586621680385306"><span class="hs-identifier hs-var">p</span></a></span><span>
+</span><span id="line-116"></span><span class="annot"><a href="M.NBT.Internal.P.html#bodypack"><span class="hs-identifier hs-var">bodypack</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="M.NBT.Internal.Types.html#Double"><span class="hs-identifier hs-type">Double</span></a></span><span> </span><span id="local-6989586621680385307"><span class="annot"><span class="annottext">Double
+</span><a href="#local-6989586621680385307"><span class="hs-identifier hs-var">p</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Double -&gt; Builder
+forall a. Pack a =&gt; a -&gt; Builder
+</span><a href="M.Pack.Internal.Types.html#pack"><span class="hs-identifier hs-var">pack</span></a></span><span> </span><span class="annot"><span class="annottext">Double
+</span><a href="#local-6989586621680385307"><span class="hs-identifier hs-var">p</span></a></span><span>
+</span><span id="line-117"></span><span class="annot"><a href="M.NBT.Internal.P.html#bodypack"><span class="hs-identifier hs-var">bodypack</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="M.NBT.Internal.Types.html#ByteArray"><span class="hs-identifier hs-type">ByteArray</span></a></span><span> </span><span id="local-6989586621680385308"><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621680385308"><span class="hs-identifier hs-var">p</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall a b. (Integral a, Pack a, Integral b) =&gt; b -&gt; Builder
+</span><a href="M.Pack.Internal.Num.html#packfi"><span class="hs-identifier hs-var">packfi</span></a></span><span> </span><span class="hs-glyph">@</span><span class="annot"><span class="hs-identifier hs-type">Int32</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">ByteString -&gt; Int
+</span><span class="hs-identifier hs-var">B.length</span></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621680385308"><span class="hs-identifier hs-var">p</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Builder -&gt; Builder -&gt; Builder
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">&lt;&gt;</span></span><span> </span><span class="annot"><span class="annottext">ByteString -&gt; Builder
+</span><span class="hs-identifier hs-var">byteString</span></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><a href="#local-6989586621680385308"><span class="hs-identifier hs-var">p</span></a></span><span>
+</span><span id="line-118"></span><span class="annot"><a href="M.NBT.Internal.P.html#bodypack"><span class="hs-identifier hs-var">bodypack</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="M.NBT.Internal.Types.html#String"><span class="hs-identifier hs-type">String</span></a></span><span> </span><span id="local-6989586621680385309"><span class="annot"><span class="annottext">Text
+</span><a href="#local-6989586621680385309"><span class="hs-identifier hs-var">p</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Text -&gt; Builder
+</span><a href="M.NBT.Internal.P.html#spack"><span class="hs-identifier hs-var">spack</span></a></span><span> </span><span class="annot"><span class="annottext">Text
+</span><a href="#local-6989586621680385309"><span class="hs-identifier hs-var">p</span></a></span><span>
+</span><span id="line-119"></span><span class="annot"><a href="M.NBT.Internal.P.html#bodypack"><span class="hs-identifier hs-var">bodypack</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="M.NBT.Internal.Types.html#List"><span class="hs-identifier hs-type">List</span></a></span><span> </span><span id="local-6989586621680385310"><span class="annot"><span class="annottext">Ty
+</span><a href="#local-6989586621680385310"><span class="hs-identifier hs-var">t</span></a></span></span><span> </span><span id="local-6989586621680385311"><span class="annot"><span class="annottext">Vector Tg
+</span><a href="#local-6989586621680385311"><span class="hs-identifier hs-var">p</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-120"></span><span>  </span><span class="annot"><span class="annottext">Ty -&gt; Builder
+forall a. Pack a =&gt; a -&gt; Builder
+</span><a href="M.Pack.Internal.Types.html#pack"><span class="hs-identifier hs-var">pack</span></a></span><span> </span><span class="annot"><span class="annottext">Ty
+</span><a href="#local-6989586621680385310"><span class="hs-identifier hs-var">t</span></a></span><span>
+</span><span id="line-121"></span><span>    </span><span class="annot"><span class="annottext">Builder -&gt; Builder -&gt; Builder
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">&lt;&gt;</span></span><span> </span><span class="annot"><span class="annottext">forall a b. (Integral a, Pack a, Integral b) =&gt; b -&gt; Builder
+</span><a href="M.Pack.Internal.Num.html#packfi"><span class="hs-identifier hs-var">packfi</span></a></span><span> </span><span class="hs-glyph">@</span><span class="annot"><span class="hs-identifier hs-type">Int32</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Vector Tg -&gt; Int
+forall a. Vector a -&gt; Int
+</span><span class="hs-identifier hs-var">V.length</span></span><span> </span><span class="annot"><span class="annottext">Vector Tg
+</span><a href="#local-6989586621680385311"><span class="hs-identifier hs-var">p</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-122"></span><span>    </span><span class="annot"><span class="annottext">Builder -&gt; Builder -&gt; Builder
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">&lt;&gt;</span></span><span> </span><span class="annot"><span class="annottext">(Tg -&gt; Builder) -&gt; Vector Tg -&gt; Builder
+forall m a. Monoid m =&gt; (a -&gt; m) -&gt; Vector a -&gt; m
+</span><span class="hs-identifier hs-var">V.foldMap</span></span><span> </span><span class="annot"><span class="annottext">Tg -&gt; Builder
+</span><a href="M.NBT.Internal.P.html#bodypack"><span class="hs-identifier hs-var">bodypack</span></a></span><span> </span><span class="annot"><span class="annottext">Vector Tg
+</span><a href="#local-6989586621680385311"><span class="hs-identifier hs-var">p</span></a></span><span>
+</span><span id="line-123"></span><span class="annot"><a href="M.NBT.Internal.P.html#bodypack"><span class="hs-identifier hs-var">bodypack</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="M.NBT.Internal.Types.html#Compound"><span class="hs-identifier hs-type">Compound</span></a></span><span> </span><span id="local-6989586621680385314"><span class="annot"><span class="annottext">HashMap Text Tg
+</span><a href="#local-6989586621680385314"><span class="hs-identifier hs-var">p</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-124"></span><span>  </span><span class="annot"><span class="annottext">((Text, Tg) -&gt; Builder) -&gt; [(Text, Tg)] -&gt; Builder
+forall m a. Monoid m =&gt; (a -&gt; m) -&gt; [a] -&gt; m
+forall (t :: * -&gt; *) m a.
+(Foldable t, Monoid m) =&gt;
+(a -&gt; m) -&gt; t a -&gt; m
+</span><span class="hs-identifier hs-var">foldMap</span></span><span>
+</span><span id="line-125"></span><span>    </span><span class="hs-special">(</span><span class="annot"><span class="annottext">NamedPair -&gt; Builder
+forall a. Pack a =&gt; a -&gt; Builder
+</span><a href="M.Pack.Internal.Types.html#pack"><span class="hs-identifier hs-var">pack</span></a></span><span> </span><span class="annot"><span class="annottext">(NamedPair -&gt; Builder)
+-&gt; ((Text, Tg) -&gt; NamedPair) -&gt; (Text, Tg) -&gt; Builder
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">(Text -&gt; Tg -&gt; NamedPair) -&gt; (Text, Tg) -&gt; NamedPair
+forall a b c. (a -&gt; b -&gt; c) -&gt; (a, b) -&gt; c
+</span><span class="hs-identifier hs-var">uncurry</span></span><span> </span><span class="annot"><span class="annottext">Text -&gt; Tg -&gt; NamedPair
+</span><a href="M.NBT.Internal.P.html#NamedPair"><span class="hs-identifier hs-var">NamedPair</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-126"></span><span>    </span><span class="hs-special">(</span><span class="annot"><span class="annottext">HashMap Text Tg -&gt; [(Text, Tg)]
+forall k v. HashMap k v -&gt; [(k, v)]
+</span><span class="hs-identifier hs-var">M.toList</span></span><span> </span><span class="annot"><span class="annottext">HashMap Text Tg
+</span><a href="#local-6989586621680385314"><span class="hs-identifier hs-var">p</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-127"></span><span>    </span><span class="annot"><span class="annottext">Builder -&gt; Builder -&gt; Builder
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">&lt;&gt;</span></span><span> </span><span class="annot"><span class="annottext">Ty -&gt; Builder
+forall a. Pack a =&gt; a -&gt; Builder
+</span><a href="M.Pack.Internal.Types.html#pack"><span class="hs-identifier hs-var">pack</span></a></span><span> </span><span class="annot"><span class="annottext">Ty
+</span><a href="M.NBT.Internal.Types.html#TEnd"><span class="hs-identifier hs-var">TEnd</span></a></span><span>
+</span><span id="line-128"></span><span class="annot"><a href="M.NBT.Internal.P.html#bodypack"><span class="hs-identifier hs-var">bodypack</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="M.NBT.Internal.Types.html#IntArray"><span class="hs-identifier hs-type">IntArray</span></a></span><span> </span><span id="local-6989586621680385318"><span class="annot"><span class="annottext">Vector Int32
+</span><a href="#local-6989586621680385318"><span class="hs-identifier hs-var">p</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall a b. (Integral a, Pack a, Integral b) =&gt; b -&gt; Builder
+</span><a href="M.Pack.Internal.Num.html#packfi"><span class="hs-identifier hs-var">packfi</span></a></span><span> </span><span class="hs-glyph">@</span><span class="annot"><span class="hs-identifier hs-type">Int32</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Vector Int32 -&gt; Int
+forall a. Unbox a =&gt; Vector a -&gt; Int
+</span><span class="hs-identifier hs-var">VU.length</span></span><span> </span><span class="annot"><span class="annottext">Vector Int32
+</span><a href="#local-6989586621680385318"><span class="hs-identifier hs-var">p</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Builder -&gt; Builder -&gt; Builder
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">&lt;&gt;</span></span><span> </span><span class="annot"><span class="annottext">(Int32 -&gt; Builder) -&gt; Vector Int32 -&gt; Builder
+forall m a. (Monoid m, Unbox a) =&gt; (a -&gt; m) -&gt; Vector a -&gt; m
+</span><span class="hs-identifier hs-var">VU.foldMap</span></span><span> </span><span class="annot"><span class="annottext">Int32 -&gt; Builder
+forall a. Pack a =&gt; a -&gt; Builder
+</span><a href="M.Pack.Internal.Types.html#pack"><span class="hs-identifier hs-var">pack</span></a></span><span> </span><span class="annot"><span class="annottext">Vector Int32
+</span><a href="#local-6989586621680385318"><span class="hs-identifier hs-var">p</span></a></span><span>
+</span><span id="line-129"></span><span class="annot"><a href="M.NBT.Internal.P.html#bodypack"><span class="hs-identifier hs-var">bodypack</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="M.NBT.Internal.Types.html#LongArray"><span class="hs-identifier hs-type">LongArray</span></a></span><span> </span><span id="local-6989586621680385321"><span class="annot"><span class="annottext">Vector Int64
+</span><a href="#local-6989586621680385321"><span class="hs-identifier hs-var">p</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall a b. (Integral a, Pack a, Integral b) =&gt; b -&gt; Builder
+</span><a href="M.Pack.Internal.Num.html#packfi"><span class="hs-identifier hs-var">packfi</span></a></span><span> </span><span class="hs-glyph">@</span><span class="annot"><span class="hs-identifier hs-type">Int32</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Vector Int64 -&gt; Int
+forall a. Unbox a =&gt; Vector a -&gt; Int
+</span><span class="hs-identifier hs-var">VU.length</span></span><span> </span><span class="annot"><span class="annottext">Vector Int64
+</span><a href="#local-6989586621680385321"><span class="hs-identifier hs-var">p</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Builder -&gt; Builder -&gt; Builder
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">&lt;&gt;</span></span><span> </span><span class="annot"><span class="annottext">(Int64 -&gt; Builder) -&gt; Vector Int64 -&gt; Builder
+forall m a. (Monoid m, Unbox a) =&gt; (a -&gt; m) -&gt; Vector a -&gt; m
+</span><span class="hs-identifier hs-var">VU.foldMap</span></span><span> </span><span class="annot"><span class="annottext">Int64 -&gt; Builder
+forall a. Pack a =&gt; a -&gt; Builder
+</span><a href="M.Pack.Internal.Types.html#pack"><span class="hs-identifier hs-var">pack</span></a></span><span> </span><span class="annot"><span class="annottext">Vector Int64
+</span><a href="#local-6989586621680385321"><span class="hs-identifier hs-var">p</span></a></span><span>
+</span><span id="line-130"></span></pre></body></html>

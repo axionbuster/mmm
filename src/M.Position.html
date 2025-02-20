@@ -1,0 +1,493 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span id="local-6989586621680392883"><span id="local-6989586621680392884"></span></span><span class="hs-comment">-- |</span><span>
+</span><span id="line-2"></span><span class="hs-comment">-- Module: M.Position</span><span>
+</span><span id="line-3"></span><span class="hs-comment">-- Description: Minecraft position encoding</span><span>
+</span><span id="line-4"></span><span class="hs-comment">-- Copyright: (c) axionbuster, 2025</span><span>
+</span><span id="line-5"></span><span class="hs-comment">-- License: BSD-3-Clause</span><span>
+</span><span id="line-6"></span><span class="hs-comment">--</span><span>
+</span><span id="line-7"></span><span class="hs-comment">-- Implements the packed integer Position format used by Minecraft Java Edition,</span><span>
+</span><span id="line-8"></span><span class="hs-comment">-- including encoding and decoding of 3D coordinates into a compact Int64</span><span>
+</span><span id="line-9"></span><span class="hs-comment">-- representation.</span><span>
+</span><span id="line-10"></span><span class="hs-keyword">module</span><span> </span><span class="annot"><a href="M.Position.html"><span class="hs-identifier">M.Position</span></a></span><span>
+</span><span id="line-11"></span><span>  </span><span class="hs-special">(</span><span> </span><span class="annot"><a href="M.Position.html#Position"><span class="hs-identifier">Position</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span>
+</span><span id="line-12"></span><span>    </span><span class="annot"><a href="M.Position.html#encodeposition"><span class="hs-identifier">encodeposition</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-13"></span><span>    </span><span class="annot"><a href="M.Position.html#decodeposition"><span class="hs-identifier">decodeposition</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-14"></span><span>    </span><span class="annot"><a href="M.Position.html#posapply"><span class="hs-identifier">posapply</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-15"></span><span>    </span><span class="annot"><a href="M.Position.html#posapplyv"><span class="hs-identifier">posapplyv</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-16"></span><span>  </span><span class="hs-special">)</span><span>
+</span><span id="line-17"></span><span class="hs-keyword">where</span><span>
+</span><span id="line-18"></span><span>
+</span><span id="line-19"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Control.DeepSeq</span></span><span>
+</span><span id="line-20"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Bits</span></span><span>
+</span><span id="line-21"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Data</span></span><span>
+</span><span id="line-22"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Hashable</span></span><span>
+</span><span id="line-23"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Int</span></span><span>
+</span><span id="line-24"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">GHC.Generics</span></span><span>
+</span><span id="line-25"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Language.Haskell.TH.Syntax</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">Lift</span></span><span class="hs-special">)</span><span>
+</span><span id="line-26"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Linear</span></span><span>
+</span><span id="line-27"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="M.Pack.html"><span class="hs-identifier">M.Pack</span></a></span><span>
+</span><span id="line-28"></span><span>
+</span><span id="line-29"></span><span class="annot"><span class="hs-comment">-- | Deserialized position representation</span></span><span>
+</span><span id="line-30"></span><span class="hs-keyword">newtype</span><span> </span><span id="Position"><span class="annot"><a href="M.Position.html#Position"><span class="hs-identifier hs-var">Position</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="Position"><span class="annot"><a href="M.Position.html#Position"><span class="hs-identifier hs-var">Position</span></a></span></span><span> </span><span class="hs-special">{</span><span id="getposition"><span class="annot"><span class="annottext">Position -&gt; V3 Int32
+</span><a href="M.Position.html#getposition"><span class="hs-identifier hs-var hs-var">getposition</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">V3</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Int32</span></span><span class="hs-special">}</span><span>
+</span><span id="line-31"></span><span>  </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">stock</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621680392943"><span id="local-6989586621680392945"><span class="annot"><span class="annottext">(forall x. Position -&gt; Rep Position x)
+-&gt; (forall x. Rep Position x -&gt; Position) -&gt; Generic Position
+forall x. Rep Position x -&gt; Position
+forall x. Position -&gt; Rep Position x
+forall a.
+(forall x. a -&gt; Rep a x) -&gt; (forall x. Rep a x -&gt; a) -&gt; Generic a
+$cfrom :: forall x. Position -&gt; Rep Position x
+from :: forall x. Position -&gt; Rep Position x
+$cto :: forall x. Rep Position x -&gt; Position
+to :: forall x. Rep Position x -&gt; Position
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Generic</span></span></span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Typeable</span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680392953"><span id="local-6989586621680392958"><span id="local-6989586621680392962"><span id="local-6989586621680392964"><span id="local-6989586621680392966"><span id="local-6989586621680392972"><span id="local-6989586621680392977"><span id="local-6989586621680392980"><span id="local-6989586621680392983"><span id="local-6989586621680392986"><span id="local-6989586621680392989"><span id="local-6989586621680392992"><span id="local-6989586621680392997"><span id="local-6989586621680393002"><span class="annot"><span class="annottext">Typeable Position
+Typeable Position =&gt;
+(forall (c :: * -&gt; *).
+ (forall d b. Data d =&gt; c (d -&gt; b) -&gt; d -&gt; c b)
+ -&gt; (forall g. g -&gt; c g) -&gt; Position -&gt; c Position)
+-&gt; (forall (c :: * -&gt; *).
+    (forall b r. Data b =&gt; c (b -&gt; r) -&gt; c r)
+    -&gt; (forall r. r -&gt; c r) -&gt; Constr -&gt; c Position)
+-&gt; (Position -&gt; Constr)
+-&gt; (Position -&gt; DataType)
+-&gt; (forall (t :: * -&gt; *) (c :: * -&gt; *).
+    Typeable t =&gt;
+    (forall d. Data d =&gt; c (t d)) -&gt; Maybe (c Position))
+-&gt; (forall (t :: * -&gt; * -&gt; *) (c :: * -&gt; *).
+    Typeable t =&gt;
+    (forall d e. (Data d, Data e) =&gt; c (t d e)) -&gt; Maybe (c Position))
+-&gt; ((forall b. Data b =&gt; b -&gt; b) -&gt; Position -&gt; Position)
+-&gt; (forall r r'.
+    (r -&gt; r' -&gt; r)
+    -&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; Position -&gt; r)
+-&gt; (forall r r'.
+    (r' -&gt; r -&gt; r)
+    -&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; Position -&gt; r)
+-&gt; (forall u. (forall d. Data d =&gt; d -&gt; u) -&gt; Position -&gt; [u])
+-&gt; (forall u. Int -&gt; (forall d. Data d =&gt; d -&gt; u) -&gt; Position -&gt; u)
+-&gt; (forall (m :: * -&gt; *).
+    Monad m =&gt;
+    (forall d. Data d =&gt; d -&gt; m d) -&gt; Position -&gt; m Position)
+-&gt; (forall (m :: * -&gt; *).
+    MonadPlus m =&gt;
+    (forall d. Data d =&gt; d -&gt; m d) -&gt; Position -&gt; m Position)
+-&gt; (forall (m :: * -&gt; *).
+    MonadPlus m =&gt;
+    (forall d. Data d =&gt; d -&gt; m d) -&gt; Position -&gt; m Position)
+-&gt; Data Position
+Position -&gt; Constr
+Position -&gt; DataType
+(forall b. Data b =&gt; b -&gt; b) -&gt; Position -&gt; Position
+forall a.
+Typeable a =&gt;
+(forall (c :: * -&gt; *).
+ (forall d b. Data d =&gt; c (d -&gt; b) -&gt; d -&gt; c b)
+ -&gt; (forall g. g -&gt; c g) -&gt; a -&gt; c a)
+-&gt; (forall (c :: * -&gt; *).
+    (forall b r. Data b =&gt; c (b -&gt; r) -&gt; c r)
+    -&gt; (forall r. r -&gt; c r) -&gt; Constr -&gt; c a)
+-&gt; (a -&gt; Constr)
+-&gt; (a -&gt; DataType)
+-&gt; (forall (t :: * -&gt; *) (c :: * -&gt; *).
+    Typeable t =&gt;
+    (forall d. Data d =&gt; c (t d)) -&gt; Maybe (c a))
+-&gt; (forall (t :: * -&gt; * -&gt; *) (c :: * -&gt; *).
+    Typeable t =&gt;
+    (forall d e. (Data d, Data e) =&gt; c (t d e)) -&gt; Maybe (c a))
+-&gt; ((forall b. Data b =&gt; b -&gt; b) -&gt; a -&gt; a)
+-&gt; (forall r r'.
+    (r -&gt; r' -&gt; r) -&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; a -&gt; r)
+-&gt; (forall r r'.
+    (r' -&gt; r -&gt; r) -&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; a -&gt; r)
+-&gt; (forall u. (forall d. Data d =&gt; d -&gt; u) -&gt; a -&gt; [u])
+-&gt; (forall u. Int -&gt; (forall d. Data d =&gt; d -&gt; u) -&gt; a -&gt; u)
+-&gt; (forall (m :: * -&gt; *).
+    Monad m =&gt;
+    (forall d. Data d =&gt; d -&gt; m d) -&gt; a -&gt; m a)
+-&gt; (forall (m :: * -&gt; *).
+    MonadPlus m =&gt;
+    (forall d. Data d =&gt; d -&gt; m d) -&gt; a -&gt; m a)
+-&gt; (forall (m :: * -&gt; *).
+    MonadPlus m =&gt;
+    (forall d. Data d =&gt; d -&gt; m d) -&gt; a -&gt; m a)
+-&gt; Data a
+forall u. Int -&gt; (forall d. Data d =&gt; d -&gt; u) -&gt; Position -&gt; u
+forall u. (forall d. Data d =&gt; d -&gt; u) -&gt; Position -&gt; [u]
+forall r r'.
+(r -&gt; r' -&gt; r)
+-&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; Position -&gt; r
+forall r r'.
+(r' -&gt; r -&gt; r)
+-&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; Position -&gt; r
+forall (m :: * -&gt; *).
+Monad m =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; Position -&gt; m Position
+forall (m :: * -&gt; *).
+MonadPlus m =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; Position -&gt; m Position
+forall (c :: * -&gt; *).
+(forall b r. Data b =&gt; c (b -&gt; r) -&gt; c r)
+-&gt; (forall r. r -&gt; c r) -&gt; Constr -&gt; c Position
+forall (c :: * -&gt; *).
+(forall d b. Data d =&gt; c (d -&gt; b) -&gt; d -&gt; c b)
+-&gt; (forall g. g -&gt; c g) -&gt; Position -&gt; c Position
+forall (t :: * -&gt; *) (c :: * -&gt; *).
+Typeable t =&gt;
+(forall d. Data d =&gt; c (t d)) -&gt; Maybe (c Position)
+forall (t :: * -&gt; * -&gt; *) (c :: * -&gt; *).
+Typeable t =&gt;
+(forall d e. (Data d, Data e) =&gt; c (t d e)) -&gt; Maybe (c Position)
+$cgfoldl :: forall (c :: * -&gt; *).
+(forall d b. Data d =&gt; c (d -&gt; b) -&gt; d -&gt; c b)
+-&gt; (forall g. g -&gt; c g) -&gt; Position -&gt; c Position
+gfoldl :: forall (c :: * -&gt; *).
+(forall d b. Data d =&gt; c (d -&gt; b) -&gt; d -&gt; c b)
+-&gt; (forall g. g -&gt; c g) -&gt; Position -&gt; c Position
+$cgunfold :: forall (c :: * -&gt; *).
+(forall b r. Data b =&gt; c (b -&gt; r) -&gt; c r)
+-&gt; (forall r. r -&gt; c r) -&gt; Constr -&gt; c Position
+gunfold :: forall (c :: * -&gt; *).
+(forall b r. Data b =&gt; c (b -&gt; r) -&gt; c r)
+-&gt; (forall r. r -&gt; c r) -&gt; Constr -&gt; c Position
+$ctoConstr :: Position -&gt; Constr
+toConstr :: Position -&gt; Constr
+$cdataTypeOf :: Position -&gt; DataType
+dataTypeOf :: Position -&gt; DataType
+$cdataCast1 :: forall (t :: * -&gt; *) (c :: * -&gt; *).
+Typeable t =&gt;
+(forall d. Data d =&gt; c (t d)) -&gt; Maybe (c Position)
+dataCast1 :: forall (t :: * -&gt; *) (c :: * -&gt; *).
+Typeable t =&gt;
+(forall d. Data d =&gt; c (t d)) -&gt; Maybe (c Position)
+$cdataCast2 :: forall (t :: * -&gt; * -&gt; *) (c :: * -&gt; *).
+Typeable t =&gt;
+(forall d e. (Data d, Data e) =&gt; c (t d e)) -&gt; Maybe (c Position)
+dataCast2 :: forall (t :: * -&gt; * -&gt; *) (c :: * -&gt; *).
+Typeable t =&gt;
+(forall d e. (Data d, Data e) =&gt; c (t d e)) -&gt; Maybe (c Position)
+$cgmapT :: (forall b. Data b =&gt; b -&gt; b) -&gt; Position -&gt; Position
+gmapT :: (forall b. Data b =&gt; b -&gt; b) -&gt; Position -&gt; Position
+$cgmapQl :: forall r r'.
+(r -&gt; r' -&gt; r)
+-&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; Position -&gt; r
+gmapQl :: forall r r'.
+(r -&gt; r' -&gt; r)
+-&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; Position -&gt; r
+$cgmapQr :: forall r r'.
+(r' -&gt; r -&gt; r)
+-&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; Position -&gt; r
+gmapQr :: forall r r'.
+(r' -&gt; r -&gt; r)
+-&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; Position -&gt; r
+$cgmapQ :: forall u. (forall d. Data d =&gt; d -&gt; u) -&gt; Position -&gt; [u]
+gmapQ :: forall u. (forall d. Data d =&gt; d -&gt; u) -&gt; Position -&gt; [u]
+$cgmapQi :: forall u. Int -&gt; (forall d. Data d =&gt; d -&gt; u) -&gt; Position -&gt; u
+gmapQi :: forall u. Int -&gt; (forall d. Data d =&gt; d -&gt; u) -&gt; Position -&gt; u
+$cgmapM :: forall (m :: * -&gt; *).
+Monad m =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; Position -&gt; m Position
+gmapM :: forall (m :: * -&gt; *).
+Monad m =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; Position -&gt; m Position
+$cgmapMp :: forall (m :: * -&gt; *).
+MonadPlus m =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; Position -&gt; m Position
+gmapMp :: forall (m :: * -&gt; *).
+MonadPlus m =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; Position -&gt; m Position
+$cgmapMo :: forall (m :: * -&gt; *).
+MonadPlus m =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; Position -&gt; m Position
+gmapMo :: forall (m :: * -&gt; *).
+MonadPlus m =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; Position -&gt; m Position
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Data</span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680393013"><span id="local-6989586621680393021"><span class="annot"><span class="annottext">(forall (m :: * -&gt; *). Quote m =&gt; Position -&gt; m Exp)
+-&gt; (forall (m :: * -&gt; *). Quote m =&gt; Position -&gt; Code m Position)
+-&gt; Lift Position
+forall t.
+(forall (m :: * -&gt; *). Quote m =&gt; t -&gt; m Exp)
+-&gt; (forall (m :: * -&gt; *). Quote m =&gt; t -&gt; Code m t) -&gt; Lift t
+forall (m :: * -&gt; *). Quote m =&gt; Position -&gt; m Exp
+forall (m :: * -&gt; *). Quote m =&gt; Position -&gt; Code m Position
+$clift :: forall (m :: * -&gt; *). Quote m =&gt; Position -&gt; m Exp
+lift :: forall (m :: * -&gt; *). Quote m =&gt; Position -&gt; m Exp
+$cliftTyped :: forall (m :: * -&gt; *). Quote m =&gt; Position -&gt; Code m Position
+liftTyped :: forall (m :: * -&gt; *). Quote m =&gt; Position -&gt; Code m Position
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Lift</span></span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-32"></span><span>  </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">anyclass</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621680393034"><span id="local-6989586621680393041"><span class="annot"><span class="annottext">Eq Position
+Eq Position =&gt;
+(Int -&gt; Position -&gt; Int) -&gt; (Position -&gt; Int) -&gt; Hashable Position
+Int -&gt; Position -&gt; Int
+Position -&gt; Int
+forall a. Eq a =&gt; (Int -&gt; a -&gt; Int) -&gt; (a -&gt; Int) -&gt; Hashable a
+$chashWithSalt :: Int -&gt; Position -&gt; Int
+hashWithSalt :: Int -&gt; Position -&gt; Int
+$chash :: Position -&gt; Int
+hash :: Position -&gt; Int
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Hashable</span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680393054"><span class="annot"><span class="annottext">Position -&gt; ()
+(Position -&gt; ()) -&gt; NFData Position
+forall a. (a -&gt; ()) -&gt; NFData a
+$crnf :: Position -&gt; ()
+rnf :: Position -&gt; ()
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var">NFData</span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-33"></span><span>  </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">newtype</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621680393071"><span id="local-6989586621680393077"><span class="annot"><span class="annottext">Position -&gt; Position -&gt; Bool
+(Position -&gt; Position -&gt; Bool)
+-&gt; (Position -&gt; Position -&gt; Bool) -&gt; Eq Position
+forall a. (a -&gt; a -&gt; Bool) -&gt; (a -&gt; a -&gt; Bool) -&gt; Eq a
+$c== :: Position -&gt; Position -&gt; Bool
+== :: Position -&gt; Position -&gt; Bool
+$c/= :: Position -&gt; Position -&gt; Bool
+/= :: Position -&gt; Position -&gt; Bool
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Eq</span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680393087"><span id="local-6989586621680393092"><span id="local-6989586621680393096"><span id="local-6989586621680393100"><span id="local-6989586621680393104"><span id="local-6989586621680393108"><span id="local-6989586621680393112"><span class="annot"><span class="annottext">Eq Position
+Eq Position =&gt;
+(Position -&gt; Position -&gt; Ordering)
+-&gt; (Position -&gt; Position -&gt; Bool)
+-&gt; (Position -&gt; Position -&gt; Bool)
+-&gt; (Position -&gt; Position -&gt; Bool)
+-&gt; (Position -&gt; Position -&gt; Bool)
+-&gt; (Position -&gt; Position -&gt; Position)
+-&gt; (Position -&gt; Position -&gt; Position)
+-&gt; Ord Position
+Position -&gt; Position -&gt; Bool
+Position -&gt; Position -&gt; Ordering
+Position -&gt; Position -&gt; Position
+forall a.
+Eq a =&gt;
+(a -&gt; a -&gt; Ordering)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; Ord a
+$ccompare :: Position -&gt; Position -&gt; Ordering
+compare :: Position -&gt; Position -&gt; Ordering
+$c&lt; :: Position -&gt; Position -&gt; Bool
+&lt; :: Position -&gt; Position -&gt; Bool
+$c&lt;= :: Position -&gt; Position -&gt; Bool
+&lt;= :: Position -&gt; Position -&gt; Bool
+$c&gt; :: Position -&gt; Position -&gt; Bool
+&gt; :: Position -&gt; Position -&gt; Bool
+$c&gt;= :: Position -&gt; Position -&gt; Bool
+&gt;= :: Position -&gt; Position -&gt; Bool
+$cmax :: Position -&gt; Position -&gt; Position
+max :: Position -&gt; Position -&gt; Position
+$cmin :: Position -&gt; Position -&gt; Position
+min :: Position -&gt; Position -&gt; Position
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Ord</span></span></span></span></span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680393124"><span id="local-6989586621680393130"><span id="local-6989586621680393135"><span class="annot"><span class="annottext">Int -&gt; Position -&gt; String -&gt; String
+[Position] -&gt; String -&gt; String
+Position -&gt; String
+(Int -&gt; Position -&gt; String -&gt; String)
+-&gt; (Position -&gt; String)
+-&gt; ([Position] -&gt; String -&gt; String)
+-&gt; Show Position
+forall a.
+(Int -&gt; a -&gt; String -&gt; String)
+-&gt; (a -&gt; String) -&gt; ([a] -&gt; String -&gt; String) -&gt; Show a
+$cshowsPrec :: Int -&gt; Position -&gt; String -&gt; String
+showsPrec :: Int -&gt; Position -&gt; String -&gt; String
+$cshow :: Position -&gt; String
+show :: Position -&gt; String
+$cshowList :: [Position] -&gt; String -&gt; String
+showList :: [Position] -&gt; String -&gt; String
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Show</span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680393146"><span id="local-6989586621680393152"><span id="local-6989586621680393157"><span id="local-6989586621680393162"><span class="annot"><span class="annottext">ReadPrec [Position]
+ReadPrec Position
+Int -&gt; ReadS Position
+ReadS [Position]
+(Int -&gt; ReadS Position)
+-&gt; ReadS [Position]
+-&gt; ReadPrec Position
+-&gt; ReadPrec [Position]
+-&gt; Read Position
+forall a.
+(Int -&gt; ReadS a)
+-&gt; ReadS [a] -&gt; ReadPrec a -&gt; ReadPrec [a] -&gt; Read a
+$creadsPrec :: Int -&gt; ReadS Position
+readsPrec :: Int -&gt; ReadS Position
+$creadList :: ReadS [Position]
+readList :: ReadS [Position]
+$creadPrec :: ReadPrec Position
+readPrec :: ReadPrec Position
+$creadListPrec :: ReadPrec [Position]
+readListPrec :: ReadPrec [Position]
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Read</span></span></span></span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-34"></span><span>
+</span><span id="line-35"></span><span id="local-6989586621680392848"><span id="local-6989586621680392849"><span class="annot"><a href="M.Position.html#fi"><span class="hs-identifier hs-type">fi</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">Integral</span></span><span> </span><span class="annot"><a href="#local-6989586621680392848"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Num</span></span><span> </span><span class="annot"><a href="#local-6989586621680392849"><span class="hs-identifier hs-type">b</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="#local-6989586621680392848"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621680392849"><span class="hs-identifier hs-type">b</span></a></span></span></span><span>
+</span><span id="line-36"></span><span id="fi"><span class="annot"><span class="annottext">fi :: forall a b. (Integral a, Num b) =&gt; a -&gt; b
+</span><a href="M.Position.html#fi"><span class="hs-identifier hs-var hs-var">fi</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">a -&gt; b
+forall a b. (Integral a, Num b) =&gt; a -&gt; b
+</span><span class="hs-identifier hs-var">fromIntegral</span></span><span>
+</span><span id="line-37"></span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="M.Position.html#fi"><span class="hs-pragma hs-type">fi</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-38"></span><span>
+</span><span id="line-39"></span><span class="annot"><span class="hs-comment">-- | encode a 'Position' into a packed Int64</span></span><span>
+</span><span id="line-40"></span><span class="annot"><a href="M.Position.html#encodeposition"><span class="hs-identifier hs-type">encodeposition</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="M.Position.html#Position"><span class="hs-identifier hs-type">Position</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Int64</span></span><span>
+</span><span id="line-41"></span><span id="encodeposition"><span class="annot"><span class="annottext">encodeposition :: Position -&gt; Int64
+</span><a href="M.Position.html#encodeposition"><span class="hs-identifier hs-var hs-var">encodeposition</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="M.Position.html#Position"><span class="hs-identifier hs-type">Position</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">V3</span></span><span> </span><span id="local-6989586621680393179"><span class="annot"><span class="annottext">Int32
+</span><a href="#local-6989586621680393179"><span class="hs-identifier hs-var">x</span></a></span></span><span> </span><span id="local-6989586621680393180"><span class="annot"><span class="annottext">Int32
+</span><a href="#local-6989586621680393180"><span class="hs-identifier hs-var">y</span></a></span></span><span> </span><span id="local-6989586621680393181"><span class="annot"><span class="annottext">Int32
+</span><a href="#local-6989586621680393181"><span class="hs-identifier hs-var">z</span></a></span></span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-42"></span><span>  </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="annottext">Int32
+</span><a href="#local-6989586621680393179"><span class="hs-identifier hs-var">x</span></a></span><span> </span><span class="annot"><span class="annottext">Int32 -&gt; Int32 -&gt; Bool
+forall a. Ord a =&gt; a -&gt; a -&gt; Bool
+</span><span class="hs-operator hs-var">&gt;</span></span><span> </span><span class="annot"><span class="annottext">Int32
+</span><span class="hs-number">0x1FFFFF</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">String -&gt; Int64
+forall a. HasCallStack =&gt; String -&gt; a
+</span><span class="hs-identifier hs-var">error</span></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;Position: X out of bounds&quot;</span></span><span>
+</span><span id="line-43"></span><span>  </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="annottext">Int32
+</span><a href="#local-6989586621680393180"><span class="hs-identifier hs-var">y</span></a></span><span> </span><span class="annot"><span class="annottext">Int32 -&gt; Int32 -&gt; Bool
+forall a. Ord a =&gt; a -&gt; a -&gt; Bool
+</span><span class="hs-operator hs-var">&gt;</span></span><span> </span><span class="annot"><span class="annottext">Int32
+</span><span class="hs-number">0xFFF</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">String -&gt; Int64
+forall a. HasCallStack =&gt; String -&gt; a
+</span><span class="hs-identifier hs-var">error</span></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;Position: Y out of bounds&quot;</span></span><span>
+</span><span id="line-44"></span><span>  </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="annottext">Int32
+</span><a href="#local-6989586621680393181"><span class="hs-identifier hs-var">z</span></a></span><span> </span><span class="annot"><span class="annottext">Int32 -&gt; Int32 -&gt; Bool
+forall a. Ord a =&gt; a -&gt; a -&gt; Bool
+</span><span class="hs-operator hs-var">&gt;</span></span><span> </span><span class="annot"><span class="annottext">Int32
+</span><span class="hs-number">0x1FFFFF</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">String -&gt; Int64
+forall a. HasCallStack =&gt; String -&gt; a
+</span><span class="hs-identifier hs-var">error</span></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;Position: Z out of bounds&quot;</span></span><span>
+</span><span id="line-45"></span><span>  </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="annottext">Bool
+</span><span class="hs-identifier hs-var">otherwise</span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-46"></span><span>      </span><span class="hs-special">(</span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int32 -&gt; Int64
+forall a b. (Integral a, Num b) =&gt; a -&gt; b
+</span><a href="M.Position.html#fi"><span class="hs-identifier hs-var">fi</span></a></span><span> </span><span class="annot"><span class="annottext">Int32
+</span><a href="#local-6989586621680393179"><span class="hs-identifier hs-var">x</span></a></span><span> </span><span class="annot"><span class="annottext">Int64 -&gt; Int64 -&gt; Int64
+forall a. Bits a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">.&amp;.</span></span><span> </span><span class="annot"><span class="annottext">Int64
+</span><span class="hs-number">0x3FFFFFF</span></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Int64 -&gt; Int -&gt; Int64
+forall a. Bits a =&gt; a -&gt; Int -&gt; a
+</span><span class="hs-operator hs-var">.&lt;&lt;.</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">38</span></span><span class="hs-special">)</span><span>
+</span><span id="line-47"></span><span>        </span><span class="annot"><span class="annottext">Int64 -&gt; Int64 -&gt; Int64
+forall a. Bits a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">.|.</span></span><span> </span><span class="hs-special">(</span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int32 -&gt; Int64
+forall a b. (Integral a, Num b) =&gt; a -&gt; b
+</span><a href="M.Position.html#fi"><span class="hs-identifier hs-var">fi</span></a></span><span> </span><span class="annot"><span class="annottext">Int32
+</span><a href="#local-6989586621680393181"><span class="hs-identifier hs-var">z</span></a></span><span> </span><span class="annot"><span class="annottext">Int64 -&gt; Int64 -&gt; Int64
+forall a. Bits a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">.&amp;.</span></span><span> </span><span class="annot"><span class="annottext">Int64
+</span><span class="hs-number">0x3FFFFFF</span></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Int64 -&gt; Int -&gt; Int64
+forall a. Bits a =&gt; a -&gt; Int -&gt; a
+</span><span class="hs-operator hs-var">.&lt;&lt;.</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">12</span></span><span class="hs-special">)</span><span>
+</span><span id="line-48"></span><span>        </span><span class="annot"><span class="annottext">Int64 -&gt; Int64 -&gt; Int64
+forall a. Bits a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">.|.</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int32 -&gt; Int64
+forall a b. (Integral a, Num b) =&gt; a -&gt; b
+</span><a href="M.Position.html#fi"><span class="hs-identifier hs-var">fi</span></a></span><span> </span><span class="annot"><span class="annottext">Int32
+</span><a href="#local-6989586621680393180"><span class="hs-identifier hs-var">y</span></a></span><span> </span><span class="annot"><span class="annottext">Int64 -&gt; Int64 -&gt; Int64
+forall a. Bits a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">.&amp;.</span></span><span> </span><span class="annot"><span class="annottext">Int64
+</span><span class="hs-number">0xFFF</span></span><span class="hs-special">)</span><span>
+</span><span id="line-49"></span><span class="hs-pragma">{-# INLINEABLE</span><span> </span><span class="annot"><a href="M.Position.html#encodeposition"><span class="hs-pragma hs-type">encodeposition</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-50"></span><span>
+</span><span id="line-51"></span><span class="annot"><span class="hs-comment">-- | decode a packed Int64 into a 'Position'</span></span><span>
+</span><span id="line-52"></span><span class="annot"><a href="M.Position.html#decodeposition"><span class="hs-identifier hs-type">decodeposition</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Int64</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="M.Position.html#Position"><span class="hs-identifier hs-type">Position</span></a></span><span>
+</span><span id="line-53"></span><span id="decodeposition"><span class="annot"><span class="annottext">decodeposition :: Int64 -&gt; Position
+</span><a href="M.Position.html#decodeposition"><span class="hs-identifier hs-var hs-var">decodeposition</span></a></span></span><span> </span><span id="local-6989586621680393186"><span class="annot"><span class="annottext">Int64
+</span><a href="#local-6989586621680393186"><span class="hs-identifier hs-var">n</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">V3 Int32 -&gt; Position
+</span><a href="M.Position.html#Position"><span class="hs-identifier hs-var">Position</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int32 -&gt; Int32 -&gt; Int32 -&gt; V3 Int32
+forall a. a -&gt; a -&gt; a -&gt; V3 a
+</span><span class="hs-identifier hs-var">V3</span></span><span> </span><span class="annot"><span class="annottext">Int32
+</span><a href="#local-6989586621680393187"><span class="hs-identifier hs-var">x</span></a></span><span> </span><span class="annot"><span class="annottext">Int32
+</span><a href="#local-6989586621680393188"><span class="hs-identifier hs-var">y</span></a></span><span> </span><span class="annot"><span class="annottext">Int32
+</span><a href="#local-6989586621680393189"><span class="hs-identifier hs-var">z</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-54"></span><span>  </span><span class="hs-keyword">where</span><span>
+</span><span id="line-55"></span><span>    </span><span id="local-6989586621680393187"><span class="annot"><span class="annottext">x :: Int32
+</span><a href="#local-6989586621680393187"><span class="hs-identifier hs-var hs-var">x</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int64 -&gt; Int32
+forall a b. (Integral a, Num b) =&gt; a -&gt; b
+</span><a href="M.Position.html#fi"><span class="hs-identifier hs-var">fi</span></a></span><span> </span><span class="annot"><span class="annottext">(Int64 -&gt; Int32) -&gt; Int64 -&gt; Int32
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">Int64
+</span><a href="#local-6989586621680393186"><span class="hs-identifier hs-var">n</span></a></span><span> </span><span class="annot"><span class="annottext">Int64 -&gt; Int -&gt; Int64
+forall a. Bits a =&gt; a -&gt; Int -&gt; a
+</span><span class="hs-operator hs-var">.&gt;&gt;.</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">38</span></span><span>
+</span><span id="line-56"></span><span>    </span><span id="local-6989586621680393188"><span class="annot"><span class="annottext">y :: Int32
+</span><a href="#local-6989586621680393188"><span class="hs-identifier hs-var hs-var">y</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int64 -&gt; Int32
+forall a b. (Integral a, Num b) =&gt; a -&gt; b
+</span><a href="M.Position.html#fi"><span class="hs-identifier hs-var">fi</span></a></span><span> </span><span class="annot"><span class="annottext">(Int64 -&gt; Int32) -&gt; Int64 -&gt; Int32
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int64
+</span><a href="#local-6989586621680393186"><span class="hs-identifier hs-var">n</span></a></span><span> </span><span class="annot"><span class="annottext">Int64 -&gt; Int -&gt; Int64
+forall a. Bits a =&gt; a -&gt; Int -&gt; a
+</span><span class="hs-operator hs-var">.&lt;&lt;.</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">52</span></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Int64 -&gt; Int -&gt; Int64
+forall a. Bits a =&gt; a -&gt; Int -&gt; a
+</span><span class="hs-operator hs-var">.&gt;&gt;.</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">52</span></span><span>
+</span><span id="line-57"></span><span>    </span><span id="local-6989586621680393189"><span class="annot"><span class="annottext">z :: Int32
+</span><a href="#local-6989586621680393189"><span class="hs-identifier hs-var hs-var">z</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int64 -&gt; Int32
+forall a b. (Integral a, Num b) =&gt; a -&gt; b
+</span><a href="M.Position.html#fi"><span class="hs-identifier hs-var">fi</span></a></span><span> </span><span class="annot"><span class="annottext">(Int64 -&gt; Int32) -&gt; Int64 -&gt; Int32
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int64
+</span><a href="#local-6989586621680393186"><span class="hs-identifier hs-var">n</span></a></span><span> </span><span class="annot"><span class="annottext">Int64 -&gt; Int -&gt; Int64
+forall a. Bits a =&gt; a -&gt; Int -&gt; a
+</span><span class="hs-operator hs-var">.&lt;&lt;.</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">26</span></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Int64 -&gt; Int -&gt; Int64
+forall a. Bits a =&gt; a -&gt; Int -&gt; a
+</span><span class="hs-operator hs-var">.&gt;&gt;.</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">38</span></span><span>
+</span><span id="line-58"></span><span class="hs-pragma">{-# INLINEABLE</span><span> </span><span class="annot"><a href="M.Position.html#decodeposition"><span class="hs-pragma hs-type">decodeposition</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-59"></span><span>
+</span><span id="line-60"></span><span class="hs-comment">-- Instances for Pack and Unpack</span><span>
+</span><span id="line-61"></span><span class="hs-keyword">instance</span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#Pack"><span class="hs-identifier hs-type">Pack</span></a></span><span> </span><span class="annot"><a href="M.Position.html#Position"><span class="hs-identifier hs-type">Position</span></a></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-62"></span><span>  </span><span id="local-6989586621680393196"><span class="annot"><span class="annottext">pack :: Position -&gt; Builder
+</span><a href="#local-6989586621680393196"><span class="hs-identifier hs-var hs-var hs-var">pack</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int64 -&gt; Builder
+forall a. Pack a =&gt; a -&gt; Builder
+</span><a href="M.Pack.Internal.Types.html#pack"><span class="hs-identifier hs-var">pack</span></a></span><span> </span><span class="annot"><span class="annottext">(Int64 -&gt; Builder) -&gt; (Position -&gt; Int64) -&gt; Position -&gt; Builder
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">Position -&gt; Int64
+</span><a href="M.Position.html#encodeposition"><span class="hs-identifier hs-var">encodeposition</span></a></span><span>
+</span><span id="line-63"></span><span>  </span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#pack"><span class="hs-pragma hs-type">pack</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-64"></span><span>
+</span><span id="line-65"></span><span class="hs-keyword">instance</span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#Unpack"><span class="hs-identifier hs-type">Unpack</span></a></span><span> </span><span class="annot"><a href="M.Position.html#Position"><span class="hs-identifier hs-type">Position</span></a></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-66"></span><span>  </span><span id="local-6989586621680393208"><span class="annot"><span class="annottext">unpack :: forall (st :: ZeroBitType) r. Parser st r Position
+</span><a href="#local-6989586621680393208"><span class="hs-identifier hs-var hs-var hs-var">unpack</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int64 -&gt; Position
+</span><a href="M.Position.html#decodeposition"><span class="hs-identifier hs-var">decodeposition</span></a></span><span> </span><span class="annot"><span class="annottext">(Int64 -&gt; Position) -&gt; (Int64 -&gt; Int64) -&gt; Int64 -&gt; Position
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">Int64 -&gt; Int64
+forall a b. (Integral a, Num b) =&gt; a -&gt; b
+</span><a href="M.Position.html#fi"><span class="hs-identifier hs-var">fi</span></a></span><span> </span><span class="annot"><span class="annottext">(Int64 -&gt; Position)
+-&gt; ParserT st r ParseError Int64
+-&gt; ParserT st r ParseError Position
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-operator hs-var">&lt;$&gt;</span></span><span> </span><span class="annot"><span class="annottext">forall a (st :: ZeroBitType) r. Unpack a =&gt; Parser st r a
+</span><a href="M.Pack.Internal.Types.html#unpack"><span class="hs-identifier hs-var">unpack</span></a></span><span> </span><span class="hs-glyph">@</span><span class="annot"><span class="hs-identifier hs-type">Int64</span></span><span>
+</span><span id="line-67"></span><span>  </span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#unpack"><span class="hs-pragma hs-type">unpack</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-68"></span><span>
+</span><span id="line-69"></span><span class="annot"><span class="hs-comment">-- | apply a function to the x, y, and z components of a 'Position'</span></span><span>
+</span><span id="line-70"></span><span class="annot"><a href="M.Position.html#posapply"><span class="hs-identifier hs-type">posapply</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">Int32</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Int32</span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="M.Position.html#Position"><span class="hs-identifier hs-type">Position</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="M.Position.html#Position"><span class="hs-identifier hs-type">Position</span></a></span><span>
+</span><span id="line-71"></span><span id="posapply"><span class="annot"><span class="annottext">posapply :: (Int32 -&gt; Int32) -&gt; Position -&gt; Position
+</span><a href="M.Position.html#posapply"><span class="hs-identifier hs-var hs-var">posapply</span></a></span></span><span> </span><span id="local-6989586621680393211"><span class="annot"><span class="annottext">Int32 -&gt; Int32
+</span><a href="#local-6989586621680393211"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="M.Position.html#Position"><span class="hs-identifier hs-type">Position</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">V3</span></span><span> </span><span id="local-6989586621680393212"><span class="annot"><span class="annottext">Int32
+</span><a href="#local-6989586621680393212"><span class="hs-identifier hs-var">x</span></a></span></span><span> </span><span id="local-6989586621680393213"><span class="annot"><span class="annottext">Int32
+</span><a href="#local-6989586621680393213"><span class="hs-identifier hs-var">y</span></a></span></span><span> </span><span id="local-6989586621680393214"><span class="annot"><span class="annottext">Int32
+</span><a href="#local-6989586621680393214"><span class="hs-identifier hs-var">z</span></a></span></span><span class="hs-special">)</span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">V3 Int32 -&gt; Position
+</span><a href="M.Position.html#Position"><span class="hs-identifier hs-var">Position</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int32 -&gt; Int32 -&gt; Int32 -&gt; V3 Int32
+forall a. a -&gt; a -&gt; a -&gt; V3 a
+</span><span class="hs-identifier hs-var">V3</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int32 -&gt; Int32
+</span><a href="#local-6989586621680393211"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="annot"><span class="annottext">Int32
+</span><a href="#local-6989586621680393212"><span class="hs-identifier hs-var">x</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int32 -&gt; Int32
+</span><a href="#local-6989586621680393211"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="annot"><span class="annottext">Int32
+</span><a href="#local-6989586621680393213"><span class="hs-identifier hs-var">y</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int32 -&gt; Int32
+</span><a href="#local-6989586621680393211"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="annot"><span class="annottext">Int32
+</span><a href="#local-6989586621680393214"><span class="hs-identifier hs-var">z</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-72"></span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="M.Position.html#posapply"><span class="hs-pragma hs-type">posapply</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-73"></span><span>
+</span><span id="line-74"></span><span class="annot"><span class="hs-comment">-- | apply a function to the x, y, and z components of a 'Position'</span></span><span>
+</span><span id="line-75"></span><span class="annot"><a href="M.Position.html#posapplyv"><span class="hs-identifier hs-type">posapplyv</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">V3</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Int32</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">V3</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Int32</span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="M.Position.html#Position"><span class="hs-identifier hs-type">Position</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="M.Position.html#Position"><span class="hs-identifier hs-type">Position</span></a></span><span>
+</span><span id="line-76"></span><span id="posapplyv"><span class="annot"><span class="annottext">posapplyv :: (V3 Int32 -&gt; V3 Int32) -&gt; Position -&gt; Position
+</span><a href="M.Position.html#posapplyv"><span class="hs-identifier hs-var hs-var">posapplyv</span></a></span></span><span> </span><span id="local-6989586621680393215"><span class="annot"><span class="annottext">V3 Int32 -&gt; V3 Int32
+</span><a href="#local-6989586621680393215"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="M.Position.html#Position"><span class="hs-identifier hs-type">Position</span></a></span><span> </span><span id="local-6989586621680393216"><span class="annot"><span class="annottext">V3 Int32
+</span><a href="#local-6989586621680393216"><span class="hs-identifier hs-var">v</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">V3 Int32 -&gt; Position
+</span><a href="M.Position.html#Position"><span class="hs-identifier hs-var">Position</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">V3 Int32 -&gt; V3 Int32
+</span><a href="#local-6989586621680393215"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="annot"><span class="annottext">V3 Int32
+</span><a href="#local-6989586621680393216"><span class="hs-identifier hs-var">v</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-77"></span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="M.Position.html#posapplyv"><span class="hs-pragma hs-type">posapplyv</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-78"></span></pre></body></html>

@@ -1,0 +1,34 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span class="hs-pragma">{-# OPTIONS_GHC -Wno-missing-export-lists #-}</span><span>
+</span><span id="line-2"></span><span>
+</span><span id="line-3"></span><span class="hs-comment">-- |</span><span>
+</span><span id="line-4"></span><span class="hs-comment">-- Module: M.V769.S</span><span>
+</span><span id="line-5"></span><span class="hs-comment">-- Description: Protocol status state packets (AI-generated)</span><span>
+</span><span id="line-6"></span><span class="hs-comment">-- Copyright: (c) axionbuster, 2025</span><span>
+</span><span id="line-7"></span><span class="hs-comment">-- License: BSD-3-Clause</span><span>
+</span><span id="line-8"></span><span class="hs-comment">--</span><span>
+</span><span id="line-9"></span><span class="hs-comment">-- Defines packet structures for the status state of protocol version 769,</span><span>
+</span><span id="line-10"></span><span class="hs-comment">-- handling server list ping functionality including server status queries</span><span>
+</span><span id="line-11"></span><span class="hs-comment">-- and latency checks.</span><span>
+</span><span id="line-12"></span><span class="hs-keyword">module</span><span> </span><span class="annot"><a href="M.V769.S.html"><span class="hs-identifier">M.V769.S</span></a></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-13"></span><span>
+</span><span id="line-14"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Control.DeepSeq</span></span><span>
+</span><span id="line-15"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Data</span></span><span>
+</span><span id="line-16"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Int</span></span><span>
+</span><span id="line-17"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Text</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">Text</span></span><span class="hs-special">)</span><span>
+</span><span id="line-18"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="M.PkMacro.html"><span class="hs-identifier">M.PkMacro</span></a></span><span>
+</span><span id="line-19"></span><span>
+</span><span id="line-20"></span><span class="hs-identifier">setdefaultderives</span><span>
+</span><span id="line-21"></span><span class="hs-identifier">addproperderives</span><span> </span><span class="hs-special">[</span><span class="hs-special">''</span><span class="hs-identifier">NFData</span><span class="hs-special">,</span><span> </span><span class="hs-special">''</span><span class="hs-identifier">Typeable</span><span class="hs-special">,</span><span> </span><span class="hs-special">''</span><span class="hs-identifier">Show</span><span class="hs-special">,</span><span> </span><span class="hs-special">''</span><span class="hs-identifier">Eq</span><span class="hs-special">]</span><span>
+</span><span id="line-22"></span><span>
+</span><span id="line-23"></span><span id="PongResponse"><span id="StatusRequest"><span id="StatusResponse"><span id="local-6989586621680418672"><span id="local-6989586621680418674"><span id="local-6989586621680418676"><span id="local-6989586621680418684"><span id="local-6989586621680418690"><span id="local-6989586621680418694"><span id="local-6989586621680418697"><span id="local-6989586621680418701"><span id="local-6989586621680418705"><span id="local-6989586621680418712"><span id="local-6989586621680418719"><span id="local-6989586621680418721"><span id="local-6989586621680418723"><span id="local-6989586621680418731"><span id="local-6989586621680418733"><span id="local-6989586621680418737"><span id="local-6989586621680418740"><span id="local-6989586621680418742"><span id="local-6989586621680418746"><span id="local-6989586621680418753"><span id="local-6989586621680418760"><span id="local-6989586621680418762"><span id="local-6989586621680418764"><span id="local-6989586621680418772"><span id="local-6989586621680418777"><span id="local-6989586621680418781"><span id="local-6989586621680418784"><span id="local-6989586621680418788"><span id="local-6989586621680418792"><span id="local-6989586621680418799"><span id="PongResponse"><span id="payload"><span id="StatusRequest"><span id="StatusResponse"><span id="jsonresponse"></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span><span class="">[pkmacro|
+data StatusResponse {
+  jsonresponse :: Text,
+}
+
+data StatusRequest {}
+
+data PongResponse {
+  payload :: Int64,
+}
+|]</span><span>
+</span><span id="line-34"></span></pre></body></html>

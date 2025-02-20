@@ -1,0 +1,2117 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span id="local-6989586621680381465"><span id="local-6989586621680381466"><span id="local-6989586621680381467"><span id="local-6989586621680381468"><span id="local-6989586621680381469"><span id="local-6989586621680381470"></span></span></span></span></span></span><span class="hs-pragma">{-# LANGUAGE UndecidableInstances #-}</span><span>
+</span><span id="line-2"></span><span>
+</span><span id="line-3"></span><span class="hs-comment">-- |</span><span>
+</span><span id="line-4"></span><span class="hs-comment">-- Module: M.Pack.Internal.Bit</span><span>
+</span><span id="line-5"></span><span class="hs-comment">-- Description: Bit-level serialization support</span><span>
+</span><span id="line-6"></span><span class="hs-comment">-- Copyright: (c) axionbuster, 2025</span><span>
+</span><span id="line-7"></span><span class="hs-comment">-- License: BSD-3-Clause</span><span>
+</span><span id="line-8"></span><span class="hs-comment">--</span><span>
+</span><span id="line-9"></span><span class="hs-comment">-- Implements bit-level serialization for boolean flags and bitsets,</span><span>
+</span><span id="line-10"></span><span class="hs-comment">-- supporting both variable-length and fixed-length bit patterns.</span><span>
+</span><span id="line-11"></span><span class="hs-keyword">module</span><span> </span><span class="annot"><a href="M.Pack.Internal.Bit.html"><span class="hs-identifier">M.Pack.Internal.Bit</span></a></span><span>
+</span><span id="line-12"></span><span>  </span><span class="hs-special">(</span><span> </span><span class="annot"><a href="M.Pack.Internal.Bit.html#Bitwise"><span class="hs-identifier">Bitwise</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span>
+</span><span id="line-13"></span><span>    </span><span class="annot"><a href="M.Pack.Internal.Bit.html#Bitreppable"><span class="hs-identifier">Bitreppable</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span>
+</span><span id="line-14"></span><span>    </span><span class="annot"><a href="M.Pack.Internal.Bit.html#Bitset"><span class="hs-identifier">Bitset</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span>
+</span><span id="line-15"></span><span>    </span><span class="annot"><a href="M.Pack.Internal.Bit.html#FixedBitset"><span class="hs-identifier">FixedBitset</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span>
+</span><span id="line-16"></span><span>  </span><span class="hs-special">)</span><span>
+</span><span id="line-17"></span><span class="hs-keyword">where</span><span>
+</span><span id="line-18"></span><span>
+</span><span id="line-19"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Control.DeepSeq</span></span><span>
+</span><span id="line-20"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Bits</span></span><span>
+</span><span id="line-21"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.ByteString.Builder</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">Builder</span></span><span class="hs-special">)</span><span>
+</span><span id="line-22"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Data</span></span><span>
+</span><span id="line-23"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Hashable</span></span><span>
+</span><span id="line-24"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Int</span></span><span>
+</span><span id="line-25"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Vector.Unboxed</span></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">VU</span></span><span>
+</span><span id="line-26"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">GHC.Generics</span></span><span>
+</span><span id="line-27"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">GHC.TypeLits</span></span><span>
+</span><span id="line-28"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Language.Haskell.TH.Syntax</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">Lift</span></span><span class="hs-special">)</span><span>
+</span><span id="line-29"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="M.Pack.Internal.Etc.html"><span class="hs-identifier">M.Pack.Internal.Etc</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span>
+</span><span id="line-30"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html"><span class="hs-identifier">M.Pack.Internal.Types</span></a></span><span>
+</span><span id="line-31"></span><span>
+</span><span id="line-32"></span><span class="hs-comment">-- | a wrapper type that enables bit-level packing of boolean product types.</span><span>
+</span><span id="line-33"></span><span class="hs-comment">-- the type parameter @i@ specifies the underlying integral type used to store</span><span>
+</span><span id="line-34"></span><span class="hs-comment">-- the bits (e.g. Word8, Word16, etc). the type parameter @a@ is the product</span><span>
+</span><span id="line-35"></span><span class="hs-comment">-- type containing the boolean fields to be encoded.</span><span>
+</span><span id="line-36"></span><span class="hs-keyword">newtype</span><span> </span><span id="Bitwise"><span class="annot"><a href="M.Pack.Internal.Bit.html#Bitwise"><span class="hs-identifier hs-var">Bitwise</span></a></span></span><span> </span><span id="local-6989586621680381129"><span class="annot"><a href="#local-6989586621680381129"><span class="hs-identifier hs-type">i</span></a></span></span><span> </span><span id="local-6989586621680381130"><span class="annot"><a href="#local-6989586621680381130"><span class="hs-identifier hs-type">a</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="Bitwise"><span class="annot"><a href="M.Pack.Internal.Bit.html#Bitwise"><span class="hs-identifier hs-var">Bitwise</span></a></span></span><span> </span><span class="hs-special">{</span><span id="unbitwise"><span class="annot"><span class="annottext">forall {k} (i :: k) a. Bitwise i a -&gt; a
+</span><a href="M.Pack.Internal.Bit.html#unbitwise"><span class="hs-identifier hs-var hs-var">unbitwise</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="#local-6989586621680381130"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">}</span><span>
+</span><span id="line-37"></span><span>  </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">stock</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621680381536"><span id="local-6989586621680381538"><span class="annot"><span class="annottext">(forall x. Bitwise i a -&gt; Rep (Bitwise i a) x)
+-&gt; (forall x. Rep (Bitwise i a) x -&gt; Bitwise i a)
+-&gt; Generic (Bitwise i a)
+forall x. Rep (Bitwise i a) x -&gt; Bitwise i a
+forall x. Bitwise i a -&gt; Rep (Bitwise i a) x
+forall a.
+(forall x. a -&gt; Rep a x) -&gt; (forall x. Rep a x -&gt; a) -&gt; Generic a
+forall k (i :: k) a x. Rep (Bitwise i a) x -&gt; Bitwise i a
+forall k (i :: k) a x. Bitwise i a -&gt; Rep (Bitwise i a) x
+$cfrom :: forall k (i :: k) a x. Bitwise i a -&gt; Rep (Bitwise i a) x
+from :: forall x. Bitwise i a -&gt; Rep (Bitwise i a) x
+$cto :: forall k (i :: k) a x. Rep (Bitwise i a) x -&gt; Bitwise i a
+to :: forall x. Rep (Bitwise i a) x -&gt; Bitwise i a
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Generic</span></span></span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Typeable</span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680381551"><span id="local-6989586621680381554"><span id="local-6989586621680381557"><span id="local-6989586621680381559"><span id="local-6989586621680381561"><span id="local-6989586621680381567"><span id="local-6989586621680381572"><span id="local-6989586621680381575"><span id="local-6989586621680381578"><span id="local-6989586621680381581"><span id="local-6989586621680381584"><span id="local-6989586621680381587"><span id="local-6989586621680381592"><span id="local-6989586621680381597"><span class="annot"><span class="annottext">Typeable (Bitwise i a)
+Typeable (Bitwise i a) =&gt;
+(forall (c :: * -&gt; *).
+ (forall d b. Data d =&gt; c (d -&gt; b) -&gt; d -&gt; c b)
+ -&gt; (forall g. g -&gt; c g) -&gt; Bitwise i a -&gt; c (Bitwise i a))
+-&gt; (forall (c :: * -&gt; *).
+    (forall b r. Data b =&gt; c (b -&gt; r) -&gt; c r)
+    -&gt; (forall r. r -&gt; c r) -&gt; Constr -&gt; c (Bitwise i a))
+-&gt; (Bitwise i a -&gt; Constr)
+-&gt; (Bitwise i a -&gt; DataType)
+-&gt; (forall (t :: * -&gt; *) (c :: * -&gt; *).
+    Typeable t =&gt;
+    (forall d. Data d =&gt; c (t d)) -&gt; Maybe (c (Bitwise i a)))
+-&gt; (forall (t :: * -&gt; * -&gt; *) (c :: * -&gt; *).
+    Typeable t =&gt;
+    (forall d e. (Data d, Data e) =&gt; c (t d e))
+    -&gt; Maybe (c (Bitwise i a)))
+-&gt; ((forall b. Data b =&gt; b -&gt; b) -&gt; Bitwise i a -&gt; Bitwise i a)
+-&gt; (forall r r'.
+    (r -&gt; r' -&gt; r)
+    -&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; Bitwise i a -&gt; r)
+-&gt; (forall r r'.
+    (r' -&gt; r -&gt; r)
+    -&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; Bitwise i a -&gt; r)
+-&gt; (forall u. (forall d. Data d =&gt; d -&gt; u) -&gt; Bitwise i a -&gt; [u])
+-&gt; (forall u.
+    Int -&gt; (forall d. Data d =&gt; d -&gt; u) -&gt; Bitwise i a -&gt; u)
+-&gt; (forall (m :: * -&gt; *).
+    Monad m =&gt;
+    (forall d. Data d =&gt; d -&gt; m d) -&gt; Bitwise i a -&gt; m (Bitwise i a))
+-&gt; (forall (m :: * -&gt; *).
+    MonadPlus m =&gt;
+    (forall d. Data d =&gt; d -&gt; m d) -&gt; Bitwise i a -&gt; m (Bitwise i a))
+-&gt; (forall (m :: * -&gt; *).
+    MonadPlus m =&gt;
+    (forall d. Data d =&gt; d -&gt; m d) -&gt; Bitwise i a -&gt; m (Bitwise i a))
+-&gt; Data (Bitwise i a)
+Bitwise i a -&gt; Constr
+Bitwise i a -&gt; DataType
+(forall b. Data b =&gt; b -&gt; b) -&gt; Bitwise i a -&gt; Bitwise i a
+forall a.
+Typeable a =&gt;
+(forall (c :: * -&gt; *).
+ (forall d b. Data d =&gt; c (d -&gt; b) -&gt; d -&gt; c b)
+ -&gt; (forall g. g -&gt; c g) -&gt; a -&gt; c a)
+-&gt; (forall (c :: * -&gt; *).
+    (forall b r. Data b =&gt; c (b -&gt; r) -&gt; c r)
+    -&gt; (forall r. r -&gt; c r) -&gt; Constr -&gt; c a)
+-&gt; (a -&gt; Constr)
+-&gt; (a -&gt; DataType)
+-&gt; (forall (t :: * -&gt; *) (c :: * -&gt; *).
+    Typeable t =&gt;
+    (forall d. Data d =&gt; c (t d)) -&gt; Maybe (c a))
+-&gt; (forall (t :: * -&gt; * -&gt; *) (c :: * -&gt; *).
+    Typeable t =&gt;
+    (forall d e. (Data d, Data e) =&gt; c (t d e)) -&gt; Maybe (c a))
+-&gt; ((forall b. Data b =&gt; b -&gt; b) -&gt; a -&gt; a)
+-&gt; (forall r r'.
+    (r -&gt; r' -&gt; r) -&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; a -&gt; r)
+-&gt; (forall r r'.
+    (r' -&gt; r -&gt; r) -&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; a -&gt; r)
+-&gt; (forall u. (forall d. Data d =&gt; d -&gt; u) -&gt; a -&gt; [u])
+-&gt; (forall u. Int -&gt; (forall d. Data d =&gt; d -&gt; u) -&gt; a -&gt; u)
+-&gt; (forall (m :: * -&gt; *).
+    Monad m =&gt;
+    (forall d. Data d =&gt; d -&gt; m d) -&gt; a -&gt; m a)
+-&gt; (forall (m :: * -&gt; *).
+    MonadPlus m =&gt;
+    (forall d. Data d =&gt; d -&gt; m d) -&gt; a -&gt; m a)
+-&gt; (forall (m :: * -&gt; *).
+    MonadPlus m =&gt;
+    (forall d. Data d =&gt; d -&gt; m d) -&gt; a -&gt; m a)
+-&gt; Data a
+forall u. Int -&gt; (forall d. Data d =&gt; d -&gt; u) -&gt; Bitwise i a -&gt; u
+forall u. (forall d. Data d =&gt; d -&gt; u) -&gt; Bitwise i a -&gt; [u]
+forall k (i :: k) a.
+(Typeable i, Typeable k, Data a) =&gt;
+Typeable (Bitwise i a)
+forall k (i :: k) a.
+(Typeable i, Typeable k, Data a) =&gt;
+Bitwise i a -&gt; Constr
+forall k (i :: k) a.
+(Typeable i, Typeable k, Data a) =&gt;
+Bitwise i a -&gt; DataType
+forall k (i :: k) a.
+(Typeable i, Typeable k, Data a) =&gt;
+(forall b. Data b =&gt; b -&gt; b) -&gt; Bitwise i a -&gt; Bitwise i a
+forall k (i :: k) a u.
+(Typeable i, Typeable k, Data a) =&gt;
+Int -&gt; (forall d. Data d =&gt; d -&gt; u) -&gt; Bitwise i a -&gt; u
+forall k (i :: k) a u.
+(Typeable i, Typeable k, Data a) =&gt;
+(forall d. Data d =&gt; d -&gt; u) -&gt; Bitwise i a -&gt; [u]
+forall k (i :: k) a r r'.
+(Typeable i, Typeable k, Data a) =&gt;
+(r -&gt; r' -&gt; r)
+-&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; Bitwise i a -&gt; r
+forall k (i :: k) a r r'.
+(Typeable i, Typeable k, Data a) =&gt;
+(r' -&gt; r -&gt; r)
+-&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; Bitwise i a -&gt; r
+forall k (i :: k) a (m :: * -&gt; *).
+(Typeable i, Typeable k, Data a, Monad m) =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; Bitwise i a -&gt; m (Bitwise i a)
+forall k (i :: k) a (m :: * -&gt; *).
+(Typeable i, Typeable k, Data a, MonadPlus m) =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; Bitwise i a -&gt; m (Bitwise i a)
+forall k (i :: k) a (c :: * -&gt; *).
+(Typeable i, Typeable k, Data a) =&gt;
+(forall b r. Data b =&gt; c (b -&gt; r) -&gt; c r)
+-&gt; (forall r. r -&gt; c r) -&gt; Constr -&gt; c (Bitwise i a)
+forall k (i :: k) a (c :: * -&gt; *).
+(Typeable i, Typeable k, Data a) =&gt;
+(forall d b. Data d =&gt; c (d -&gt; b) -&gt; d -&gt; c b)
+-&gt; (forall g. g -&gt; c g) -&gt; Bitwise i a -&gt; c (Bitwise i a)
+forall k (i :: k) a (t :: * -&gt; *) (c :: * -&gt; *).
+(Typeable i, Typeable k, Data a, Typeable t) =&gt;
+(forall d. Data d =&gt; c (t d)) -&gt; Maybe (c (Bitwise i a))
+forall k (i :: k) a (t :: * -&gt; * -&gt; *) (c :: * -&gt; *).
+(Typeable i, Typeable k, Data a, Typeable t) =&gt;
+(forall d e. (Data d, Data e) =&gt; c (t d e))
+-&gt; Maybe (c (Bitwise i a))
+forall r r'.
+(r -&gt; r' -&gt; r)
+-&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; Bitwise i a -&gt; r
+forall r r'.
+(r' -&gt; r -&gt; r)
+-&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; Bitwise i a -&gt; r
+forall (m :: * -&gt; *).
+Monad m =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; Bitwise i a -&gt; m (Bitwise i a)
+forall (m :: * -&gt; *).
+MonadPlus m =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; Bitwise i a -&gt; m (Bitwise i a)
+forall (c :: * -&gt; *).
+(forall b r. Data b =&gt; c (b -&gt; r) -&gt; c r)
+-&gt; (forall r. r -&gt; c r) -&gt; Constr -&gt; c (Bitwise i a)
+forall (c :: * -&gt; *).
+(forall d b. Data d =&gt; c (d -&gt; b) -&gt; d -&gt; c b)
+-&gt; (forall g. g -&gt; c g) -&gt; Bitwise i a -&gt; c (Bitwise i a)
+forall (t :: * -&gt; *) (c :: * -&gt; *).
+Typeable t =&gt;
+(forall d. Data d =&gt; c (t d)) -&gt; Maybe (c (Bitwise i a))
+forall (t :: * -&gt; * -&gt; *) (c :: * -&gt; *).
+Typeable t =&gt;
+(forall d e. (Data d, Data e) =&gt; c (t d e))
+-&gt; Maybe (c (Bitwise i a))
+$cgfoldl :: forall k (i :: k) a (c :: * -&gt; *).
+(Typeable i, Typeable k, Data a) =&gt;
+(forall d b. Data d =&gt; c (d -&gt; b) -&gt; d -&gt; c b)
+-&gt; (forall g. g -&gt; c g) -&gt; Bitwise i a -&gt; c (Bitwise i a)
+gfoldl :: forall (c :: * -&gt; *).
+(forall d b. Data d =&gt; c (d -&gt; b) -&gt; d -&gt; c b)
+-&gt; (forall g. g -&gt; c g) -&gt; Bitwise i a -&gt; c (Bitwise i a)
+$cgunfold :: forall k (i :: k) a (c :: * -&gt; *).
+(Typeable i, Typeable k, Data a) =&gt;
+(forall b r. Data b =&gt; c (b -&gt; r) -&gt; c r)
+-&gt; (forall r. r -&gt; c r) -&gt; Constr -&gt; c (Bitwise i a)
+gunfold :: forall (c :: * -&gt; *).
+(forall b r. Data b =&gt; c (b -&gt; r) -&gt; c r)
+-&gt; (forall r. r -&gt; c r) -&gt; Constr -&gt; c (Bitwise i a)
+$ctoConstr :: forall k (i :: k) a.
+(Typeable i, Typeable k, Data a) =&gt;
+Bitwise i a -&gt; Constr
+toConstr :: Bitwise i a -&gt; Constr
+$cdataTypeOf :: forall k (i :: k) a.
+(Typeable i, Typeable k, Data a) =&gt;
+Bitwise i a -&gt; DataType
+dataTypeOf :: Bitwise i a -&gt; DataType
+$cdataCast1 :: forall k (i :: k) a (t :: * -&gt; *) (c :: * -&gt; *).
+(Typeable i, Typeable k, Data a, Typeable t) =&gt;
+(forall d. Data d =&gt; c (t d)) -&gt; Maybe (c (Bitwise i a))
+dataCast1 :: forall (t :: * -&gt; *) (c :: * -&gt; *).
+Typeable t =&gt;
+(forall d. Data d =&gt; c (t d)) -&gt; Maybe (c (Bitwise i a))
+$cdataCast2 :: forall k (i :: k) a (t :: * -&gt; * -&gt; *) (c :: * -&gt; *).
+(Typeable i, Typeable k, Data a, Typeable t) =&gt;
+(forall d e. (Data d, Data e) =&gt; c (t d e))
+-&gt; Maybe (c (Bitwise i a))
+dataCast2 :: forall (t :: * -&gt; * -&gt; *) (c :: * -&gt; *).
+Typeable t =&gt;
+(forall d e. (Data d, Data e) =&gt; c (t d e))
+-&gt; Maybe (c (Bitwise i a))
+$cgmapT :: forall k (i :: k) a.
+(Typeable i, Typeable k, Data a) =&gt;
+(forall b. Data b =&gt; b -&gt; b) -&gt; Bitwise i a -&gt; Bitwise i a
+gmapT :: (forall b. Data b =&gt; b -&gt; b) -&gt; Bitwise i a -&gt; Bitwise i a
+$cgmapQl :: forall k (i :: k) a r r'.
+(Typeable i, Typeable k, Data a) =&gt;
+(r -&gt; r' -&gt; r)
+-&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; Bitwise i a -&gt; r
+gmapQl :: forall r r'.
+(r -&gt; r' -&gt; r)
+-&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; Bitwise i a -&gt; r
+$cgmapQr :: forall k (i :: k) a r r'.
+(Typeable i, Typeable k, Data a) =&gt;
+(r' -&gt; r -&gt; r)
+-&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; Bitwise i a -&gt; r
+gmapQr :: forall r r'.
+(r' -&gt; r -&gt; r)
+-&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; Bitwise i a -&gt; r
+$cgmapQ :: forall k (i :: k) a u.
+(Typeable i, Typeable k, Data a) =&gt;
+(forall d. Data d =&gt; d -&gt; u) -&gt; Bitwise i a -&gt; [u]
+gmapQ :: forall u. (forall d. Data d =&gt; d -&gt; u) -&gt; Bitwise i a -&gt; [u]
+$cgmapQi :: forall k (i :: k) a u.
+(Typeable i, Typeable k, Data a) =&gt;
+Int -&gt; (forall d. Data d =&gt; d -&gt; u) -&gt; Bitwise i a -&gt; u
+gmapQi :: forall u. Int -&gt; (forall d. Data d =&gt; d -&gt; u) -&gt; Bitwise i a -&gt; u
+$cgmapM :: forall k (i :: k) a (m :: * -&gt; *).
+(Typeable i, Typeable k, Data a, Monad m) =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; Bitwise i a -&gt; m (Bitwise i a)
+gmapM :: forall (m :: * -&gt; *).
+Monad m =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; Bitwise i a -&gt; m (Bitwise i a)
+$cgmapMp :: forall k (i :: k) a (m :: * -&gt; *).
+(Typeable i, Typeable k, Data a, MonadPlus m) =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; Bitwise i a -&gt; m (Bitwise i a)
+gmapMp :: forall (m :: * -&gt; *).
+MonadPlus m =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; Bitwise i a -&gt; m (Bitwise i a)
+$cgmapMo :: forall k (i :: k) a (m :: * -&gt; *).
+(Typeable i, Typeable k, Data a, MonadPlus m) =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; Bitwise i a -&gt; m (Bitwise i a)
+gmapMo :: forall (m :: * -&gt; *).
+MonadPlus m =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; Bitwise i a -&gt; m (Bitwise i a)
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Data</span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680381609"><span id="local-6989586621680381611"><span class="annot"><span class="annottext">(forall a b. (a -&gt; b) -&gt; Bitwise i a -&gt; Bitwise i b)
+-&gt; (forall a b. a -&gt; Bitwise i b -&gt; Bitwise i a)
+-&gt; Functor (Bitwise i)
+forall k (i :: k) a b. a -&gt; Bitwise i b -&gt; Bitwise i a
+forall k (i :: k) a b. (a -&gt; b) -&gt; Bitwise i a -&gt; Bitwise i b
+forall a b. a -&gt; Bitwise i b -&gt; Bitwise i a
+forall a b. (a -&gt; b) -&gt; Bitwise i a -&gt; Bitwise i b
+forall (f :: * -&gt; *).
+(forall a b. (a -&gt; b) -&gt; f a -&gt; f b)
+-&gt; (forall a b. a -&gt; f b -&gt; f a) -&gt; Functor f
+$cfmap :: forall k (i :: k) a b. (a -&gt; b) -&gt; Bitwise i a -&gt; Bitwise i b
+fmap :: forall a b. (a -&gt; b) -&gt; Bitwise i a -&gt; Bitwise i b
+$c&lt;$ :: forall k (i :: k) a b. a -&gt; Bitwise i b -&gt; Bitwise i a
+&lt;$ :: forall a b. a -&gt; Bitwise i b -&gt; Bitwise i a
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Functor</span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680381617"><span id="local-6989586621680381623"><span class="annot"><span class="annottext">(forall (m :: * -&gt; *). Quote m =&gt; Bitwise i a -&gt; m Exp)
+-&gt; (forall (m :: * -&gt; *).
+    Quote m =&gt;
+    Bitwise i a -&gt; Code m (Bitwise i a))
+-&gt; Lift (Bitwise i a)
+forall k (i :: k) a (m :: * -&gt; *).
+(Lift a, Quote m) =&gt;
+Bitwise i a -&gt; m Exp
+forall k (i :: k) a (m :: * -&gt; *).
+(Lift a, Quote m) =&gt;
+Bitwise i a -&gt; Code m (Bitwise i a)
+forall t.
+(forall (m :: * -&gt; *). Quote m =&gt; t -&gt; m Exp)
+-&gt; (forall (m :: * -&gt; *). Quote m =&gt; t -&gt; Code m t) -&gt; Lift t
+forall (m :: * -&gt; *). Quote m =&gt; Bitwise i a -&gt; m Exp
+forall (m :: * -&gt; *).
+Quote m =&gt;
+Bitwise i a -&gt; Code m (Bitwise i a)
+$clift :: forall k (i :: k) a (m :: * -&gt; *).
+(Lift a, Quote m) =&gt;
+Bitwise i a -&gt; m Exp
+lift :: forall (m :: * -&gt; *). Quote m =&gt; Bitwise i a -&gt; m Exp
+$cliftTyped :: forall k (i :: k) a (m :: * -&gt; *).
+(Lift a, Quote m) =&gt;
+Bitwise i a -&gt; Code m (Bitwise i a)
+liftTyped :: forall (m :: * -&gt; *).
+Quote m =&gt;
+Bitwise i a -&gt; Code m (Bitwise i a)
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Lift</span></span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-38"></span><span>  </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">newtype</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621680381632"><span id="local-6989586621680381636"><span class="annot"><span class="annottext">Bitwise i a -&gt; Bitwise i a -&gt; Bool
+(Bitwise i a -&gt; Bitwise i a -&gt; Bool)
+-&gt; (Bitwise i a -&gt; Bitwise i a -&gt; Bool) -&gt; Eq (Bitwise i a)
+forall a. (a -&gt; a -&gt; Bool) -&gt; (a -&gt; a -&gt; Bool) -&gt; Eq a
+forall k (i :: k) a. Eq a =&gt; Bitwise i a -&gt; Bitwise i a -&gt; Bool
+$c== :: forall k (i :: k) a. Eq a =&gt; Bitwise i a -&gt; Bitwise i a -&gt; Bool
+== :: Bitwise i a -&gt; Bitwise i a -&gt; Bool
+$c/= :: forall k (i :: k) a. Eq a =&gt; Bitwise i a -&gt; Bitwise i a -&gt; Bool
+/= :: Bitwise i a -&gt; Bitwise i a -&gt; Bool
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Eq</span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680381647"><span id="local-6989586621680381651"><span id="local-6989586621680381655"><span id="local-6989586621680381659"><span id="local-6989586621680381663"><span id="local-6989586621680381667"><span id="local-6989586621680381671"><span class="annot"><span class="annottext">Eq (Bitwise i a)
+Eq (Bitwise i a) =&gt;
+(Bitwise i a -&gt; Bitwise i a -&gt; Ordering)
+-&gt; (Bitwise i a -&gt; Bitwise i a -&gt; Bool)
+-&gt; (Bitwise i a -&gt; Bitwise i a -&gt; Bool)
+-&gt; (Bitwise i a -&gt; Bitwise i a -&gt; Bool)
+-&gt; (Bitwise i a -&gt; Bitwise i a -&gt; Bool)
+-&gt; (Bitwise i a -&gt; Bitwise i a -&gt; Bitwise i a)
+-&gt; (Bitwise i a -&gt; Bitwise i a -&gt; Bitwise i a)
+-&gt; Ord (Bitwise i a)
+Bitwise i a -&gt; Bitwise i a -&gt; Bool
+Bitwise i a -&gt; Bitwise i a -&gt; Ordering
+Bitwise i a -&gt; Bitwise i a -&gt; Bitwise i a
+forall a.
+Eq a =&gt;
+(a -&gt; a -&gt; Ordering)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; Ord a
+forall k (i :: k) a. Ord a =&gt; Eq (Bitwise i a)
+forall k (i :: k) a. Ord a =&gt; Bitwise i a -&gt; Bitwise i a -&gt; Bool
+forall k (i :: k) a.
+Ord a =&gt;
+Bitwise i a -&gt; Bitwise i a -&gt; Ordering
+forall k (i :: k) a.
+Ord a =&gt;
+Bitwise i a -&gt; Bitwise i a -&gt; Bitwise i a
+$ccompare :: forall k (i :: k) a.
+Ord a =&gt;
+Bitwise i a -&gt; Bitwise i a -&gt; Ordering
+compare :: Bitwise i a -&gt; Bitwise i a -&gt; Ordering
+$c&lt; :: forall k (i :: k) a. Ord a =&gt; Bitwise i a -&gt; Bitwise i a -&gt; Bool
+&lt; :: Bitwise i a -&gt; Bitwise i a -&gt; Bool
+$c&lt;= :: forall k (i :: k) a. Ord a =&gt; Bitwise i a -&gt; Bitwise i a -&gt; Bool
+&lt;= :: Bitwise i a -&gt; Bitwise i a -&gt; Bool
+$c&gt; :: forall k (i :: k) a. Ord a =&gt; Bitwise i a -&gt; Bitwise i a -&gt; Bool
+&gt; :: Bitwise i a -&gt; Bitwise i a -&gt; Bool
+$c&gt;= :: forall k (i :: k) a. Ord a =&gt; Bitwise i a -&gt; Bitwise i a -&gt; Bool
+&gt;= :: Bitwise i a -&gt; Bitwise i a -&gt; Bool
+$cmax :: forall k (i :: k) a.
+Ord a =&gt;
+Bitwise i a -&gt; Bitwise i a -&gt; Bitwise i a
+max :: Bitwise i a -&gt; Bitwise i a -&gt; Bitwise i a
+$cmin :: forall k (i :: k) a.
+Ord a =&gt;
+Bitwise i a -&gt; Bitwise i a -&gt; Bitwise i a
+min :: Bitwise i a -&gt; Bitwise i a -&gt; Bitwise i a
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Ord</span></span></span></span></span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680381685"><span id="local-6989586621680381689"><span id="local-6989586621680381693"><span class="annot"><span class="annottext">Int -&gt; Bitwise i a -&gt; String -&gt; String
+[Bitwise i a] -&gt; String -&gt; String
+Bitwise i a -&gt; String
+(Int -&gt; Bitwise i a -&gt; String -&gt; String)
+-&gt; (Bitwise i a -&gt; String)
+-&gt; ([Bitwise i a] -&gt; String -&gt; String)
+-&gt; Show (Bitwise i a)
+forall a.
+(Int -&gt; a -&gt; String -&gt; String)
+-&gt; (a -&gt; String) -&gt; ([a] -&gt; String -&gt; String) -&gt; Show a
+forall k (i :: k) a.
+Show a =&gt;
+Int -&gt; Bitwise i a -&gt; String -&gt; String
+forall k (i :: k) a. Show a =&gt; [Bitwise i a] -&gt; String -&gt; String
+forall k (i :: k) a. Show a =&gt; Bitwise i a -&gt; String
+$cshowsPrec :: forall k (i :: k) a.
+Show a =&gt;
+Int -&gt; Bitwise i a -&gt; String -&gt; String
+showsPrec :: Int -&gt; Bitwise i a -&gt; String -&gt; String
+$cshow :: forall k (i :: k) a. Show a =&gt; Bitwise i a -&gt; String
+show :: Bitwise i a -&gt; String
+$cshowList :: forall k (i :: k) a. Show a =&gt; [Bitwise i a] -&gt; String -&gt; String
+showList :: [Bitwise i a] -&gt; String -&gt; String
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Show</span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680381703"><span id="local-6989586621680381707"><span id="local-6989586621680381711"><span id="local-6989586621680381715"><span class="annot"><span class="annottext">ReadPrec [Bitwise i a]
+ReadPrec (Bitwise i a)
+Int -&gt; ReadS (Bitwise i a)
+ReadS [Bitwise i a]
+(Int -&gt; ReadS (Bitwise i a))
+-&gt; ReadS [Bitwise i a]
+-&gt; ReadPrec (Bitwise i a)
+-&gt; ReadPrec [Bitwise i a]
+-&gt; Read (Bitwise i a)
+forall a.
+(Int -&gt; ReadS a)
+-&gt; ReadS [a] -&gt; ReadPrec a -&gt; ReadPrec [a] -&gt; Read a
+forall k (i :: k) a. Read a =&gt; ReadPrec [Bitwise i a]
+forall k (i :: k) a. Read a =&gt; ReadPrec (Bitwise i a)
+forall k (i :: k) a. Read a =&gt; Int -&gt; ReadS (Bitwise i a)
+forall k (i :: k) a. Read a =&gt; ReadS [Bitwise i a]
+$creadsPrec :: forall k (i :: k) a. Read a =&gt; Int -&gt; ReadS (Bitwise i a)
+readsPrec :: Int -&gt; ReadS (Bitwise i a)
+$creadList :: forall k (i :: k) a. Read a =&gt; ReadS [Bitwise i a]
+readList :: ReadS [Bitwise i a]
+$creadPrec :: forall k (i :: k) a. Read a =&gt; ReadPrec (Bitwise i a)
+readPrec :: ReadPrec (Bitwise i a)
+$creadListPrec :: forall k (i :: k) a. Read a =&gt; ReadPrec [Bitwise i a]
+readListPrec :: ReadPrec [Bitwise i a]
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Read</span></span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680381729"><span id="local-6989586621680381733"><span class="annot"><span class="annottext">Eq (Bitwise i a)
+Eq (Bitwise i a) =&gt;
+(Int -&gt; Bitwise i a -&gt; Int)
+-&gt; (Bitwise i a -&gt; Int) -&gt; Hashable (Bitwise i a)
+Int -&gt; Bitwise i a -&gt; Int
+Bitwise i a -&gt; Int
+forall a. Eq a =&gt; (Int -&gt; a -&gt; Int) -&gt; (a -&gt; Int) -&gt; Hashable a
+forall k (i :: k) a. Hashable a =&gt; Eq (Bitwise i a)
+forall k (i :: k) a. Hashable a =&gt; Int -&gt; Bitwise i a -&gt; Int
+forall k (i :: k) a. Hashable a =&gt; Bitwise i a -&gt; Int
+$chashWithSalt :: forall k (i :: k) a. Hashable a =&gt; Int -&gt; Bitwise i a -&gt; Int
+hashWithSalt :: Int -&gt; Bitwise i a -&gt; Int
+$chash :: forall k (i :: k) a. Hashable a =&gt; Bitwise i a -&gt; Int
+hash :: Bitwise i a -&gt; Int
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Hashable</span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680381743"><span class="annot"><span class="annottext">Bitwise i a -&gt; ()
+(Bitwise i a -&gt; ()) -&gt; NFData (Bitwise i a)
+forall a. (a -&gt; ()) -&gt; NFData a
+forall k (i :: k) a. NFData a =&gt; Bitwise i a -&gt; ()
+$crnf :: forall k (i :: k) a. NFData a =&gt; Bitwise i a -&gt; ()
+rnf :: Bitwise i a -&gt; ()
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var">NFData</span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-39"></span><span>
+</span><span id="line-40"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621680381260"><span id="local-6989586621680381261"><span class="hs-special">(</span><span class="annot"><a href="M.Pack.Internal.Bit.html#Bitreppable"><span class="hs-identifier hs-type">Bitreppable</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680381260"><span class="hs-identifier hs-type">i</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680381261"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#Pack"><span class="hs-identifier hs-type">Pack</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="M.Pack.Internal.Bit.html#Bitwise"><span class="hs-identifier hs-type">Bitwise</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680381260"><span class="hs-identifier hs-type">i</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680381261"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-41"></span><span>  </span><span id="local-6989586621680381754"><span class="annot"><span class="annottext">pack :: Bitwise i a -&gt; Builder
+</span><a href="#local-6989586621680381754"><span class="hs-identifier hs-var hs-var hs-var">pack</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall i a. Bitreppable i a =&gt; a -&gt; Builder
+</span><a href="M.Pack.Internal.Bit.html#tobits0"><span class="hs-identifier hs-var">tobits0</span></a></span><span> </span><span class="hs-glyph">@</span><span class="annot"><a href="#local-6989586621680381260"><span class="hs-identifier hs-type">i</span></a></span><span> </span><span class="annot"><span class="annottext">(a -&gt; Builder) -&gt; (Bitwise i a -&gt; a) -&gt; Bitwise i a -&gt; Builder
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">Bitwise i a -&gt; a
+forall {k} (i :: k) a. Bitwise i a -&gt; a
+</span><a href="M.Pack.Internal.Bit.html#unbitwise"><span class="hs-identifier hs-var">unbitwise</span></a></span><span>
+</span><span id="line-42"></span><span>  </span><span class="hs-pragma">{-# INLINEABLE</span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#pack"><span class="hs-pragma hs-type">pack</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-43"></span><span>
+</span><span id="line-44"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621680381274"><span id="local-6989586621680381275"><span class="hs-special">(</span><span class="annot"><a href="M.Pack.Internal.Bit.html#Bitreppable"><span class="hs-identifier hs-type">Bitreppable</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680381274"><span class="hs-identifier hs-type">i</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680381275"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#Unpack"><span class="hs-identifier hs-type">Unpack</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="M.Pack.Internal.Bit.html#Bitwise"><span class="hs-identifier hs-type">Bitwise</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680381274"><span class="hs-identifier hs-type">i</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680381275"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-45"></span><span>  </span><span id="local-6989586621680381765"><span class="annot"><span class="annottext">unpack :: forall (st :: ZeroBitType) r. Parser st r (Bitwise i a)
+</span><a href="#local-6989586621680381765"><span class="hs-identifier hs-var hs-var hs-var">unpack</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">a -&gt; Bitwise i a
+forall {k} (i :: k) a. a -&gt; Bitwise i a
+</span><a href="M.Pack.Internal.Bit.html#Bitwise"><span class="hs-identifier hs-var">Bitwise</span></a></span><span> </span><span class="annot"><span class="annottext">(a -&gt; Bitwise i a)
+-&gt; ParserT st r ParseError a
+-&gt; ParserT st r ParseError (Bitwise i a)
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-operator hs-var">&lt;$&gt;</span></span><span> </span><span class="annot"><span class="annottext">forall i a (st :: ZeroBitType) r. Bitreppable i a =&gt; Parser st r a
+</span><a href="M.Pack.Internal.Bit.html#frombits0"><span class="hs-identifier hs-var">frombits0</span></a></span><span> </span><span class="hs-glyph">@</span><span class="annot"><a href="#local-6989586621680381274"><span class="hs-identifier hs-type">i</span></a></span><span>
+</span><span id="line-46"></span><span>  </span><span class="hs-pragma">{-# INLINEABLE</span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#unpack"><span class="hs-pragma hs-type">unpack</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-47"></span><span>
+</span><span id="line-48"></span><span class="hs-comment">-- | type class for types that can be represented as bit flags.</span><span>
+</span><span id="line-49"></span><span class="hs-comment">-- provides methods for converting to and from bit representations.</span><span>
+</span><span id="line-50"></span><span class="hs-comment">--</span><span>
+</span><span id="line-51"></span><span class="hs-comment">-- most users should not need to implement this directly - just derive 'Generic'</span><span>
+</span><span id="line-52"></span><span class="hs-comment">-- for your type and declare an instance without implementations:</span><span>
+</span><span id="line-53"></span><span class="hs-comment">--</span><span>
+</span><span id="line-54"></span><span class="hs-comment">-- @</span><span>
+</span><span id="line-55"></span><span class="hs-comment">-- instance Bitreppable Word8 MyFlags</span><span>
+</span><span id="line-56"></span><span class="hs-comment">-- @</span><span>
+</span><span id="line-57"></span><span class="hs-keyword">class</span><span> </span><span id="Bitreppable"><span class="annot"><a href="M.Pack.Internal.Bit.html#Bitreppable"><span class="hs-identifier hs-var">Bitreppable</span></a></span></span><span> </span><span id="local-6989586621680381262"><span class="annot"><a href="#local-6989586621680381262"><span class="hs-identifier hs-type">i</span></a></span></span><span> </span><span id="local-6989586621680381263"><span class="annot"><a href="#local-6989586621680381263"><span class="hs-identifier hs-type">a</span></a></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-58"></span><span>  </span><span id="tobits0"><span class="annot"><a href="M.Pack.Internal.Bit.html#tobits0"><span class="hs-identifier hs-type">tobits0</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="#local-6989586621680381263"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Builder</span></span><span>
+</span><span id="line-59"></span><span>  </span><span class="hs-keyword">default</span><span> </span><span id="tobits0"><span class="annot"><a href="M.Pack.Internal.Bit.html#tobits0"><span class="hs-identifier hs-type">tobits0</span></a></span></span><span> </span><span class="hs-glyph">::</span><span>
+</span><span id="line-60"></span><span>    </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">Generic</span></span><span> </span><span class="annot"><a href="#local-6989586621680381263"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="M.Pack.Internal.Bit.html#GBitRep"><span class="hs-identifier hs-type">GBitRep</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">Rep</span></span><span> </span><span class="annot"><a href="#local-6989586621680381263"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Integral</span></span><span> </span><span class="annot"><a href="#local-6989586621680381262"><span class="hs-identifier hs-type">i</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Bits</span></span><span> </span><span class="annot"><a href="#local-6989586621680381262"><span class="hs-identifier hs-type">i</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#Pack"><span class="hs-identifier hs-type">Pack</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680381262"><span class="hs-identifier hs-type">i</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=&gt;</span><span>
+</span><span id="line-61"></span><span>    </span><span class="annot"><a href="#local-6989586621680381263"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Builder</span></span><span>
+</span><span id="line-62"></span><span>  </span><span id="local-6989586621680381770"><span class="annot"><a href="M.Pack.Internal.Bit.html#tobits0"><span class="hs-identifier hs-var hs-var">tobits0</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">i -&gt; Builder
+forall a. Pack a =&gt; a -&gt; Builder
+</span><a href="M.Pack.Internal.Types.html#pack"><span class="hs-identifier hs-var">pack</span></a></span><span> </span><span class="annot"><span class="annottext">(i -&gt; Builder) -&gt; (a -&gt; i) -&gt; a -&gt; Builder
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">(i, Int) -&gt; i
+forall a b. (a, b) -&gt; a
+</span><span class="hs-identifier hs-var">fst</span></span><span> </span><span class="annot"><span class="annottext">((i, Int) -&gt; i) -&gt; (a -&gt; (i, Int)) -&gt; a -&gt; i
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">i -&gt; Int -&gt; Rep a Any -&gt; (i, Int)
+forall i p. (Bits i, Integral i) =&gt; i -&gt; Int -&gt; Rep a p -&gt; (i, Int)
+forall {k} (f :: k -&gt; *) i (p :: k).
+(GBitRep f, Bits i, Integral i) =&gt;
+i -&gt; Int -&gt; f p -&gt; (i, Int)
+</span><a href="M.Pack.Internal.Bit.html#tobits"><span class="hs-identifier hs-var">tobits</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">i
+</span><span class="hs-number">0</span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="#local-6989586621680381262"><span class="hs-identifier hs-type">i</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">0</span></span><span> </span><span class="annot"><span class="annottext">(Rep a Any -&gt; (i, Int)) -&gt; (a -&gt; Rep a Any) -&gt; a -&gt; (i, Int)
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">a -&gt; Rep a Any
+forall x. a -&gt; Rep a x
+forall a x. Generic a =&gt; a -&gt; Rep a x
+</span><span class="hs-identifier hs-var">from</span></span></span><span>
+</span><span id="line-63"></span><span>  </span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="M.Pack.Internal.Bit.html#tobits0"><span class="hs-pragma hs-type">tobits0</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-64"></span><span>  </span><span id="frombits0"><span class="annot"><a href="M.Pack.Internal.Bit.html#frombits0"><span class="hs-identifier hs-type">frombits0</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span id="local-6989586621680381286"><span id="local-6989586621680381287"><span class="annot"><a href="M.Pack.Internal.Types.html#Parser"><span class="hs-identifier hs-type">Parser</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680381286"><span class="hs-identifier hs-type">st</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680381287"><span class="hs-identifier hs-type">r</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680381263"><span class="hs-identifier hs-type">a</span></a></span></span></span><span>
+</span><span id="line-65"></span><span>  </span><span class="hs-keyword">default</span><span> </span><span id="frombits0"><span class="annot"><a href="M.Pack.Internal.Bit.html#frombits0"><span class="hs-identifier hs-type">frombits0</span></a></span></span><span> </span><span class="hs-glyph">::</span><span>
+</span><span id="line-66"></span><span>    </span><span class="hs-keyword">forall</span><span> </span><span id="local-6989586621680381299"><span class="annot"><a href="#local-6989586621680381299"><span class="hs-identifier hs-type">r</span></a></span></span><span> </span><span id="local-6989586621680381298"><span class="annot"><a href="#local-6989586621680381298"><span class="hs-identifier hs-type">st</span></a></span></span><span class="hs-operator">.</span><span>
+</span><span id="line-67"></span><span>    </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">Generic</span></span><span> </span><span class="annot"><a href="#local-6989586621680381263"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="M.Pack.Internal.Bit.html#GBitRep"><span class="hs-identifier hs-type">GBitRep</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">Rep</span></span><span> </span><span class="annot"><a href="#local-6989586621680381263"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">)</span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Integral</span></span><span> </span><span class="annot"><a href="#local-6989586621680381262"><span class="hs-identifier hs-type">i</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Bits</span></span><span> </span><span class="annot"><a href="#local-6989586621680381262"><span class="hs-identifier hs-type">i</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#Unpack"><span class="hs-identifier hs-type">Unpack</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680381262"><span class="hs-identifier hs-type">i</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=&gt;</span><span>
+</span><span id="line-68"></span><span>    </span><span class="annot"><a href="M.Pack.Internal.Types.html#Parser"><span class="hs-identifier hs-type">Parser</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680381298"><span class="hs-identifier hs-type">st</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680381299"><span class="hs-identifier hs-type">r</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680381263"><span class="hs-identifier hs-type">a</span></a></span><span>
+</span><span id="line-69"></span><span>  </span><span id="local-6989586621680381788"><span class="annot"><a href="M.Pack.Internal.Bit.html#frombits0"><span class="hs-identifier hs-var hs-var">frombits0</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Rep a Any -&gt; a
+forall a x. Generic a =&gt; Rep a x -&gt; a
+forall x. Rep a x -&gt; a
+</span><span class="hs-identifier hs-var">to</span></span><span> </span><span class="annot"><span class="annottext">(Rep a Any -&gt; a) -&gt; (i -&gt; Rep a Any) -&gt; i -&gt; a
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">(Rep a Any, Int) -&gt; Rep a Any
+forall a b. (a, b) -&gt; a
+</span><span class="hs-identifier hs-var">fst</span></span><span> </span><span class="annot"><span class="annottext">((Rep a Any, Int) -&gt; Rep a Any)
+-&gt; (i -&gt; (Rep a Any, Int)) -&gt; i -&gt; Rep a Any
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">(i -&gt; Int -&gt; (Rep a Any, Int)) -&gt; Int -&gt; i -&gt; (Rep a Any, Int)
+forall a b c. (a -&gt; b -&gt; c) -&gt; b -&gt; a -&gt; c
+</span><span class="hs-identifier hs-var">flip</span></span><span> </span><span class="annot"><span class="annottext">i -&gt; Int -&gt; (Rep a Any, Int)
+forall i p. (Bits i, Integral i) =&gt; i -&gt; Int -&gt; (Rep a p, Int)
+forall {k} (f :: k -&gt; *) i (p :: k).
+(GBitRep f, Bits i, Integral i) =&gt;
+i -&gt; Int -&gt; (f p, Int)
+</span><a href="M.Pack.Internal.Bit.html#frombits"><span class="hs-identifier hs-var">frombits</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">0</span></span><span> </span><span class="annot"><span class="annottext">(i -&gt; a) -&gt; ParserT st r ParseError i -&gt; ParserT st r ParseError a
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-operator hs-var">&lt;$&gt;</span></span><span> </span><span class="annot"><span class="annottext">forall a (st :: ZeroBitType) r. Unpack a =&gt; Parser st r a
+</span><a href="M.Pack.Internal.Types.html#unpack"><span class="hs-identifier hs-var">unpack</span></a></span><span> </span><span class="hs-glyph">@</span><span class="annot"><a href="#local-6989586621680381262"><span class="hs-identifier hs-type">i</span></a></span></span><span>
+</span><span id="line-70"></span><span>  </span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="M.Pack.Internal.Bit.html#frombits0"><span class="hs-pragma hs-type">frombits0</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-71"></span><span>
+</span><span id="line-72"></span><span class="hs-comment">-- internal class for encoding/decoding bit flags</span><span>
+</span><span id="line-73"></span><span class="hs-keyword">class</span><span> </span><span id="GBitRep"><span class="annot"><a href="M.Pack.Internal.Bit.html#GBitRep"><span class="hs-identifier hs-var">GBitRep</span></a></span></span><span> </span><span id="local-6989586621680381296"><span class="annot"><a href="#local-6989586621680381296"><span class="hs-identifier hs-type">f</span></a></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-74"></span><span>  </span><span id="tobits"><span class="annot"><a href="M.Pack.Internal.Bit.html#tobits"><span class="hs-identifier hs-type">tobits</span></a></span></span><span> </span><span class="hs-glyph">::</span><span>
+</span><span id="line-75"></span><span>    </span><span id="local-6989586621680381293"><span id="local-6989586621680381294"><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">Bits</span></span><span> </span><span class="annot"><a href="#local-6989586621680381293"><span class="hs-identifier hs-type">i</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Integral</span></span><span> </span><span class="annot"><a href="#local-6989586621680381293"><span class="hs-identifier hs-type">i</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=&gt;</span><span>
+</span><span id="line-76"></span><span>    </span><span class="annot"><a href="#local-6989586621680381293"><span class="hs-identifier hs-type">i</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-comment">-- accumulator</span><span>
+</span><span id="line-77"></span><span>    </span><span class="annot"><span class="hs-identifier hs-type">Int</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-comment">-- current bit position</span><span>
+</span><span id="line-78"></span><span>    </span><span class="annot"><a href="#local-6989586621680381296"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680381294"><span class="hs-identifier hs-type">p</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-79"></span><span>    </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621680381293"><span class="hs-identifier hs-type">i</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Int</span></span><span class="hs-special">)</span></span></span><span> </span><span class="hs-comment">-- new accumulator, new position</span><span>
+</span><span id="line-80"></span><span>  </span><span id="frombits"><span class="annot"><a href="M.Pack.Internal.Bit.html#frombits"><span class="hs-identifier hs-type">frombits</span></a></span></span><span> </span><span class="hs-glyph">::</span><span>
+</span><span id="line-81"></span><span>    </span><span id="local-6989586621680381305"><span id="local-6989586621680381306"><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">Bits</span></span><span> </span><span class="annot"><a href="#local-6989586621680381305"><span class="hs-identifier hs-type">i</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Integral</span></span><span> </span><span class="annot"><a href="#local-6989586621680381305"><span class="hs-identifier hs-type">i</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=&gt;</span><span>
+</span><span id="line-82"></span><span>    </span><span class="hs-comment">-- accumulator</span><span>
+</span><span id="line-83"></span><span>    </span><span class="annot"><a href="#local-6989586621680381305"><span class="hs-identifier hs-type">i</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-84"></span><span>    </span><span class="hs-comment">-- current bit position</span><span>
+</span><span id="line-85"></span><span>    </span><span class="annot"><span class="hs-identifier hs-type">Int</span></span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-86"></span><span>    </span><span class="hs-comment">-- representation, new position</span><span>
+</span><span id="line-87"></span><span>    </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621680381296"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680381306"><span class="hs-identifier hs-type">p</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Int</span></span><span class="hs-special">)</span></span></span><span>
+</span><span id="line-88"></span><span>
+</span><span id="line-89"></span><span class="hs-keyword">instance</span><span> </span><span class="annot"><a href="M.Pack.Internal.Bit.html#GBitRep"><span class="hs-identifier hs-type">GBitRep</span></a></span><span> </span><span class="annot"><span class="hs-identifier hs-type">V1</span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-90"></span><span>  </span><span id="local-6989586621680381812"><span class="annot"><span class="annottext">tobits :: forall i (p :: k).
+(Bits i, Integral i) =&gt;
+i -&gt; Int -&gt; V1 p -&gt; (i, Int)
+</span><a href="M.Pack.Internal.Bit.html#tobits"><span class="hs-identifier hs-var hs-var hs-var">tobits</span></a></span></span><span> </span><span class="annot"><span class="annottext">i
+</span><span class="hs-identifier">_</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-identifier">_</span></span><span> </span><span class="annot"><span class="annottext">V1 p
+</span><span class="hs-identifier">_</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">i
+</span><span class="hs-number">0</span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">0</span></span><span class="hs-special">)</span><span>
+</span><span id="line-91"></span><span>  </span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="M.Pack.Internal.Bit.html#tobits"><span class="hs-pragma hs-type">tobits</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-92"></span><span>  </span><span id="local-6989586621680381817"><span class="annot"><span class="annottext">frombits :: forall i (p :: k). (Bits i, Integral i) =&gt; i -&gt; Int -&gt; (V1 p, Int)
+</span><a href="M.Pack.Internal.Bit.html#frombits"><span class="hs-identifier hs-var hs-var hs-var">frombits</span></a></span></span><span> </span><span class="annot"><span class="annottext">i
+</span><span class="hs-identifier">_</span></span><span> </span><span id="local-6989586621680381818"><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621680381818"><span class="hs-identifier hs-var">p</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">V1 p
+forall a. HasCallStack =&gt; a
+</span><span class="hs-identifier hs-var">undefined</span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621680381818"><span class="hs-identifier hs-var">p</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-93"></span><span>  </span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="M.Pack.Internal.Bit.html#frombits"><span class="hs-pragma hs-type">frombits</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-94"></span><span>
+</span><span id="line-95"></span><span class="hs-keyword">instance</span><span> </span><span class="annot"><a href="M.Pack.Internal.Bit.html#GBitRep"><span class="hs-identifier hs-type">GBitRep</span></a></span><span> </span><span class="annot"><span class="hs-identifier hs-type">U1</span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-96"></span><span>  </span><span id="local-6989586621680381825"><span class="annot"><span class="annottext">tobits :: forall i (p :: k).
+(Bits i, Integral i) =&gt;
+i -&gt; Int -&gt; U1 p -&gt; (i, Int)
+</span><a href="M.Pack.Internal.Bit.html#tobits"><span class="hs-identifier hs-var hs-var hs-var">tobits</span></a></span></span><span> </span><span id="local-6989586621680381826"><span class="annot"><span class="annottext">i
+</span><a href="#local-6989586621680381826"><span class="hs-identifier hs-var">i</span></a></span></span><span> </span><span id="local-6989586621680381827"><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621680381827"><span class="hs-identifier hs-var">p</span></a></span></span><span> </span><span class="annot"><span class="annottext">U1 p
+</span><span class="hs-identifier">_</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">i
+</span><a href="#local-6989586621680381826"><span class="hs-identifier hs-var">i</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621680381827"><span class="hs-identifier hs-var">p</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-97"></span><span>  </span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="M.Pack.Internal.Bit.html#tobits"><span class="hs-pragma hs-type">tobits</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-98"></span><span>  </span><span id="local-6989586621680381830"><span class="annot"><span class="annottext">frombits :: forall i (p :: k). (Bits i, Integral i) =&gt; i -&gt; Int -&gt; (U1 p, Int)
+</span><a href="M.Pack.Internal.Bit.html#frombits"><span class="hs-identifier hs-var hs-var hs-var">frombits</span></a></span></span><span> </span><span class="annot"><span class="annottext">i
+</span><span class="hs-identifier">_</span></span><span> </span><span id="local-6989586621680381831"><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621680381831"><span class="hs-identifier hs-var">p</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">U1 p
+forall k (p :: k). U1 p
+</span><span class="hs-identifier hs-var">U1</span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621680381831"><span class="hs-identifier hs-var">p</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-99"></span><span>  </span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="M.Pack.Internal.Bit.html#frombits"><span class="hs-pragma hs-type">frombits</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-100"></span><span>
+</span><span id="line-101"></span><span class="hs-keyword">instance</span><span> </span><span class="annot"><a href="M.Pack.Internal.Bit.html#GBitRep"><span class="hs-identifier hs-type">GBitRep</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">K1</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">R</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Bool</span></span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-102"></span><span>  </span><span id="local-6989586621680381844"><span class="annot"><span class="annottext">tobits :: forall i (p :: k).
+(Bits i, Integral i) =&gt;
+i -&gt; Int -&gt; K1 R Bool p -&gt; (i, Int)
+</span><a href="M.Pack.Internal.Bit.html#tobits"><span class="hs-identifier hs-var hs-var hs-var">tobits</span></a></span></span><span> </span><span id="local-6989586621680381845"><span class="annot"><span class="annottext">i
+</span><a href="#local-6989586621680381845"><span class="hs-identifier hs-var">i</span></a></span></span><span> </span><span id="local-6989586621680381846"><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621680381846"><span class="hs-identifier hs-var">p</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">K1</span></span><span> </span><span class="annot"><span class="annottext">Bool
+</span><span class="hs-identifier hs-var">True</span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">i -&gt; Int -&gt; i
+forall a. Bits a =&gt; a -&gt; Int -&gt; a
+</span><span class="hs-identifier hs-var">setBit</span></span><span> </span><span class="annot"><span class="annottext">i
+</span><a href="#local-6989586621680381845"><span class="hs-identifier hs-var">i</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621680381846"><span class="hs-identifier hs-var">p</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621680381846"><span class="hs-identifier hs-var">p</span></a></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Int
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">+</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">1</span></span><span class="hs-special">)</span><span>
+</span><span id="line-103"></span><span>  </span><span class="annot"><a href="M.Pack.Internal.Bit.html#tobits"><span class="hs-identifier hs-var">tobits</span></a></span><span> </span><span id="local-6989586621680381850"><span class="annot"><span class="annottext">i
+</span><a href="#local-6989586621680381850"><span class="hs-identifier hs-var">i</span></a></span></span><span> </span><span id="local-6989586621680381851"><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621680381851"><span class="hs-identifier hs-var">p</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">K1</span></span><span> </span><span class="annot"><span class="annottext">Bool
+</span><span class="hs-identifier hs-var">False</span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">i -&gt; Int -&gt; i
+forall a. Bits a =&gt; a -&gt; Int -&gt; a
+</span><span class="hs-identifier hs-var">clearBit</span></span><span> </span><span class="annot"><span class="annottext">i
+</span><a href="#local-6989586621680381850"><span class="hs-identifier hs-var">i</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621680381851"><span class="hs-identifier hs-var">p</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621680381851"><span class="hs-identifier hs-var">p</span></a></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Int
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">+</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">1</span></span><span class="hs-special">)</span><span>
+</span><span id="line-104"></span><span>  </span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="M.Pack.Internal.Bit.html#tobits"><span class="hs-pragma hs-type">tobits</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-105"></span><span>  </span><span id="local-6989586621680381858"><span class="annot"><span class="annottext">frombits :: forall i (p :: k).
+(Bits i, Integral i) =&gt;
+i -&gt; Int -&gt; (K1 R Bool p, Int)
+</span><a href="M.Pack.Internal.Bit.html#frombits"><span class="hs-identifier hs-var hs-var hs-var">frombits</span></a></span></span><span> </span><span id="local-6989586621680381859"><span class="annot"><span class="annottext">i
+</span><a href="#local-6989586621680381859"><span class="hs-identifier hs-var">i</span></a></span></span><span> </span><span id="local-6989586621680381860"><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621680381860"><span class="hs-identifier hs-var">p</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Bool -&gt; K1 R Bool p
+forall k i c (p :: k). c -&gt; K1 i c p
+</span><span class="hs-identifier hs-var">K1</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">i -&gt; Int -&gt; Bool
+forall a. Bits a =&gt; a -&gt; Int -&gt; Bool
+</span><span class="hs-identifier hs-var">testBit</span></span><span> </span><span class="annot"><span class="annottext">i
+</span><a href="#local-6989586621680381859"><span class="hs-identifier hs-var">i</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621680381860"><span class="hs-identifier hs-var">p</span></a></span><span class="hs-special">)</span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621680381860"><span class="hs-identifier hs-var">p</span></a></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Int
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">+</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">1</span></span><span class="hs-special">)</span><span>
+</span><span id="line-106"></span><span>  </span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="M.Pack.Internal.Bit.html#frombits"><span class="hs-pragma hs-type">frombits</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-107"></span><span>
+</span><span id="line-108"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621680381340"><span id="local-6989586621680381341"><span id="local-6989586621680381342"><span class="hs-special">(</span><span class="annot"><a href="M.Pack.Internal.Bit.html#GBitRep"><span class="hs-identifier hs-type">GBitRep</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680381340"><span class="hs-identifier hs-type">f</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="M.Pack.Internal.Bit.html#GBitRep"><span class="hs-identifier hs-type">GBitRep</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">M1</span></span><span> </span><span class="annot"><a href="#local-6989586621680381341"><span class="hs-identifier hs-type">i</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680381342"><span class="hs-identifier hs-type">c</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680381340"><span class="hs-identifier hs-type">f</span></a></span><span class="hs-special">)</span></span></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-109"></span><span>  </span><span id="local-6989586621680381871"><span class="annot"><span class="annottext">tobits :: forall i (p :: k).
+(Bits i, Integral i) =&gt;
+i -&gt; Int -&gt; M1 i c f p -&gt; (i, Int)
+</span><a href="M.Pack.Internal.Bit.html#tobits"><span class="hs-identifier hs-var hs-var hs-var">tobits</span></a></span></span><span> </span><span id="local-6989586621680381872"><span class="annot"><span class="annottext">i
+</span><a href="#local-6989586621680381872"><span class="hs-identifier hs-var">i</span></a></span></span><span> </span><span id="local-6989586621680381873"><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621680381873"><span class="hs-identifier hs-var">p</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">M1</span></span><span> </span><span id="local-6989586621680381875"><span class="annot"><span class="annottext">f p
+</span><a href="#local-6989586621680381875"><span class="hs-identifier hs-var">x</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">i -&gt; Int -&gt; f p -&gt; (i, Int)
+forall i (p :: k).
+(Bits i, Integral i) =&gt;
+i -&gt; Int -&gt; f p -&gt; (i, Int)
+forall {k} (f :: k -&gt; *) i (p :: k).
+(GBitRep f, Bits i, Integral i) =&gt;
+i -&gt; Int -&gt; f p -&gt; (i, Int)
+</span><a href="M.Pack.Internal.Bit.html#tobits"><span class="hs-identifier hs-var">tobits</span></a></span><span> </span><span class="annot"><span class="annottext">i
+</span><a href="#local-6989586621680381872"><span class="hs-identifier hs-var">i</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621680381873"><span class="hs-identifier hs-var">p</span></a></span><span> </span><span class="annot"><span class="annottext">f p
+</span><a href="#local-6989586621680381875"><span class="hs-identifier hs-var">x</span></a></span><span>
+</span><span id="line-110"></span><span>  </span><span id="local-6989586621680381881"><span class="annot"><span class="annottext">frombits :: forall i (p :: k).
+(Bits i, Integral i) =&gt;
+i -&gt; Int -&gt; (M1 i c f p, Int)
+</span><a href="M.Pack.Internal.Bit.html#frombits"><span class="hs-identifier hs-var hs-var hs-var">frombits</span></a></span></span><span> </span><span id="local-6989586621680381882"><span class="annot"><span class="annottext">i
+</span><a href="#local-6989586621680381882"><span class="hs-identifier hs-var">i</span></a></span></span><span> </span><span id="local-6989586621680381883"><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621680381883"><span class="hs-identifier hs-var">p</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">case</span><span> </span><span class="annot"><span class="annottext">i -&gt; Int -&gt; (f p, Int)
+forall i (p :: k). (Bits i, Integral i) =&gt; i -&gt; Int -&gt; (f p, Int)
+forall {k} (f :: k -&gt; *) i (p :: k).
+(GBitRep f, Bits i, Integral i) =&gt;
+i -&gt; Int -&gt; (f p, Int)
+</span><a href="M.Pack.Internal.Bit.html#frombits"><span class="hs-identifier hs-var">frombits</span></a></span><span> </span><span class="annot"><span class="annottext">i
+</span><a href="#local-6989586621680381882"><span class="hs-identifier hs-var">i</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621680381883"><span class="hs-identifier hs-var">p</span></a></span><span> </span><span class="hs-keyword">of</span><span>
+</span><span id="line-111"></span><span>    </span><span class="hs-special">(</span><span id="local-6989586621680381884"><span class="annot"><span class="annottext">f p
+</span><a href="#local-6989586621680381884"><span class="hs-identifier hs-var">x</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680381885"><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621680381885"><span class="hs-identifier hs-var">p'</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">f p -&gt; M1 i c f p
+forall k i (c :: Meta) (f :: k -&gt; *) (p :: k). f p -&gt; M1 i c f p
+</span><span class="hs-identifier hs-var">M1</span></span><span> </span><span class="annot"><span class="annottext">f p
+</span><a href="#local-6989586621680381884"><span class="hs-identifier hs-var">x</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621680381885"><span class="hs-identifier hs-var">p'</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-112"></span><span>
+</span><span id="line-113"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621680381356"><span id="local-6989586621680381357"><span class="hs-special">(</span><span class="annot"><a href="M.Pack.Internal.Bit.html#GBitRep"><span class="hs-identifier hs-type">GBitRep</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680381356"><span class="hs-identifier hs-type">f</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="M.Pack.Internal.Bit.html#GBitRep"><span class="hs-identifier hs-type">GBitRep</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680381357"><span class="hs-identifier hs-type">g</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="M.Pack.Internal.Bit.html#GBitRep"><span class="hs-identifier hs-type">GBitRep</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621680381356"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="annot"><span class="hs-operator hs-type">:*:</span></span><span> </span><span class="annot"><a href="#local-6989586621680381357"><span class="hs-identifier hs-type">g</span></a></span><span class="hs-special">)</span></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-114"></span><span>  </span><span id="local-6989586621680381899"><span class="annot"><span class="annottext">tobits :: forall i (p :: k).
+(Bits i, Integral i) =&gt;
+i -&gt; Int -&gt; (:*:) f g p -&gt; (i, Int)
+</span><a href="M.Pack.Internal.Bit.html#tobits"><span class="hs-identifier hs-var hs-var hs-var">tobits</span></a></span></span><span> </span><span id="local-6989586621680381900"><span class="annot"><span class="annottext">i
+</span><a href="#local-6989586621680381900"><span class="hs-identifier hs-var">i</span></a></span></span><span> </span><span id="local-6989586621680381901"><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621680381901"><span class="hs-identifier hs-var">p</span></a></span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621680381902"><span class="annot"><span class="annottext">f p
+</span><a href="#local-6989586621680381902"><span class="hs-identifier hs-var">x</span></a></span></span><span> </span><span class="annot"><span class="hs-operator hs-type">:*:</span></span><span> </span><span id="local-6989586621680381904"><span class="annot"><span class="annottext">g p
+</span><a href="#local-6989586621680381904"><span class="hs-identifier hs-var">y</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-115"></span><span>    </span><span class="hs-keyword">let</span><span> </span><span class="hs-special">(</span><span id="local-6989586621680381905"><span class="annot"><span class="annottext">i
+</span><a href="#local-6989586621680381905"><span class="hs-identifier hs-var">i'</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680381906"><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621680381906"><span class="hs-identifier hs-var">p'</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">i -&gt; Int -&gt; f p -&gt; (i, Int)
+forall i (p :: k).
+(Bits i, Integral i) =&gt;
+i -&gt; Int -&gt; f p -&gt; (i, Int)
+forall {k} (f :: k -&gt; *) i (p :: k).
+(GBitRep f, Bits i, Integral i) =&gt;
+i -&gt; Int -&gt; f p -&gt; (i, Int)
+</span><a href="M.Pack.Internal.Bit.html#tobits"><span class="hs-identifier hs-var">tobits</span></a></span><span> </span><span class="annot"><span class="annottext">i
+</span><a href="#local-6989586621680381900"><span class="hs-identifier hs-var">i</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621680381901"><span class="hs-identifier hs-var">p</span></a></span><span> </span><span class="annot"><span class="annottext">f p
+</span><a href="#local-6989586621680381902"><span class="hs-identifier hs-var">x</span></a></span><span>
+</span><span id="line-116"></span><span>     </span><span class="hs-keyword">in</span><span> </span><span class="annot"><span class="annottext">i -&gt; Int -&gt; g p -&gt; (i, Int)
+forall i (p :: k).
+(Bits i, Integral i) =&gt;
+i -&gt; Int -&gt; g p -&gt; (i, Int)
+forall {k} (f :: k -&gt; *) i (p :: k).
+(GBitRep f, Bits i, Integral i) =&gt;
+i -&gt; Int -&gt; f p -&gt; (i, Int)
+</span><a href="M.Pack.Internal.Bit.html#tobits"><span class="hs-identifier hs-var">tobits</span></a></span><span> </span><span class="annot"><span class="annottext">i
+</span><a href="#local-6989586621680381905"><span class="hs-identifier hs-var">i'</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621680381906"><span class="hs-identifier hs-var">p'</span></a></span><span> </span><span class="annot"><span class="annottext">g p
+</span><a href="#local-6989586621680381904"><span class="hs-identifier hs-var">y</span></a></span><span>
+</span><span id="line-117"></span><span>  </span><span id="local-6989586621680381915"><span class="annot"><span class="annottext">frombits :: forall i (p :: k).
+(Bits i, Integral i) =&gt;
+i -&gt; Int -&gt; ((:*:) f g p, Int)
+</span><a href="M.Pack.Internal.Bit.html#frombits"><span class="hs-identifier hs-var hs-var hs-var">frombits</span></a></span></span><span> </span><span id="local-6989586621680381916"><span class="annot"><span class="annottext">i
+</span><a href="#local-6989586621680381916"><span class="hs-identifier hs-var">i</span></a></span></span><span> </span><span id="local-6989586621680381917"><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621680381917"><span class="hs-identifier hs-var">p</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">case</span><span> </span><span class="annot"><span class="annottext">i -&gt; Int -&gt; (f p, Int)
+forall i (p :: k). (Bits i, Integral i) =&gt; i -&gt; Int -&gt; (f p, Int)
+forall {k} (f :: k -&gt; *) i (p :: k).
+(GBitRep f, Bits i, Integral i) =&gt;
+i -&gt; Int -&gt; (f p, Int)
+</span><a href="M.Pack.Internal.Bit.html#frombits"><span class="hs-identifier hs-var">frombits</span></a></span><span> </span><span class="annot"><span class="annottext">i
+</span><a href="#local-6989586621680381916"><span class="hs-identifier hs-var">i</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621680381917"><span class="hs-identifier hs-var">p</span></a></span><span> </span><span class="hs-keyword">of</span><span>
+</span><span id="line-118"></span><span>    </span><span class="hs-special">(</span><span id="local-6989586621680381918"><span class="annot"><span class="annottext">f p
+</span><a href="#local-6989586621680381918"><span class="hs-identifier hs-var">x</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680381919"><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621680381919"><span class="hs-identifier hs-var">p'</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-keyword">case</span><span> </span><span class="annot"><span class="annottext">i -&gt; Int -&gt; (g p, Int)
+forall i (p :: k). (Bits i, Integral i) =&gt; i -&gt; Int -&gt; (g p, Int)
+forall {k} (f :: k -&gt; *) i (p :: k).
+(GBitRep f, Bits i, Integral i) =&gt;
+i -&gt; Int -&gt; (f p, Int)
+</span><a href="M.Pack.Internal.Bit.html#frombits"><span class="hs-identifier hs-var">frombits</span></a></span><span> </span><span class="annot"><span class="annottext">i
+</span><a href="#local-6989586621680381916"><span class="hs-identifier hs-var">i</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621680381919"><span class="hs-identifier hs-var">p'</span></a></span><span> </span><span class="hs-keyword">of</span><span>
+</span><span id="line-119"></span><span>      </span><span class="hs-special">(</span><span id="local-6989586621680381920"><span class="annot"><span class="annottext">g p
+</span><a href="#local-6989586621680381920"><span class="hs-identifier hs-var">y</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680381921"><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621680381921"><span class="hs-identifier hs-var">p''</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">f p
+</span><a href="#local-6989586621680381918"><span class="hs-identifier hs-var">x</span></a></span><span> </span><span class="annot"><span class="annottext">f p -&gt; g p -&gt; (:*:) f g p
+forall k (f :: k -&gt; *) (g :: k -&gt; *) (p :: k).
+f p -&gt; g p -&gt; (:*:) f g p
+</span><span class="hs-operator hs-var">:*:</span></span><span> </span><span class="annot"><span class="annottext">g p
+</span><a href="#local-6989586621680381920"><span class="hs-identifier hs-var">y</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621680381921"><span class="hs-identifier hs-var">p''</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-120"></span><span>
+</span><span id="line-121"></span><span class="hs-comment">-- | variable-length bitset</span><span>
+</span><span id="line-122"></span><span class="hs-comment">--</span><span>
+</span><span id="line-123"></span><span class="hs-comment">-- (network representation: little-endian vector of 'Int64's)</span><span>
+</span><span id="line-124"></span><span class="hs-keyword">newtype</span><span> </span><span id="Bitset"><span class="annot"><a href="M.Pack.Internal.Bit.html#Bitset"><span class="hs-identifier hs-var">Bitset</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="Bitset"><span class="annot"><a href="M.Pack.Internal.Bit.html#Bitset"><span class="hs-identifier hs-var">Bitset</span></a></span></span><span> </span><span class="hs-special">{</span><span id="getbitset"><span class="annot"><span class="annottext">Bitset -&gt; Integer
+</span><a href="M.Pack.Internal.Bit.html#getbitset"><span class="hs-identifier hs-var hs-var">getbitset</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Integer</span></span><span class="hs-special">}</span><span>
+</span><span id="line-125"></span><span>  </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">stock</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621680381925"><span id="local-6989586621680381927"><span class="annot"><span class="annottext">(forall x. Bitset -&gt; Rep Bitset x)
+-&gt; (forall x. Rep Bitset x -&gt; Bitset) -&gt; Generic Bitset
+forall x. Rep Bitset x -&gt; Bitset
+forall x. Bitset -&gt; Rep Bitset x
+forall a.
+(forall x. a -&gt; Rep a x) -&gt; (forall x. Rep a x -&gt; a) -&gt; Generic a
+$cfrom :: forall x. Bitset -&gt; Rep Bitset x
+from :: forall x. Bitset -&gt; Rep Bitset x
+$cto :: forall x. Rep Bitset x -&gt; Bitset
+to :: forall x. Rep Bitset x -&gt; Bitset
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Generic</span></span></span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Typeable</span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680381932"><span id="local-6989586621680381936"><span id="local-6989586621680381939"><span id="local-6989586621680381941"><span id="local-6989586621680381943"><span id="local-6989586621680381949"><span id="local-6989586621680381954"><span id="local-6989586621680381957"><span id="local-6989586621680381960"><span id="local-6989586621680381963"><span id="local-6989586621680381966"><span id="local-6989586621680381969"><span id="local-6989586621680381974"><span id="local-6989586621680381979"><span class="annot"><span class="annottext">Typeable Bitset
+Typeable Bitset =&gt;
+(forall (c :: * -&gt; *).
+ (forall d b. Data d =&gt; c (d -&gt; b) -&gt; d -&gt; c b)
+ -&gt; (forall g. g -&gt; c g) -&gt; Bitset -&gt; c Bitset)
+-&gt; (forall (c :: * -&gt; *).
+    (forall b r. Data b =&gt; c (b -&gt; r) -&gt; c r)
+    -&gt; (forall r. r -&gt; c r) -&gt; Constr -&gt; c Bitset)
+-&gt; (Bitset -&gt; Constr)
+-&gt; (Bitset -&gt; DataType)
+-&gt; (forall (t :: * -&gt; *) (c :: * -&gt; *).
+    Typeable t =&gt;
+    (forall d. Data d =&gt; c (t d)) -&gt; Maybe (c Bitset))
+-&gt; (forall (t :: * -&gt; * -&gt; *) (c :: * -&gt; *).
+    Typeable t =&gt;
+    (forall d e. (Data d, Data e) =&gt; c (t d e)) -&gt; Maybe (c Bitset))
+-&gt; ((forall b. Data b =&gt; b -&gt; b) -&gt; Bitset -&gt; Bitset)
+-&gt; (forall r r'.
+    (r -&gt; r' -&gt; r)
+    -&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; Bitset -&gt; r)
+-&gt; (forall r r'.
+    (r' -&gt; r -&gt; r)
+    -&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; Bitset -&gt; r)
+-&gt; (forall u. (forall d. Data d =&gt; d -&gt; u) -&gt; Bitset -&gt; [u])
+-&gt; (forall u. Int -&gt; (forall d. Data d =&gt; d -&gt; u) -&gt; Bitset -&gt; u)
+-&gt; (forall (m :: * -&gt; *).
+    Monad m =&gt;
+    (forall d. Data d =&gt; d -&gt; m d) -&gt; Bitset -&gt; m Bitset)
+-&gt; (forall (m :: * -&gt; *).
+    MonadPlus m =&gt;
+    (forall d. Data d =&gt; d -&gt; m d) -&gt; Bitset -&gt; m Bitset)
+-&gt; (forall (m :: * -&gt; *).
+    MonadPlus m =&gt;
+    (forall d. Data d =&gt; d -&gt; m d) -&gt; Bitset -&gt; m Bitset)
+-&gt; Data Bitset
+Bitset -&gt; Constr
+Bitset -&gt; DataType
+(forall b. Data b =&gt; b -&gt; b) -&gt; Bitset -&gt; Bitset
+forall a.
+Typeable a =&gt;
+(forall (c :: * -&gt; *).
+ (forall d b. Data d =&gt; c (d -&gt; b) -&gt; d -&gt; c b)
+ -&gt; (forall g. g -&gt; c g) -&gt; a -&gt; c a)
+-&gt; (forall (c :: * -&gt; *).
+    (forall b r. Data b =&gt; c (b -&gt; r) -&gt; c r)
+    -&gt; (forall r. r -&gt; c r) -&gt; Constr -&gt; c a)
+-&gt; (a -&gt; Constr)
+-&gt; (a -&gt; DataType)
+-&gt; (forall (t :: * -&gt; *) (c :: * -&gt; *).
+    Typeable t =&gt;
+    (forall d. Data d =&gt; c (t d)) -&gt; Maybe (c a))
+-&gt; (forall (t :: * -&gt; * -&gt; *) (c :: * -&gt; *).
+    Typeable t =&gt;
+    (forall d e. (Data d, Data e) =&gt; c (t d e)) -&gt; Maybe (c a))
+-&gt; ((forall b. Data b =&gt; b -&gt; b) -&gt; a -&gt; a)
+-&gt; (forall r r'.
+    (r -&gt; r' -&gt; r) -&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; a -&gt; r)
+-&gt; (forall r r'.
+    (r' -&gt; r -&gt; r) -&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; a -&gt; r)
+-&gt; (forall u. (forall d. Data d =&gt; d -&gt; u) -&gt; a -&gt; [u])
+-&gt; (forall u. Int -&gt; (forall d. Data d =&gt; d -&gt; u) -&gt; a -&gt; u)
+-&gt; (forall (m :: * -&gt; *).
+    Monad m =&gt;
+    (forall d. Data d =&gt; d -&gt; m d) -&gt; a -&gt; m a)
+-&gt; (forall (m :: * -&gt; *).
+    MonadPlus m =&gt;
+    (forall d. Data d =&gt; d -&gt; m d) -&gt; a -&gt; m a)
+-&gt; (forall (m :: * -&gt; *).
+    MonadPlus m =&gt;
+    (forall d. Data d =&gt; d -&gt; m d) -&gt; a -&gt; m a)
+-&gt; Data a
+forall u. Int -&gt; (forall d. Data d =&gt; d -&gt; u) -&gt; Bitset -&gt; u
+forall u. (forall d. Data d =&gt; d -&gt; u) -&gt; Bitset -&gt; [u]
+forall r r'.
+(r -&gt; r' -&gt; r) -&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; Bitset -&gt; r
+forall r r'.
+(r' -&gt; r -&gt; r) -&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; Bitset -&gt; r
+forall (m :: * -&gt; *).
+Monad m =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; Bitset -&gt; m Bitset
+forall (m :: * -&gt; *).
+MonadPlus m =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; Bitset -&gt; m Bitset
+forall (c :: * -&gt; *).
+(forall b r. Data b =&gt; c (b -&gt; r) -&gt; c r)
+-&gt; (forall r. r -&gt; c r) -&gt; Constr -&gt; c Bitset
+forall (c :: * -&gt; *).
+(forall d b. Data d =&gt; c (d -&gt; b) -&gt; d -&gt; c b)
+-&gt; (forall g. g -&gt; c g) -&gt; Bitset -&gt; c Bitset
+forall (t :: * -&gt; *) (c :: * -&gt; *).
+Typeable t =&gt;
+(forall d. Data d =&gt; c (t d)) -&gt; Maybe (c Bitset)
+forall (t :: * -&gt; * -&gt; *) (c :: * -&gt; *).
+Typeable t =&gt;
+(forall d e. (Data d, Data e) =&gt; c (t d e)) -&gt; Maybe (c Bitset)
+$cgfoldl :: forall (c :: * -&gt; *).
+(forall d b. Data d =&gt; c (d -&gt; b) -&gt; d -&gt; c b)
+-&gt; (forall g. g -&gt; c g) -&gt; Bitset -&gt; c Bitset
+gfoldl :: forall (c :: * -&gt; *).
+(forall d b. Data d =&gt; c (d -&gt; b) -&gt; d -&gt; c b)
+-&gt; (forall g. g -&gt; c g) -&gt; Bitset -&gt; c Bitset
+$cgunfold :: forall (c :: * -&gt; *).
+(forall b r. Data b =&gt; c (b -&gt; r) -&gt; c r)
+-&gt; (forall r. r -&gt; c r) -&gt; Constr -&gt; c Bitset
+gunfold :: forall (c :: * -&gt; *).
+(forall b r. Data b =&gt; c (b -&gt; r) -&gt; c r)
+-&gt; (forall r. r -&gt; c r) -&gt; Constr -&gt; c Bitset
+$ctoConstr :: Bitset -&gt; Constr
+toConstr :: Bitset -&gt; Constr
+$cdataTypeOf :: Bitset -&gt; DataType
+dataTypeOf :: Bitset -&gt; DataType
+$cdataCast1 :: forall (t :: * -&gt; *) (c :: * -&gt; *).
+Typeable t =&gt;
+(forall d. Data d =&gt; c (t d)) -&gt; Maybe (c Bitset)
+dataCast1 :: forall (t :: * -&gt; *) (c :: * -&gt; *).
+Typeable t =&gt;
+(forall d. Data d =&gt; c (t d)) -&gt; Maybe (c Bitset)
+$cdataCast2 :: forall (t :: * -&gt; * -&gt; *) (c :: * -&gt; *).
+Typeable t =&gt;
+(forall d e. (Data d, Data e) =&gt; c (t d e)) -&gt; Maybe (c Bitset)
+dataCast2 :: forall (t :: * -&gt; * -&gt; *) (c :: * -&gt; *).
+Typeable t =&gt;
+(forall d e. (Data d, Data e) =&gt; c (t d e)) -&gt; Maybe (c Bitset)
+$cgmapT :: (forall b. Data b =&gt; b -&gt; b) -&gt; Bitset -&gt; Bitset
+gmapT :: (forall b. Data b =&gt; b -&gt; b) -&gt; Bitset -&gt; Bitset
+$cgmapQl :: forall r r'.
+(r -&gt; r' -&gt; r) -&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; Bitset -&gt; r
+gmapQl :: forall r r'.
+(r -&gt; r' -&gt; r) -&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; Bitset -&gt; r
+$cgmapQr :: forall r r'.
+(r' -&gt; r -&gt; r) -&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; Bitset -&gt; r
+gmapQr :: forall r r'.
+(r' -&gt; r -&gt; r) -&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; Bitset -&gt; r
+$cgmapQ :: forall u. (forall d. Data d =&gt; d -&gt; u) -&gt; Bitset -&gt; [u]
+gmapQ :: forall u. (forall d. Data d =&gt; d -&gt; u) -&gt; Bitset -&gt; [u]
+$cgmapQi :: forall u. Int -&gt; (forall d. Data d =&gt; d -&gt; u) -&gt; Bitset -&gt; u
+gmapQi :: forall u. Int -&gt; (forall d. Data d =&gt; d -&gt; u) -&gt; Bitset -&gt; u
+$cgmapM :: forall (m :: * -&gt; *).
+Monad m =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; Bitset -&gt; m Bitset
+gmapM :: forall (m :: * -&gt; *).
+Monad m =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; Bitset -&gt; m Bitset
+$cgmapMp :: forall (m :: * -&gt; *).
+MonadPlus m =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; Bitset -&gt; m Bitset
+gmapMp :: forall (m :: * -&gt; *).
+MonadPlus m =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; Bitset -&gt; m Bitset
+$cgmapMo :: forall (m :: * -&gt; *).
+MonadPlus m =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; Bitset -&gt; m Bitset
+gmapMo :: forall (m :: * -&gt; *).
+MonadPlus m =&gt;
+(forall d. Data d =&gt; d -&gt; m d) -&gt; Bitset -&gt; m Bitset
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Data</span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680381984"><span id="local-6989586621680381991"><span class="annot"><span class="annottext">(forall (m :: * -&gt; *). Quote m =&gt; Bitset -&gt; m Exp)
+-&gt; (forall (m :: * -&gt; *). Quote m =&gt; Bitset -&gt; Code m Bitset)
+-&gt; Lift Bitset
+forall t.
+(forall (m :: * -&gt; *). Quote m =&gt; t -&gt; m Exp)
+-&gt; (forall (m :: * -&gt; *). Quote m =&gt; t -&gt; Code m t) -&gt; Lift t
+forall (m :: * -&gt; *). Quote m =&gt; Bitset -&gt; m Exp
+forall (m :: * -&gt; *). Quote m =&gt; Bitset -&gt; Code m Bitset
+$clift :: forall (m :: * -&gt; *). Quote m =&gt; Bitset -&gt; m Exp
+lift :: forall (m :: * -&gt; *). Quote m =&gt; Bitset -&gt; m Exp
+$cliftTyped :: forall (m :: * -&gt; *). Quote m =&gt; Bitset -&gt; Code m Bitset
+liftTyped :: forall (m :: * -&gt; *). Quote m =&gt; Bitset -&gt; Code m Bitset
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Lift</span></span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-126"></span><span>  </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">newtype</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621680381998"><span id="local-6989586621680382002"><span class="annot"><span class="annottext">Bitset -&gt; Bitset -&gt; Bool
+(Bitset -&gt; Bitset -&gt; Bool)
+-&gt; (Bitset -&gt; Bitset -&gt; Bool) -&gt; Eq Bitset
+forall a. (a -&gt; a -&gt; Bool) -&gt; (a -&gt; a -&gt; Bool) -&gt; Eq a
+$c== :: Bitset -&gt; Bitset -&gt; Bool
+== :: Bitset -&gt; Bitset -&gt; Bool
+$c/= :: Bitset -&gt; Bitset -&gt; Bool
+/= :: Bitset -&gt; Bitset -&gt; Bool
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Eq</span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680382009"><span id="local-6989586621680382013"><span id="local-6989586621680382017"><span id="local-6989586621680382021"><span id="local-6989586621680382025"><span id="local-6989586621680382029"><span id="local-6989586621680382033"><span class="annot"><span class="annottext">Eq Bitset
+Eq Bitset =&gt;
+(Bitset -&gt; Bitset -&gt; Ordering)
+-&gt; (Bitset -&gt; Bitset -&gt; Bool)
+-&gt; (Bitset -&gt; Bitset -&gt; Bool)
+-&gt; (Bitset -&gt; Bitset -&gt; Bool)
+-&gt; (Bitset -&gt; Bitset -&gt; Bool)
+-&gt; (Bitset -&gt; Bitset -&gt; Bitset)
+-&gt; (Bitset -&gt; Bitset -&gt; Bitset)
+-&gt; Ord Bitset
+Bitset -&gt; Bitset -&gt; Bool
+Bitset -&gt; Bitset -&gt; Ordering
+Bitset -&gt; Bitset -&gt; Bitset
+forall a.
+Eq a =&gt;
+(a -&gt; a -&gt; Ordering)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; Ord a
+$ccompare :: Bitset -&gt; Bitset -&gt; Ordering
+compare :: Bitset -&gt; Bitset -&gt; Ordering
+$c&lt; :: Bitset -&gt; Bitset -&gt; Bool
+&lt; :: Bitset -&gt; Bitset -&gt; Bool
+$c&lt;= :: Bitset -&gt; Bitset -&gt; Bool
+&lt;= :: Bitset -&gt; Bitset -&gt; Bool
+$c&gt; :: Bitset -&gt; Bitset -&gt; Bool
+&gt; :: Bitset -&gt; Bitset -&gt; Bool
+$c&gt;= :: Bitset -&gt; Bitset -&gt; Bool
+&gt;= :: Bitset -&gt; Bitset -&gt; Bool
+$cmax :: Bitset -&gt; Bitset -&gt; Bitset
+max :: Bitset -&gt; Bitset -&gt; Bitset
+$cmin :: Bitset -&gt; Bitset -&gt; Bitset
+min :: Bitset -&gt; Bitset -&gt; Bitset
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Ord</span></span></span></span></span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680382038"><span id="local-6989586621680382043"><span id="local-6989586621680382047"><span class="annot"><span class="annottext">Int -&gt; Bitset -&gt; String -&gt; String
+[Bitset] -&gt; String -&gt; String
+Bitset -&gt; String
+(Int -&gt; Bitset -&gt; String -&gt; String)
+-&gt; (Bitset -&gt; String)
+-&gt; ([Bitset] -&gt; String -&gt; String)
+-&gt; Show Bitset
+forall a.
+(Int -&gt; a -&gt; String -&gt; String)
+-&gt; (a -&gt; String) -&gt; ([a] -&gt; String -&gt; String) -&gt; Show a
+$cshowsPrec :: Int -&gt; Bitset -&gt; String -&gt; String
+showsPrec :: Int -&gt; Bitset -&gt; String -&gt; String
+$cshow :: Bitset -&gt; String
+show :: Bitset -&gt; String
+$cshowList :: [Bitset] -&gt; String -&gt; String
+showList :: [Bitset] -&gt; String -&gt; String
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Show</span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680382052"><span id="local-6989586621680382057"><span id="local-6989586621680382061"><span id="local-6989586621680382065"><span class="annot"><span class="annottext">ReadPrec [Bitset]
+ReadPrec Bitset
+Int -&gt; ReadS Bitset
+ReadS [Bitset]
+(Int -&gt; ReadS Bitset)
+-&gt; ReadS [Bitset]
+-&gt; ReadPrec Bitset
+-&gt; ReadPrec [Bitset]
+-&gt; Read Bitset
+forall a.
+(Int -&gt; ReadS a)
+-&gt; ReadS [a] -&gt; ReadPrec a -&gt; ReadPrec [a] -&gt; Read a
+$creadsPrec :: Int -&gt; ReadS Bitset
+readsPrec :: Int -&gt; ReadS Bitset
+$creadList :: ReadS [Bitset]
+readList :: ReadS [Bitset]
+$creadPrec :: ReadPrec Bitset
+readPrec :: ReadPrec Bitset
+$creadListPrec :: ReadPrec [Bitset]
+readListPrec :: ReadPrec [Bitset]
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Read</span></span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680382072"><span id="local-6989586621680382077"><span class="annot"><span class="annottext">Eq Bitset
+Eq Bitset =&gt;
+(Int -&gt; Bitset -&gt; Int) -&gt; (Bitset -&gt; Int) -&gt; Hashable Bitset
+Int -&gt; Bitset -&gt; Int
+Bitset -&gt; Int
+forall a. Eq a =&gt; (Int -&gt; a -&gt; Int) -&gt; (a -&gt; Int) -&gt; Hashable a
+$chashWithSalt :: Int -&gt; Bitset -&gt; Int
+hashWithSalt :: Int -&gt; Bitset -&gt; Int
+$chash :: Bitset -&gt; Int
+hash :: Bitset -&gt; Int
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Hashable</span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680382082"><span class="annot"><span class="annottext">Bitset -&gt; ()
+(Bitset -&gt; ()) -&gt; NFData Bitset
+forall a. (a -&gt; ()) -&gt; NFData a
+$crnf :: Bitset -&gt; ()
+rnf :: Bitset -&gt; ()
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var">NFData</span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-127"></span><span>  </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">newtype</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621680382088"><span id="local-6989586621680382093"><span id="local-6989586621680382097"><span id="local-6989586621680382101"><span id="local-6989586621680382105"><span id="local-6989586621680382109"><span id="local-6989586621680382113"><span id="local-6989586621680382117"><span class="annot"><span class="annottext">Int -&gt; Bitset
+Bitset -&gt; Int
+Bitset -&gt; [Bitset]
+Bitset -&gt; Bitset
+Bitset -&gt; Bitset -&gt; [Bitset]
+Bitset -&gt; Bitset -&gt; Bitset -&gt; [Bitset]
+(Bitset -&gt; Bitset)
+-&gt; (Bitset -&gt; Bitset)
+-&gt; (Int -&gt; Bitset)
+-&gt; (Bitset -&gt; Int)
+-&gt; (Bitset -&gt; [Bitset])
+-&gt; (Bitset -&gt; Bitset -&gt; [Bitset])
+-&gt; (Bitset -&gt; Bitset -&gt; [Bitset])
+-&gt; (Bitset -&gt; Bitset -&gt; Bitset -&gt; [Bitset])
+-&gt; Enum Bitset
+forall a.
+(a -&gt; a)
+-&gt; (a -&gt; a)
+-&gt; (Int -&gt; a)
+-&gt; (a -&gt; Int)
+-&gt; (a -&gt; [a])
+-&gt; (a -&gt; a -&gt; [a])
+-&gt; (a -&gt; a -&gt; [a])
+-&gt; (a -&gt; a -&gt; a -&gt; [a])
+-&gt; Enum a
+$csucc :: Bitset -&gt; Bitset
+succ :: Bitset -&gt; Bitset
+$cpred :: Bitset -&gt; Bitset
+pred :: Bitset -&gt; Bitset
+$ctoEnum :: Int -&gt; Bitset
+toEnum :: Int -&gt; Bitset
+$cfromEnum :: Bitset -&gt; Int
+fromEnum :: Bitset -&gt; Int
+$cenumFrom :: Bitset -&gt; [Bitset]
+enumFrom :: Bitset -&gt; [Bitset]
+$cenumFromThen :: Bitset -&gt; Bitset -&gt; [Bitset]
+enumFromThen :: Bitset -&gt; Bitset -&gt; [Bitset]
+$cenumFromTo :: Bitset -&gt; Bitset -&gt; [Bitset]
+enumFromTo :: Bitset -&gt; Bitset -&gt; [Bitset]
+$cenumFromThenTo :: Bitset -&gt; Bitset -&gt; Bitset -&gt; [Bitset]
+enumFromThenTo :: Bitset -&gt; Bitset -&gt; Bitset -&gt; [Bitset]
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Enum</span></span></span></span></span></span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680382127"><span id="local-6989586621680382131"><span id="local-6989586621680382135"><span id="local-6989586621680382139"><span id="local-6989586621680382143"><span id="local-6989586621680382147"><span id="local-6989586621680382151"><span class="annot"><span class="annottext">Integer -&gt; Bitset
+Bitset -&gt; Bitset
+Bitset -&gt; Bitset -&gt; Bitset
+(Bitset -&gt; Bitset -&gt; Bitset)
+-&gt; (Bitset -&gt; Bitset -&gt; Bitset)
+-&gt; (Bitset -&gt; Bitset -&gt; Bitset)
+-&gt; (Bitset -&gt; Bitset)
+-&gt; (Bitset -&gt; Bitset)
+-&gt; (Bitset -&gt; Bitset)
+-&gt; (Integer -&gt; Bitset)
+-&gt; Num Bitset
+forall a.
+(a -&gt; a -&gt; a)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; (a -&gt; a)
+-&gt; (a -&gt; a)
+-&gt; (a -&gt; a)
+-&gt; (Integer -&gt; a)
+-&gt; Num a
+$c+ :: Bitset -&gt; Bitset -&gt; Bitset
++ :: Bitset -&gt; Bitset -&gt; Bitset
+$c- :: Bitset -&gt; Bitset -&gt; Bitset
+- :: Bitset -&gt; Bitset -&gt; Bitset
+$c* :: Bitset -&gt; Bitset -&gt; Bitset
+* :: Bitset -&gt; Bitset -&gt; Bitset
+$cnegate :: Bitset -&gt; Bitset
+negate :: Bitset -&gt; Bitset
+$cabs :: Bitset -&gt; Bitset
+abs :: Bitset -&gt; Bitset
+$csignum :: Bitset -&gt; Bitset
+signum :: Bitset -&gt; Bitset
+$cfromInteger :: Integer -&gt; Bitset
+fromInteger :: Integer -&gt; Bitset
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Num</span></span></span></span></span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680382164"><span class="annot"><span class="annottext">Num Bitset
+Ord Bitset
+(Num Bitset, Ord Bitset) =&gt; (Bitset -&gt; Rational) -&gt; Real Bitset
+Bitset -&gt; Rational
+forall a. (Num a, Ord a) =&gt; (a -&gt; Rational) -&gt; Real a
+$ctoRational :: Bitset -&gt; Rational
+toRational :: Bitset -&gt; Rational
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Real</span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680382173"><span id="local-6989586621680382177"><span id="local-6989586621680382181"><span id="local-6989586621680382185"><span id="local-6989586621680382189"><span id="local-6989586621680382193"><span id="local-6989586621680382197"><span id="local-6989586621680382201"><span id="local-6989586621680382205"><span id="local-6989586621680382209"><span id="local-6989586621680382213"><span id="local-6989586621680382217"><span id="local-6989586621680382221"><span id="local-6989586621680382225"><span id="local-6989586621680382229"><span id="local-6989586621680382233"><span id="local-6989586621680382237"><span id="local-6989586621680382241"><span id="local-6989586621680382245"><span id="local-6989586621680382249"><span id="local-6989586621680382253"><span id="local-6989586621680382257"><span class="annot"><span class="annottext">Eq Bitset
+Bitset
+Eq Bitset =&gt;
+(Bitset -&gt; Bitset -&gt; Bitset)
+-&gt; (Bitset -&gt; Bitset -&gt; Bitset)
+-&gt; (Bitset -&gt; Bitset -&gt; Bitset)
+-&gt; (Bitset -&gt; Bitset)
+-&gt; (Bitset -&gt; Int -&gt; Bitset)
+-&gt; (Bitset -&gt; Int -&gt; Bitset)
+-&gt; Bitset
+-&gt; (Int -&gt; Bitset)
+-&gt; (Bitset -&gt; Int -&gt; Bitset)
+-&gt; (Bitset -&gt; Int -&gt; Bitset)
+-&gt; (Bitset -&gt; Int -&gt; Bitset)
+-&gt; (Bitset -&gt; Int -&gt; Bool)
+-&gt; (Bitset -&gt; Maybe Int)
+-&gt; (Bitset -&gt; Int)
+-&gt; (Bitset -&gt; Bool)
+-&gt; (Bitset -&gt; Int -&gt; Bitset)
+-&gt; (Bitset -&gt; Int -&gt; Bitset)
+-&gt; (Bitset -&gt; Int -&gt; Bitset)
+-&gt; (Bitset -&gt; Int -&gt; Bitset)
+-&gt; (Bitset -&gt; Int -&gt; Bitset)
+-&gt; (Bitset -&gt; Int -&gt; Bitset)
+-&gt; (Bitset -&gt; Int)
+-&gt; Bits Bitset
+Int -&gt; Bitset
+Bitset -&gt; Bool
+Bitset -&gt; Int
+Bitset -&gt; Maybe Int
+Bitset -&gt; Bitset
+Bitset -&gt; Int -&gt; Bool
+Bitset -&gt; Int -&gt; Bitset
+Bitset -&gt; Bitset -&gt; Bitset
+forall a.
+Eq a =&gt;
+(a -&gt; a -&gt; a)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; (a -&gt; a)
+-&gt; (a -&gt; Int -&gt; a)
+-&gt; (a -&gt; Int -&gt; a)
+-&gt; a
+-&gt; (Int -&gt; a)
+-&gt; (a -&gt; Int -&gt; a)
+-&gt; (a -&gt; Int -&gt; a)
+-&gt; (a -&gt; Int -&gt; a)
+-&gt; (a -&gt; Int -&gt; Bool)
+-&gt; (a -&gt; Maybe Int)
+-&gt; (a -&gt; Int)
+-&gt; (a -&gt; Bool)
+-&gt; (a -&gt; Int -&gt; a)
+-&gt; (a -&gt; Int -&gt; a)
+-&gt; (a -&gt; Int -&gt; a)
+-&gt; (a -&gt; Int -&gt; a)
+-&gt; (a -&gt; Int -&gt; a)
+-&gt; (a -&gt; Int -&gt; a)
+-&gt; (a -&gt; Int)
+-&gt; Bits a
+$c.&amp;. :: Bitset -&gt; Bitset -&gt; Bitset
+.&amp;. :: Bitset -&gt; Bitset -&gt; Bitset
+$c.|. :: Bitset -&gt; Bitset -&gt; Bitset
+.|. :: Bitset -&gt; Bitset -&gt; Bitset
+$cxor :: Bitset -&gt; Bitset -&gt; Bitset
+xor :: Bitset -&gt; Bitset -&gt; Bitset
+$ccomplement :: Bitset -&gt; Bitset
+complement :: Bitset -&gt; Bitset
+$cshift :: Bitset -&gt; Int -&gt; Bitset
+shift :: Bitset -&gt; Int -&gt; Bitset
+$crotate :: Bitset -&gt; Int -&gt; Bitset
+rotate :: Bitset -&gt; Int -&gt; Bitset
+$czeroBits :: Bitset
+zeroBits :: Bitset
+$cbit :: Int -&gt; Bitset
+bit :: Int -&gt; Bitset
+$csetBit :: Bitset -&gt; Int -&gt; Bitset
+setBit :: Bitset -&gt; Int -&gt; Bitset
+$cclearBit :: Bitset -&gt; Int -&gt; Bitset
+clearBit :: Bitset -&gt; Int -&gt; Bitset
+$ccomplementBit :: Bitset -&gt; Int -&gt; Bitset
+complementBit :: Bitset -&gt; Int -&gt; Bitset
+$ctestBit :: Bitset -&gt; Int -&gt; Bool
+testBit :: Bitset -&gt; Int -&gt; Bool
+$cbitSizeMaybe :: Bitset -&gt; Maybe Int
+bitSizeMaybe :: Bitset -&gt; Maybe Int
+$cbitSize :: Bitset -&gt; Int
+bitSize :: Bitset -&gt; Int
+$cisSigned :: Bitset -&gt; Bool
+isSigned :: Bitset -&gt; Bool
+$cshiftL :: Bitset -&gt; Int -&gt; Bitset
+shiftL :: Bitset -&gt; Int -&gt; Bitset
+$cunsafeShiftL :: Bitset -&gt; Int -&gt; Bitset
+unsafeShiftL :: Bitset -&gt; Int -&gt; Bitset
+$cshiftR :: Bitset -&gt; Int -&gt; Bitset
+shiftR :: Bitset -&gt; Int -&gt; Bitset
+$cunsafeShiftR :: Bitset -&gt; Int -&gt; Bitset
+unsafeShiftR :: Bitset -&gt; Int -&gt; Bitset
+$crotateL :: Bitset -&gt; Int -&gt; Bitset
+rotateL :: Bitset -&gt; Int -&gt; Bitset
+$crotateR :: Bitset -&gt; Int -&gt; Bitset
+rotateR :: Bitset -&gt; Int -&gt; Bitset
+$cpopCount :: Bitset -&gt; Int
+popCount :: Bitset -&gt; Int
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Bits</span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-128"></span><span>
+</span><span id="line-129"></span><span class="hs-keyword">instance</span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#Pack"><span class="hs-identifier hs-type">Pack</span></a></span><span> </span><span class="annot"><a href="M.Pack.Internal.Bit.html#Bitset"><span class="hs-identifier hs-type">Bitset</span></a></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-130"></span><span>  </span><span id="local-6989586621680382287"><span class="annot"><span class="annottext">pack :: Bitset -&gt; Builder
+</span><a href="M.Pack.Internal.Types.html#pack"><span class="hs-identifier hs-var hs-var hs-var">pack</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Vector Int8 -&gt; Builder
+forall a. Pack a =&gt; a -&gt; Builder
+</span><a href="M.Pack.Internal.Types.html#pack"><span class="hs-identifier hs-var">pack</span></a></span><span> </span><span class="annot"><span class="annottext">(Vector Int8 -&gt; Builder)
+-&gt; (Bitset -&gt; Vector Int8) -&gt; Bitset -&gt; Builder
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">Bitset -&gt; Vector Int8
+</span><a href="M.Pack.Internal.Bit.html#bitsettovui64"><span class="hs-identifier hs-var">bitsettovui64</span></a></span><span>
+</span><span id="line-131"></span><span>  </span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#pack"><span class="hs-pragma hs-type">pack</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-132"></span><span>
+</span><span id="line-133"></span><span class="hs-keyword">instance</span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#Unpack"><span class="hs-identifier hs-type">Unpack</span></a></span><span> </span><span class="annot"><a href="M.Pack.Internal.Bit.html#Bitset"><span class="hs-identifier hs-type">Bitset</span></a></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-134"></span><span>  </span><span id="local-6989586621680382296"><span class="annot"><span class="annottext">unpack :: forall (st :: ZeroBitType) r. Parser st r Bitset
+</span><a href="M.Pack.Internal.Types.html#unpack"><span class="hs-identifier hs-var hs-var hs-var">unpack</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Vector Int8 -&gt; Bitset
+</span><a href="M.Pack.Internal.Bit.html#bitsetfromvui64"><span class="hs-identifier hs-var">bitsetfromvui64</span></a></span><span> </span><span class="annot"><span class="annottext">(Vector Int8 -&gt; Bitset)
+-&gt; ParserT st r ParseError (Vector Int8)
+-&gt; ParserT st r ParseError Bitset
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-operator hs-var">&lt;$&gt;</span></span><span> </span><span class="annot"><span class="annottext">ParserT st r ParseError (Vector Int8)
+forall (st :: ZeroBitType) r. Parser st r (Vector Int8)
+forall a (st :: ZeroBitType) r. Unpack a =&gt; Parser st r a
+</span><a href="M.Pack.Internal.Types.html#unpack"><span class="hs-identifier hs-var">unpack</span></a></span><span>
+</span><span id="line-135"></span><span>  </span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#unpack"><span class="hs-pragma hs-type">unpack</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-136"></span><span>
+</span><span id="line-137"></span><span class="hs-comment">-- sort of a naive implementation, but it's fine for our purposes</span><span>
+</span><span id="line-138"></span><span class="hs-comment">--</span><span>
+</span><span id="line-139"></span><span class="hs-comment">-- actually returns the highest bit location + 1</span><span>
+</span><span id="line-140"></span><span class="annot"><a href="M.Pack.Internal.Bit.html#highestbitloc"><span class="hs-identifier hs-type">highestbitloc</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Integer</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Int</span></span><span>
+</span><span id="line-141"></span><span id="highestbitloc"><span class="annot"><span class="annottext">highestbitloc :: Integer -&gt; Int
+</span><a href="M.Pack.Internal.Bit.html#highestbitloc"><span class="hs-identifier hs-var hs-var">highestbitloc</span></a></span></span><span> </span><span id="local-6989586621680382299"><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621680382299"><span class="hs-identifier hs-var">x</span></a></span></span><span> </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621680382299"><span class="hs-identifier hs-var">x</span></a></span><span> </span><span class="annot"><span class="annottext">Integer -&gt; Integer -&gt; Bool
+forall a. Ord a =&gt; a -&gt; a -&gt; Bool
+</span><span class="hs-operator hs-var">&lt;</span></span><span> </span><span class="annot"><span class="annottext">Integer
+</span><span class="hs-number">0</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">String -&gt; Int
+forall a. HasCallStack =&gt; String -&gt; a
+</span><span class="hs-identifier hs-var">error</span></span><span> </span><span class="annot"><span class="annottext">String
+</span><span class="hs-string">&quot;highestbitloc: negative argument&quot;</span></span><span>
+</span><span id="line-142"></span><span class="annot"><a href="M.Pack.Internal.Bit.html#highestbitloc"><span class="hs-identifier hs-var">highestbitloc</span></a></span><span> </span><span class="annot"><span class="annottext">Integer
+</span><span class="hs-number">0</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">0</span></span><span>
+</span><span id="line-143"></span><span class="annot"><a href="M.Pack.Internal.Bit.html#highestbitloc"><span class="hs-identifier hs-var">highestbitloc</span></a></span><span> </span><span id="local-6989586621680382301"><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621680382301"><span class="hs-identifier hs-var">x</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">1</span></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Int
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">+</span></span><span> </span><span class="annot"><span class="annottext">Integer -&gt; Int
+</span><a href="M.Pack.Internal.Bit.html#highestbitloc"><span class="hs-identifier hs-var">highestbitloc</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621680382301"><span class="hs-identifier hs-var">x</span></a></span><span> </span><span class="annot"><span class="annottext">Integer -&gt; Int -&gt; Integer
+forall a. Bits a =&gt; a -&gt; Int -&gt; a
+</span><span class="hs-operator hs-var">.&gt;&gt;.</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">1</span></span><span class="hs-special">)</span><span>
+</span><span id="line-144"></span><span>
+</span><span id="line-145"></span><span class="annot"><a href="M.Pack.Internal.Bit.html#bitsettovuin"><span class="hs-identifier hs-type">bitsettovuin</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Int</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="M.Pack.Internal.Bit.html#Bitset"><span class="hs-identifier hs-type">Bitset</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">VU.Vector</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Int8</span></span><span>
+</span><span id="line-146"></span><span id="bitsettovuin"><span class="annot"><span class="annottext">bitsettovuin :: Int -&gt; Bitset -&gt; Vector Int8
+</span><a href="M.Pack.Internal.Bit.html#bitsettovuin"><span class="hs-identifier hs-var hs-var">bitsettovuin</span></a></span></span><span> </span><span id="local-6989586621680382304"><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621680382304"><span class="hs-identifier hs-var">n</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="M.Pack.Internal.Bit.html#Bitset"><span class="hs-identifier hs-type">Bitset</span></a></span><span> </span><span id="local-6989586621680382305"><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621680382305"><span class="hs-identifier hs-var">x</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int -&gt; [Int8] -&gt; Vector Int8
+forall a. Unbox a =&gt; Int -&gt; [a] -&gt; Vector a
+</span><span class="hs-identifier hs-var">VU.fromListN</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621680382307"><span class="hs-identifier hs-var">m</span></a></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Int
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">+</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">1</span></span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Integer -&gt; [Int8]
+</span><a href="#local-6989586621680382308"><span class="hs-identifier hs-var">go</span></a></span><span> </span><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621680382305"><span class="hs-identifier hs-var">x</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-147"></span><span>  </span><span class="hs-keyword">where</span><span>
+</span><span id="line-148"></span><span>    </span><span id="local-6989586621680382307"><span class="annot"><span class="annottext">m :: Int
+</span><a href="#local-6989586621680382307"><span class="hs-identifier hs-var hs-var">m</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Integer -&gt; Int
+</span><a href="M.Pack.Internal.Bit.html#highestbitloc"><span class="hs-identifier hs-var">highestbitloc</span></a></span><span> </span><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621680382305"><span class="hs-identifier hs-var">x</span></a></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Int
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">+</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621680382304"><span class="hs-identifier hs-var">n</span></a></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Int
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-glyph hs-var">-</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">1</span></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Int
+forall a. Integral a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">`div`</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621680382304"><span class="hs-identifier hs-var">n</span></a></span><span>
+</span><span id="line-149"></span><span>    </span><span id="local-6989586621680382308"><span class="annot"><span class="annottext">go :: Integer -&gt; [Int8]
+</span><a href="#local-6989586621680382308"><span class="hs-identifier hs-var hs-var">go</span></a></span></span><span> </span><span class="annot"><span class="annottext">Integer
+</span><span class="hs-number">0</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-special">[</span><span class="hs-special">]</span><span>
+</span><span id="line-150"></span><span>    </span><span class="annot"><a href="#local-6989586621680382308"><span class="hs-identifier hs-var">go</span></a></span><span> </span><span id="local-6989586621680382310"><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621680382310"><span class="hs-identifier hs-var">y</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Integer -&gt; Int8
+forall a b. (Integral a, Num b) =&gt; a -&gt; b
+</span><span class="hs-identifier hs-var">fromIntegral</span></span><span> </span><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621680382310"><span class="hs-identifier hs-var">y</span></a></span><span> </span><span class="annot"><span class="annottext">Int8 -&gt; [Int8] -&gt; [Int8]
+forall a. a -&gt; [a] -&gt; [a]
+</span><span class="hs-glyph hs-var">:</span></span><span> </span><span class="annot"><span class="annottext">Integer -&gt; [Int8]
+</span><a href="#local-6989586621680382308"><span class="hs-identifier hs-var">go</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621680382310"><span class="hs-identifier hs-var">y</span></a></span><span> </span><span class="annot"><span class="annottext">Integer -&gt; Int -&gt; Integer
+forall a. Bits a =&gt; a -&gt; Int -&gt; a
+</span><span class="hs-operator hs-var">.&gt;&gt;.</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621680382304"><span class="hs-identifier hs-var">n</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-151"></span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="M.Pack.Internal.Bit.html#bitsettovuin"><span class="hs-pragma hs-type">bitsettovuin</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-152"></span><span>
+</span><span id="line-153"></span><span class="annot"><a href="M.Pack.Internal.Bit.html#bitsetfromvuin"><span class="hs-identifier hs-type">bitsetfromvuin</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Int</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">VU.Vector</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Int8</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="M.Pack.Internal.Bit.html#Bitset"><span class="hs-identifier hs-type">Bitset</span></a></span><span>
+</span><span id="line-154"></span><span id="bitsetfromvuin"><span class="annot"><span class="annottext">bitsetfromvuin :: Int -&gt; Vector Int8 -&gt; Bitset
+</span><a href="M.Pack.Internal.Bit.html#bitsetfromvuin"><span class="hs-identifier hs-var hs-var">bitsetfromvuin</span></a></span></span><span> </span><span id="local-6989586621680382312"><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621680382312"><span class="hs-identifier hs-var">n</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Integer -&gt; Bitset
+</span><a href="M.Pack.Internal.Bit.html#Bitset"><span class="hs-identifier hs-var">Bitset</span></a></span><span> </span><span class="annot"><span class="annottext">(Integer -&gt; Bitset)
+-&gt; (Vector Int8 -&gt; Integer) -&gt; Vector Int8 -&gt; Bitset
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">Integer -&gt; Int -&gt; Vector Int8 -&gt; Integer
+</span><a href="#local-6989586621680382313"><span class="hs-identifier hs-var">go</span></a></span><span> </span><span class="annot"><span class="annottext">Integer
+</span><span class="hs-number">0</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">0</span></span><span>
+</span><span id="line-155"></span><span>  </span><span class="hs-keyword">where</span><span>
+</span><span id="line-156"></span><span>    </span><span id="local-6989586621680382313"><span class="annot"><span class="annottext">go :: Integer -&gt; Int -&gt; Vector Int8 -&gt; Integer
+</span><a href="#local-6989586621680382313"><span class="hs-identifier hs-var hs-var">go</span></a></span></span><span> </span><span id="local-6989586621680382314"><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621680382314"><span class="hs-identifier hs-var">a</span></a></span></span><span> </span><span id="local-6989586621680382315"><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621680382315"><span class="hs-identifier hs-var">s</span></a></span></span><span> </span><span id="local-6989586621680382316"><span class="annot"><span class="annottext">Vector Int8
+</span><a href="#local-6989586621680382316"><span class="hs-identifier hs-var">v</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-157"></span><span>      </span><span class="hs-keyword">case</span><span> </span><span class="annot"><span class="annottext">Vector Int8 -&gt; Maybe (Int8, Vector Int8)
+forall a. Unbox a =&gt; Vector a -&gt; Maybe (a, Vector a)
+</span><span class="hs-identifier hs-var">VU.uncons</span></span><span> </span><span class="annot"><span class="annottext">Vector Int8
+</span><a href="#local-6989586621680382316"><span class="hs-identifier hs-var">v</span></a></span><span> </span><span class="hs-keyword">of</span><span>
+</span><span id="line-158"></span><span>        </span><span class="annot"><span class="annottext">Maybe (Int8, Vector Int8)
+</span><span class="hs-identifier hs-var">Nothing</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621680382314"><span class="hs-identifier hs-var">a</span></a></span><span>
+</span><span id="line-159"></span><span>        </span><span class="annot"><span class="hs-identifier hs-type">Just</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621680382318"><span class="annot"><span class="annottext">Int8
+</span><a href="#local-6989586621680382318"><span class="hs-identifier hs-var">x</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680382319"><span class="annot"><span class="annottext">Vector Int8
+</span><a href="#local-6989586621680382319"><span class="hs-identifier hs-var">xs</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Integer -&gt; Int -&gt; Vector Int8 -&gt; Integer
+</span><a href="#local-6989586621680382313"><span class="hs-identifier hs-var">go</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Integer
+</span><a href="#local-6989586621680382314"><span class="hs-identifier hs-var">a</span></a></span><span> </span><span class="annot"><span class="annottext">Integer -&gt; Integer -&gt; Integer
+forall a. Bits a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">.|.</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int8 -&gt; Integer
+forall a b. (Integral a, Num b) =&gt; a -&gt; b
+</span><span class="hs-identifier hs-var">fromIntegral</span></span><span> </span><span class="annot"><span class="annottext">Int8
+</span><a href="#local-6989586621680382318"><span class="hs-identifier hs-var">x</span></a></span><span> </span><span class="annot"><span class="annottext">Integer -&gt; Int -&gt; Integer
+forall a. Bits a =&gt; a -&gt; Int -&gt; a
+</span><span class="hs-operator hs-var">.&lt;&lt;.</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621680382315"><span class="hs-identifier hs-var">s</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621680382315"><span class="hs-identifier hs-var">s</span></a></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Int
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">+</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621680382312"><span class="hs-identifier hs-var">n</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Vector Int8
+</span><a href="#local-6989586621680382319"><span class="hs-identifier hs-var">xs</span></a></span><span>
+</span><span id="line-160"></span><span>
+</span><span id="line-161"></span><span class="annot"><a href="M.Pack.Internal.Bit.html#bitsettovui64"><span class="hs-identifier hs-type">bitsettovui64</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="M.Pack.Internal.Bit.html#Bitset"><span class="hs-identifier hs-type">Bitset</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">VU.Vector</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Int8</span></span><span>
+</span><span id="line-162"></span><span id="bitsettovui64"><span class="annot"><span class="annottext">bitsettovui64 :: Bitset -&gt; Vector Int8
+</span><a href="M.Pack.Internal.Bit.html#bitsettovui64"><span class="hs-identifier hs-var hs-var">bitsettovui64</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int -&gt; Bitset -&gt; Vector Int8
+</span><a href="M.Pack.Internal.Bit.html#bitsettovuin"><span class="hs-identifier hs-var">bitsettovuin</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">64</span></span><span>
+</span><span id="line-163"></span><span>
+</span><span id="line-164"></span><span class="annot"><a href="M.Pack.Internal.Bit.html#bitsetfromvui64"><span class="hs-identifier hs-type">bitsetfromvui64</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">VU.Vector</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Int8</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="M.Pack.Internal.Bit.html#Bitset"><span class="hs-identifier hs-type">Bitset</span></a></span><span>
+</span><span id="line-165"></span><span id="bitsetfromvui64"><span class="annot"><span class="annottext">bitsetfromvui64 :: Vector Int8 -&gt; Bitset
+</span><a href="M.Pack.Internal.Bit.html#bitsetfromvui64"><span class="hs-identifier hs-var hs-var">bitsetfromvui64</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int -&gt; Vector Int8 -&gt; Bitset
+</span><a href="M.Pack.Internal.Bit.html#bitsetfromvuin"><span class="hs-identifier hs-var">bitsetfromvuin</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">64</span></span><span>
+</span><span id="line-166"></span><span>
+</span><span id="line-167"></span><span class="annot"><a href="M.Pack.Internal.Bit.html#bitsettovui8"><span class="hs-identifier hs-type">bitsettovui8</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="M.Pack.Internal.Bit.html#Bitset"><span class="hs-identifier hs-type">Bitset</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">VU.Vector</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Int8</span></span><span>
+</span><span id="line-168"></span><span id="bitsettovui8"><span class="annot"><span class="annottext">bitsettovui8 :: Bitset -&gt; Vector Int8
+</span><a href="M.Pack.Internal.Bit.html#bitsettovui8"><span class="hs-identifier hs-var hs-var">bitsettovui8</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int -&gt; Bitset -&gt; Vector Int8
+</span><a href="M.Pack.Internal.Bit.html#bitsettovuin"><span class="hs-identifier hs-var">bitsettovuin</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">8</span></span><span>
+</span><span id="line-169"></span><span>
+</span><span id="line-170"></span><span class="annot"><a href="M.Pack.Internal.Bit.html#bitsetfromvui8"><span class="hs-identifier hs-type">bitsetfromvui8</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">VU.Vector</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Int8</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="M.Pack.Internal.Bit.html#Bitset"><span class="hs-identifier hs-type">Bitset</span></a></span><span>
+</span><span id="line-171"></span><span id="bitsetfromvui8"><span class="annot"><span class="annottext">bitsetfromvui8 :: Vector Int8 -&gt; Bitset
+</span><a href="M.Pack.Internal.Bit.html#bitsetfromvui8"><span class="hs-identifier hs-var hs-var">bitsetfromvui8</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int -&gt; Vector Int8 -&gt; Bitset
+</span><a href="M.Pack.Internal.Bit.html#bitsetfromvuin"><span class="hs-identifier hs-var">bitsetfromvuin</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">8</span></span><span>
+</span><span id="line-172"></span><span>
+</span><span id="line-173"></span><span class="hs-comment">-- | a fixed-size bitset with @i@ bits</span><span>
+</span><span id="line-174"></span><span class="hs-comment">--</span><span>
+</span><span id="line-175"></span><span class="hs-comment">-- (implemented identically to 'Bitset'; only difference is that</span><span>
+</span><span id="line-176"></span><span class="hs-comment">-- when ser/de occurs, it pads missing bits with zeroes. hence it is</span><span>
+</span><span id="line-177"></span><span class="hs-comment">-- also possible to access out-of-bounds bits, and these bits will</span><span>
+</span><span id="line-178"></span><span class="hs-comment">-- get silently truncated when ser/de occurs)</span><span>
+</span><span id="line-179"></span><span class="hs-keyword">newtype</span><span> </span><span id="FixedBitset"><span class="annot"><a href="M.Pack.Internal.Bit.html#FixedBitset"><span class="hs-identifier hs-var">FixedBitset</span></a></span></span><span> </span><span id="local-6989586621680381386"><span class="annot"><a href="#local-6989586621680381386"><span class="hs-identifier hs-type">i</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="FixedBitset"><span class="annot"><a href="M.Pack.Internal.Bit.html#FixedBitset"><span class="hs-identifier hs-var">FixedBitset</span></a></span></span><span> </span><span class="hs-special">{</span><span id="getfixedbitset"><span class="annot"><span class="annottext">forall {k} (i :: k). FixedBitset i -&gt; Integer
+</span><a href="M.Pack.Internal.Bit.html#getfixedbitset"><span class="hs-identifier hs-var hs-var">getfixedbitset</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Integer</span></span><span class="hs-special">}</span><span>
+</span><span id="line-180"></span><span>  </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">stock</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621680382326"><span id="local-6989586621680382328"><span class="annot"><span class="annottext">(forall x. FixedBitset i -&gt; Rep (FixedBitset i) x)
+-&gt; (forall x. Rep (FixedBitset i) x -&gt; FixedBitset i)
+-&gt; Generic (FixedBitset i)
+forall x. Rep (FixedBitset i) x -&gt; FixedBitset i
+forall x. FixedBitset i -&gt; Rep (FixedBitset i) x
+forall a.
+(forall x. a -&gt; Rep a x) -&gt; (forall x. Rep a x -&gt; a) -&gt; Generic a
+forall k (i :: k) x. Rep (FixedBitset i) x -&gt; FixedBitset i
+forall k (i :: k) x. FixedBitset i -&gt; Rep (FixedBitset i) x
+$cfrom :: forall k (i :: k) x. FixedBitset i -&gt; Rep (FixedBitset i) x
+from :: forall x. FixedBitset i -&gt; Rep (FixedBitset i) x
+$cto :: forall k (i :: k) x. Rep (FixedBitset i) x -&gt; FixedBitset i
+to :: forall x. Rep (FixedBitset i) x -&gt; FixedBitset i
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Generic</span></span></span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Typeable</span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680382336"><span id="local-6989586621680382339"><span id="local-6989586621680382342"><span id="local-6989586621680382344"><span id="local-6989586621680382346"><span id="local-6989586621680382352"><span id="local-6989586621680382357"><span id="local-6989586621680382360"><span id="local-6989586621680382363"><span id="local-6989586621680382366"><span id="local-6989586621680382369"><span id="local-6989586621680382372"><span id="local-6989586621680382377"><span id="local-6989586621680382382"><span class="annot"><span class="annottext">Typeable (FixedBitset i)
+Typeable (FixedBitset i) =&gt;
+(forall (c :: * -&gt; *).
+ (forall d b. Data d =&gt; c (d -&gt; b) -&gt; d -&gt; c b)
+ -&gt; (forall g. g -&gt; c g) -&gt; FixedBitset i -&gt; c (FixedBitset i))
+-&gt; (forall (c :: * -&gt; *).
+    (forall b r. Data b =&gt; c (b -&gt; r) -&gt; c r)
+    -&gt; (forall r. r -&gt; c r) -&gt; Constr -&gt; c (FixedBitset i))
+-&gt; (FixedBitset i -&gt; Constr)
+-&gt; (FixedBitset i -&gt; DataType)
+-&gt; (forall (t :: * -&gt; *) (c :: * -&gt; *).
+    Typeable t =&gt;
+    (forall d. Data d =&gt; c (t d)) -&gt; Maybe (c (FixedBitset i)))
+-&gt; (forall (t :: * -&gt; * -&gt; *) (c :: * -&gt; *).
+    Typeable t =&gt;
+    (forall d e. (Data d, Data e) =&gt; c (t d e))
+    -&gt; Maybe (c (FixedBitset i)))
+-&gt; ((forall b. Data b =&gt; b -&gt; b) -&gt; FixedBitset i -&gt; FixedBitset i)
+-&gt; (forall r r'.
+    (r -&gt; r' -&gt; r)
+    -&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; FixedBitset i -&gt; r)
+-&gt; (forall r r'.
+    (r' -&gt; r -&gt; r)
+    -&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; FixedBitset i -&gt; r)
+-&gt; (forall u. (forall d. Data d =&gt; d -&gt; u) -&gt; FixedBitset i -&gt; [u])
+-&gt; (forall u.
+    Int -&gt; (forall d. Data d =&gt; d -&gt; u) -&gt; FixedBitset i -&gt; u)
+-&gt; (forall (m :: * -&gt; *).
+    Monad m =&gt;
+    (forall d. Data d =&gt; d -&gt; m d)
+    -&gt; FixedBitset i -&gt; m (FixedBitset i))
+-&gt; (forall (m :: * -&gt; *).
+    MonadPlus m =&gt;
+    (forall d. Data d =&gt; d -&gt; m d)
+    -&gt; FixedBitset i -&gt; m (FixedBitset i))
+-&gt; (forall (m :: * -&gt; *).
+    MonadPlus m =&gt;
+    (forall d. Data d =&gt; d -&gt; m d)
+    -&gt; FixedBitset i -&gt; m (FixedBitset i))
+-&gt; Data (FixedBitset i)
+FixedBitset i -&gt; Constr
+FixedBitset i -&gt; DataType
+(forall b. Data b =&gt; b -&gt; b) -&gt; FixedBitset i -&gt; FixedBitset i
+forall a.
+Typeable a =&gt;
+(forall (c :: * -&gt; *).
+ (forall d b. Data d =&gt; c (d -&gt; b) -&gt; d -&gt; c b)
+ -&gt; (forall g. g -&gt; c g) -&gt; a -&gt; c a)
+-&gt; (forall (c :: * -&gt; *).
+    (forall b r. Data b =&gt; c (b -&gt; r) -&gt; c r)
+    -&gt; (forall r. r -&gt; c r) -&gt; Constr -&gt; c a)
+-&gt; (a -&gt; Constr)
+-&gt; (a -&gt; DataType)
+-&gt; (forall (t :: * -&gt; *) (c :: * -&gt; *).
+    Typeable t =&gt;
+    (forall d. Data d =&gt; c (t d)) -&gt; Maybe (c a))
+-&gt; (forall (t :: * -&gt; * -&gt; *) (c :: * -&gt; *).
+    Typeable t =&gt;
+    (forall d e. (Data d, Data e) =&gt; c (t d e)) -&gt; Maybe (c a))
+-&gt; ((forall b. Data b =&gt; b -&gt; b) -&gt; a -&gt; a)
+-&gt; (forall r r'.
+    (r -&gt; r' -&gt; r) -&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; a -&gt; r)
+-&gt; (forall r r'.
+    (r' -&gt; r -&gt; r) -&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; a -&gt; r)
+-&gt; (forall u. (forall d. Data d =&gt; d -&gt; u) -&gt; a -&gt; [u])
+-&gt; (forall u. Int -&gt; (forall d. Data d =&gt; d -&gt; u) -&gt; a -&gt; u)
+-&gt; (forall (m :: * -&gt; *).
+    Monad m =&gt;
+    (forall d. Data d =&gt; d -&gt; m d) -&gt; a -&gt; m a)
+-&gt; (forall (m :: * -&gt; *).
+    MonadPlus m =&gt;
+    (forall d. Data d =&gt; d -&gt; m d) -&gt; a -&gt; m a)
+-&gt; (forall (m :: * -&gt; *).
+    MonadPlus m =&gt;
+    (forall d. Data d =&gt; d -&gt; m d) -&gt; a -&gt; m a)
+-&gt; Data a
+forall u. Int -&gt; (forall d. Data d =&gt; d -&gt; u) -&gt; FixedBitset i -&gt; u
+forall u. (forall d. Data d =&gt; d -&gt; u) -&gt; FixedBitset i -&gt; [u]
+forall k (i :: k).
+(Typeable i, Typeable k) =&gt;
+Typeable (FixedBitset i)
+forall k (i :: k).
+(Typeable i, Typeable k) =&gt;
+FixedBitset i -&gt; Constr
+forall k (i :: k).
+(Typeable i, Typeable k) =&gt;
+FixedBitset i -&gt; DataType
+forall k (i :: k).
+(Typeable i, Typeable k) =&gt;
+(forall b. Data b =&gt; b -&gt; b) -&gt; FixedBitset i -&gt; FixedBitset i
+forall k (i :: k) u.
+(Typeable i, Typeable k) =&gt;
+Int -&gt; (forall d. Data d =&gt; d -&gt; u) -&gt; FixedBitset i -&gt; u
+forall k (i :: k) u.
+(Typeable i, Typeable k) =&gt;
+(forall d. Data d =&gt; d -&gt; u) -&gt; FixedBitset i -&gt; [u]
+forall k (i :: k) r r'.
+(Typeable i, Typeable k) =&gt;
+(r -&gt; r' -&gt; r)
+-&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; FixedBitset i -&gt; r
+forall k (i :: k) r r'.
+(Typeable i, Typeable k) =&gt;
+(r' -&gt; r -&gt; r)
+-&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; FixedBitset i -&gt; r
+forall k (i :: k) (m :: * -&gt; *).
+(Typeable i, Typeable k, Monad m) =&gt;
+(forall d. Data d =&gt; d -&gt; m d)
+-&gt; FixedBitset i -&gt; m (FixedBitset i)
+forall k (i :: k) (m :: * -&gt; *).
+(Typeable i, Typeable k, MonadPlus m) =&gt;
+(forall d. Data d =&gt; d -&gt; m d)
+-&gt; FixedBitset i -&gt; m (FixedBitset i)
+forall k (i :: k) (c :: * -&gt; *).
+(Typeable i, Typeable k) =&gt;
+(forall b r. Data b =&gt; c (b -&gt; r) -&gt; c r)
+-&gt; (forall r. r -&gt; c r) -&gt; Constr -&gt; c (FixedBitset i)
+forall k (i :: k) (c :: * -&gt; *).
+(Typeable i, Typeable k) =&gt;
+(forall d b. Data d =&gt; c (d -&gt; b) -&gt; d -&gt; c b)
+-&gt; (forall g. g -&gt; c g) -&gt; FixedBitset i -&gt; c (FixedBitset i)
+forall k (i :: k) (t :: * -&gt; *) (c :: * -&gt; *).
+(Typeable i, Typeable k, Typeable t) =&gt;
+(forall d. Data d =&gt; c (t d)) -&gt; Maybe (c (FixedBitset i))
+forall k (i :: k) (t :: * -&gt; * -&gt; *) (c :: * -&gt; *).
+(Typeable i, Typeable k, Typeable t) =&gt;
+(forall d e. (Data d, Data e) =&gt; c (t d e))
+-&gt; Maybe (c (FixedBitset i))
+forall r r'.
+(r -&gt; r' -&gt; r)
+-&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; FixedBitset i -&gt; r
+forall r r'.
+(r' -&gt; r -&gt; r)
+-&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; FixedBitset i -&gt; r
+forall (m :: * -&gt; *).
+Monad m =&gt;
+(forall d. Data d =&gt; d -&gt; m d)
+-&gt; FixedBitset i -&gt; m (FixedBitset i)
+forall (m :: * -&gt; *).
+MonadPlus m =&gt;
+(forall d. Data d =&gt; d -&gt; m d)
+-&gt; FixedBitset i -&gt; m (FixedBitset i)
+forall (c :: * -&gt; *).
+(forall b r. Data b =&gt; c (b -&gt; r) -&gt; c r)
+-&gt; (forall r. r -&gt; c r) -&gt; Constr -&gt; c (FixedBitset i)
+forall (c :: * -&gt; *).
+(forall d b. Data d =&gt; c (d -&gt; b) -&gt; d -&gt; c b)
+-&gt; (forall g. g -&gt; c g) -&gt; FixedBitset i -&gt; c (FixedBitset i)
+forall (t :: * -&gt; *) (c :: * -&gt; *).
+Typeable t =&gt;
+(forall d. Data d =&gt; c (t d)) -&gt; Maybe (c (FixedBitset i))
+forall (t :: * -&gt; * -&gt; *) (c :: * -&gt; *).
+Typeable t =&gt;
+(forall d e. (Data d, Data e) =&gt; c (t d e))
+-&gt; Maybe (c (FixedBitset i))
+$cgfoldl :: forall k (i :: k) (c :: * -&gt; *).
+(Typeable i, Typeable k) =&gt;
+(forall d b. Data d =&gt; c (d -&gt; b) -&gt; d -&gt; c b)
+-&gt; (forall g. g -&gt; c g) -&gt; FixedBitset i -&gt; c (FixedBitset i)
+gfoldl :: forall (c :: * -&gt; *).
+(forall d b. Data d =&gt; c (d -&gt; b) -&gt; d -&gt; c b)
+-&gt; (forall g. g -&gt; c g) -&gt; FixedBitset i -&gt; c (FixedBitset i)
+$cgunfold :: forall k (i :: k) (c :: * -&gt; *).
+(Typeable i, Typeable k) =&gt;
+(forall b r. Data b =&gt; c (b -&gt; r) -&gt; c r)
+-&gt; (forall r. r -&gt; c r) -&gt; Constr -&gt; c (FixedBitset i)
+gunfold :: forall (c :: * -&gt; *).
+(forall b r. Data b =&gt; c (b -&gt; r) -&gt; c r)
+-&gt; (forall r. r -&gt; c r) -&gt; Constr -&gt; c (FixedBitset i)
+$ctoConstr :: forall k (i :: k).
+(Typeable i, Typeable k) =&gt;
+FixedBitset i -&gt; Constr
+toConstr :: FixedBitset i -&gt; Constr
+$cdataTypeOf :: forall k (i :: k).
+(Typeable i, Typeable k) =&gt;
+FixedBitset i -&gt; DataType
+dataTypeOf :: FixedBitset i -&gt; DataType
+$cdataCast1 :: forall k (i :: k) (t :: * -&gt; *) (c :: * -&gt; *).
+(Typeable i, Typeable k, Typeable t) =&gt;
+(forall d. Data d =&gt; c (t d)) -&gt; Maybe (c (FixedBitset i))
+dataCast1 :: forall (t :: * -&gt; *) (c :: * -&gt; *).
+Typeable t =&gt;
+(forall d. Data d =&gt; c (t d)) -&gt; Maybe (c (FixedBitset i))
+$cdataCast2 :: forall k (i :: k) (t :: * -&gt; * -&gt; *) (c :: * -&gt; *).
+(Typeable i, Typeable k, Typeable t) =&gt;
+(forall d e. (Data d, Data e) =&gt; c (t d e))
+-&gt; Maybe (c (FixedBitset i))
+dataCast2 :: forall (t :: * -&gt; * -&gt; *) (c :: * -&gt; *).
+Typeable t =&gt;
+(forall d e. (Data d, Data e) =&gt; c (t d e))
+-&gt; Maybe (c (FixedBitset i))
+$cgmapT :: forall k (i :: k).
+(Typeable i, Typeable k) =&gt;
+(forall b. Data b =&gt; b -&gt; b) -&gt; FixedBitset i -&gt; FixedBitset i
+gmapT :: (forall b. Data b =&gt; b -&gt; b) -&gt; FixedBitset i -&gt; FixedBitset i
+$cgmapQl :: forall k (i :: k) r r'.
+(Typeable i, Typeable k) =&gt;
+(r -&gt; r' -&gt; r)
+-&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; FixedBitset i -&gt; r
+gmapQl :: forall r r'.
+(r -&gt; r' -&gt; r)
+-&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; FixedBitset i -&gt; r
+$cgmapQr :: forall k (i :: k) r r'.
+(Typeable i, Typeable k) =&gt;
+(r' -&gt; r -&gt; r)
+-&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; FixedBitset i -&gt; r
+gmapQr :: forall r r'.
+(r' -&gt; r -&gt; r)
+-&gt; r -&gt; (forall d. Data d =&gt; d -&gt; r') -&gt; FixedBitset i -&gt; r
+$cgmapQ :: forall k (i :: k) u.
+(Typeable i, Typeable k) =&gt;
+(forall d. Data d =&gt; d -&gt; u) -&gt; FixedBitset i -&gt; [u]
+gmapQ :: forall u. (forall d. Data d =&gt; d -&gt; u) -&gt; FixedBitset i -&gt; [u]
+$cgmapQi :: forall k (i :: k) u.
+(Typeable i, Typeable k) =&gt;
+Int -&gt; (forall d. Data d =&gt; d -&gt; u) -&gt; FixedBitset i -&gt; u
+gmapQi :: forall u. Int -&gt; (forall d. Data d =&gt; d -&gt; u) -&gt; FixedBitset i -&gt; u
+$cgmapM :: forall k (i :: k) (m :: * -&gt; *).
+(Typeable i, Typeable k, Monad m) =&gt;
+(forall d. Data d =&gt; d -&gt; m d)
+-&gt; FixedBitset i -&gt; m (FixedBitset i)
+gmapM :: forall (m :: * -&gt; *).
+Monad m =&gt;
+(forall d. Data d =&gt; d -&gt; m d)
+-&gt; FixedBitset i -&gt; m (FixedBitset i)
+$cgmapMp :: forall k (i :: k) (m :: * -&gt; *).
+(Typeable i, Typeable k, MonadPlus m) =&gt;
+(forall d. Data d =&gt; d -&gt; m d)
+-&gt; FixedBitset i -&gt; m (FixedBitset i)
+gmapMp :: forall (m :: * -&gt; *).
+MonadPlus m =&gt;
+(forall d. Data d =&gt; d -&gt; m d)
+-&gt; FixedBitset i -&gt; m (FixedBitset i)
+$cgmapMo :: forall k (i :: k) (m :: * -&gt; *).
+(Typeable i, Typeable k, MonadPlus m) =&gt;
+(forall d. Data d =&gt; d -&gt; m d)
+-&gt; FixedBitset i -&gt; m (FixedBitset i)
+gmapMo :: forall (m :: * -&gt; *).
+MonadPlus m =&gt;
+(forall d. Data d =&gt; d -&gt; m d)
+-&gt; FixedBitset i -&gt; m (FixedBitset i)
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Data</span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680382387"><span id="local-6989586621680382393"><span class="annot"><span class="annottext">(forall (m :: * -&gt; *). Quote m =&gt; FixedBitset i -&gt; m Exp)
+-&gt; (forall (m :: * -&gt; *).
+    Quote m =&gt;
+    FixedBitset i -&gt; Code m (FixedBitset i))
+-&gt; Lift (FixedBitset i)
+forall k (i :: k) (m :: * -&gt; *). Quote m =&gt; FixedBitset i -&gt; m Exp
+forall k (i :: k) (m :: * -&gt; *).
+Quote m =&gt;
+FixedBitset i -&gt; Code m (FixedBitset i)
+forall t.
+(forall (m :: * -&gt; *). Quote m =&gt; t -&gt; m Exp)
+-&gt; (forall (m :: * -&gt; *). Quote m =&gt; t -&gt; Code m t) -&gt; Lift t
+forall (m :: * -&gt; *). Quote m =&gt; FixedBitset i -&gt; m Exp
+forall (m :: * -&gt; *).
+Quote m =&gt;
+FixedBitset i -&gt; Code m (FixedBitset i)
+$clift :: forall k (i :: k) (m :: * -&gt; *). Quote m =&gt; FixedBitset i -&gt; m Exp
+lift :: forall (m :: * -&gt; *). Quote m =&gt; FixedBitset i -&gt; m Exp
+$cliftTyped :: forall k (i :: k) (m :: * -&gt; *).
+Quote m =&gt;
+FixedBitset i -&gt; Code m (FixedBitset i)
+liftTyped :: forall (m :: * -&gt; *).
+Quote m =&gt;
+FixedBitset i -&gt; Code m (FixedBitset i)
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Lift</span></span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-181"></span><span>  </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">newtype</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621680382400"><span id="local-6989586621680382404"><span class="annot"><span class="annottext">FixedBitset i -&gt; FixedBitset i -&gt; Bool
+(FixedBitset i -&gt; FixedBitset i -&gt; Bool)
+-&gt; (FixedBitset i -&gt; FixedBitset i -&gt; Bool) -&gt; Eq (FixedBitset i)
+forall a. (a -&gt; a -&gt; Bool) -&gt; (a -&gt; a -&gt; Bool) -&gt; Eq a
+forall k (i :: k). FixedBitset i -&gt; FixedBitset i -&gt; Bool
+$c== :: forall k (i :: k). FixedBitset i -&gt; FixedBitset i -&gt; Bool
+== :: FixedBitset i -&gt; FixedBitset i -&gt; Bool
+$c/= :: forall k (i :: k). FixedBitset i -&gt; FixedBitset i -&gt; Bool
+/= :: FixedBitset i -&gt; FixedBitset i -&gt; Bool
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Eq</span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680382411"><span id="local-6989586621680382415"><span id="local-6989586621680382419"><span id="local-6989586621680382423"><span id="local-6989586621680382427"><span id="local-6989586621680382431"><span id="local-6989586621680382435"><span class="annot"><span class="annottext">Eq (FixedBitset i)
+Eq (FixedBitset i) =&gt;
+(FixedBitset i -&gt; FixedBitset i -&gt; Ordering)
+-&gt; (FixedBitset i -&gt; FixedBitset i -&gt; Bool)
+-&gt; (FixedBitset i -&gt; FixedBitset i -&gt; Bool)
+-&gt; (FixedBitset i -&gt; FixedBitset i -&gt; Bool)
+-&gt; (FixedBitset i -&gt; FixedBitset i -&gt; Bool)
+-&gt; (FixedBitset i -&gt; FixedBitset i -&gt; FixedBitset i)
+-&gt; (FixedBitset i -&gt; FixedBitset i -&gt; FixedBitset i)
+-&gt; Ord (FixedBitset i)
+FixedBitset i -&gt; FixedBitset i -&gt; Bool
+FixedBitset i -&gt; FixedBitset i -&gt; Ordering
+FixedBitset i -&gt; FixedBitset i -&gt; FixedBitset i
+forall a.
+Eq a =&gt;
+(a -&gt; a -&gt; Ordering)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; Bool)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; Ord a
+forall k (i :: k). Eq (FixedBitset i)
+forall k (i :: k). FixedBitset i -&gt; FixedBitset i -&gt; Bool
+forall k (i :: k). FixedBitset i -&gt; FixedBitset i -&gt; Ordering
+forall k (i :: k). FixedBitset i -&gt; FixedBitset i -&gt; FixedBitset i
+$ccompare :: forall k (i :: k). FixedBitset i -&gt; FixedBitset i -&gt; Ordering
+compare :: FixedBitset i -&gt; FixedBitset i -&gt; Ordering
+$c&lt; :: forall k (i :: k). FixedBitset i -&gt; FixedBitset i -&gt; Bool
+&lt; :: FixedBitset i -&gt; FixedBitset i -&gt; Bool
+$c&lt;= :: forall k (i :: k). FixedBitset i -&gt; FixedBitset i -&gt; Bool
+&lt;= :: FixedBitset i -&gt; FixedBitset i -&gt; Bool
+$c&gt; :: forall k (i :: k). FixedBitset i -&gt; FixedBitset i -&gt; Bool
+&gt; :: FixedBitset i -&gt; FixedBitset i -&gt; Bool
+$c&gt;= :: forall k (i :: k). FixedBitset i -&gt; FixedBitset i -&gt; Bool
+&gt;= :: FixedBitset i -&gt; FixedBitset i -&gt; Bool
+$cmax :: forall k (i :: k). FixedBitset i -&gt; FixedBitset i -&gt; FixedBitset i
+max :: FixedBitset i -&gt; FixedBitset i -&gt; FixedBitset i
+$cmin :: forall k (i :: k). FixedBitset i -&gt; FixedBitset i -&gt; FixedBitset i
+min :: FixedBitset i -&gt; FixedBitset i -&gt; FixedBitset i
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Ord</span></span></span></span></span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680382440"><span id="local-6989586621680382444"><span id="local-6989586621680382448"><span class="annot"><span class="annottext">Int -&gt; FixedBitset i -&gt; String -&gt; String
+[FixedBitset i] -&gt; String -&gt; String
+FixedBitset i -&gt; String
+(Int -&gt; FixedBitset i -&gt; String -&gt; String)
+-&gt; (FixedBitset i -&gt; String)
+-&gt; ([FixedBitset i] -&gt; String -&gt; String)
+-&gt; Show (FixedBitset i)
+forall a.
+(Int -&gt; a -&gt; String -&gt; String)
+-&gt; (a -&gt; String) -&gt; ([a] -&gt; String -&gt; String) -&gt; Show a
+forall k (i :: k). Int -&gt; FixedBitset i -&gt; String -&gt; String
+forall k (i :: k). [FixedBitset i] -&gt; String -&gt; String
+forall k (i :: k). FixedBitset i -&gt; String
+$cshowsPrec :: forall k (i :: k). Int -&gt; FixedBitset i -&gt; String -&gt; String
+showsPrec :: Int -&gt; FixedBitset i -&gt; String -&gt; String
+$cshow :: forall k (i :: k). FixedBitset i -&gt; String
+show :: FixedBitset i -&gt; String
+$cshowList :: forall k (i :: k). [FixedBitset i] -&gt; String -&gt; String
+showList :: [FixedBitset i] -&gt; String -&gt; String
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Show</span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680382453"><span id="local-6989586621680382457"><span id="local-6989586621680382461"><span id="local-6989586621680382465"><span class="annot"><span class="annottext">ReadPrec [FixedBitset i]
+ReadPrec (FixedBitset i)
+Int -&gt; ReadS (FixedBitset i)
+ReadS [FixedBitset i]
+(Int -&gt; ReadS (FixedBitset i))
+-&gt; ReadS [FixedBitset i]
+-&gt; ReadPrec (FixedBitset i)
+-&gt; ReadPrec [FixedBitset i]
+-&gt; Read (FixedBitset i)
+forall a.
+(Int -&gt; ReadS a)
+-&gt; ReadS [a] -&gt; ReadPrec a -&gt; ReadPrec [a] -&gt; Read a
+forall k (i :: k). ReadPrec [FixedBitset i]
+forall k (i :: k). ReadPrec (FixedBitset i)
+forall k (i :: k). Int -&gt; ReadS (FixedBitset i)
+forall k (i :: k). ReadS [FixedBitset i]
+$creadsPrec :: forall k (i :: k). Int -&gt; ReadS (FixedBitset i)
+readsPrec :: Int -&gt; ReadS (FixedBitset i)
+$creadList :: forall k (i :: k). ReadS [FixedBitset i]
+readList :: ReadS [FixedBitset i]
+$creadPrec :: forall k (i :: k). ReadPrec (FixedBitset i)
+readPrec :: ReadPrec (FixedBitset i)
+$creadListPrec :: forall k (i :: k). ReadPrec [FixedBitset i]
+readListPrec :: ReadPrec [FixedBitset i]
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Read</span></span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680382472"><span id="local-6989586621680382476"><span class="annot"><span class="annottext">Eq (FixedBitset i)
+Eq (FixedBitset i) =&gt;
+(Int -&gt; FixedBitset i -&gt; Int)
+-&gt; (FixedBitset i -&gt; Int) -&gt; Hashable (FixedBitset i)
+Int -&gt; FixedBitset i -&gt; Int
+FixedBitset i -&gt; Int
+forall a. Eq a =&gt; (Int -&gt; a -&gt; Int) -&gt; (a -&gt; Int) -&gt; Hashable a
+forall k (i :: k). Eq (FixedBitset i)
+forall k (i :: k). Int -&gt; FixedBitset i -&gt; Int
+forall k (i :: k). FixedBitset i -&gt; Int
+$chashWithSalt :: forall k (i :: k). Int -&gt; FixedBitset i -&gt; Int
+hashWithSalt :: Int -&gt; FixedBitset i -&gt; Int
+$chash :: forall k (i :: k). FixedBitset i -&gt; Int
+hash :: FixedBitset i -&gt; Int
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Hashable</span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680382481"><span class="annot"><span class="annottext">FixedBitset i -&gt; ()
+(FixedBitset i -&gt; ()) -&gt; NFData (FixedBitset i)
+forall a. (a -&gt; ()) -&gt; NFData a
+forall k (i :: k). FixedBitset i -&gt; ()
+$crnf :: forall k (i :: k). FixedBitset i -&gt; ()
+rnf :: FixedBitset i -&gt; ()
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var">NFData</span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-182"></span><span>  </span><span class="hs-keyword">deriving</span><span> </span><span class="annot"><span class="hs-keyword">newtype</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621680382486"><span id="local-6989586621680382490"><span id="local-6989586621680382494"><span id="local-6989586621680382498"><span id="local-6989586621680382502"><span id="local-6989586621680382506"><span id="local-6989586621680382510"><span id="local-6989586621680382514"><span class="annot"><span class="annottext">Int -&gt; FixedBitset i
+FixedBitset i -&gt; Int
+FixedBitset i -&gt; [FixedBitset i]
+FixedBitset i -&gt; FixedBitset i
+FixedBitset i -&gt; FixedBitset i -&gt; [FixedBitset i]
+FixedBitset i -&gt; FixedBitset i -&gt; FixedBitset i -&gt; [FixedBitset i]
+(FixedBitset i -&gt; FixedBitset i)
+-&gt; (FixedBitset i -&gt; FixedBitset i)
+-&gt; (Int -&gt; FixedBitset i)
+-&gt; (FixedBitset i -&gt; Int)
+-&gt; (FixedBitset i -&gt; [FixedBitset i])
+-&gt; (FixedBitset i -&gt; FixedBitset i -&gt; [FixedBitset i])
+-&gt; (FixedBitset i -&gt; FixedBitset i -&gt; [FixedBitset i])
+-&gt; (FixedBitset i
+    -&gt; FixedBitset i -&gt; FixedBitset i -&gt; [FixedBitset i])
+-&gt; Enum (FixedBitset i)
+forall a.
+(a -&gt; a)
+-&gt; (a -&gt; a)
+-&gt; (Int -&gt; a)
+-&gt; (a -&gt; Int)
+-&gt; (a -&gt; [a])
+-&gt; (a -&gt; a -&gt; [a])
+-&gt; (a -&gt; a -&gt; [a])
+-&gt; (a -&gt; a -&gt; a -&gt; [a])
+-&gt; Enum a
+forall k (i :: k). Int -&gt; FixedBitset i
+forall k (i :: k). FixedBitset i -&gt; Int
+forall k (i :: k). FixedBitset i -&gt; [FixedBitset i]
+forall k (i :: k). FixedBitset i -&gt; FixedBitset i
+forall k (i :: k).
+FixedBitset i -&gt; FixedBitset i -&gt; [FixedBitset i]
+forall k (i :: k).
+FixedBitset i -&gt; FixedBitset i -&gt; FixedBitset i -&gt; [FixedBitset i]
+$csucc :: forall k (i :: k). FixedBitset i -&gt; FixedBitset i
+succ :: FixedBitset i -&gt; FixedBitset i
+$cpred :: forall k (i :: k). FixedBitset i -&gt; FixedBitset i
+pred :: FixedBitset i -&gt; FixedBitset i
+$ctoEnum :: forall k (i :: k). Int -&gt; FixedBitset i
+toEnum :: Int -&gt; FixedBitset i
+$cfromEnum :: forall k (i :: k). FixedBitset i -&gt; Int
+fromEnum :: FixedBitset i -&gt; Int
+$cenumFrom :: forall k (i :: k). FixedBitset i -&gt; [FixedBitset i]
+enumFrom :: FixedBitset i -&gt; [FixedBitset i]
+$cenumFromThen :: forall k (i :: k).
+FixedBitset i -&gt; FixedBitset i -&gt; [FixedBitset i]
+enumFromThen :: FixedBitset i -&gt; FixedBitset i -&gt; [FixedBitset i]
+$cenumFromTo :: forall k (i :: k).
+FixedBitset i -&gt; FixedBitset i -&gt; [FixedBitset i]
+enumFromTo :: FixedBitset i -&gt; FixedBitset i -&gt; [FixedBitset i]
+$cenumFromThenTo :: forall k (i :: k).
+FixedBitset i -&gt; FixedBitset i -&gt; FixedBitset i -&gt; [FixedBitset i]
+enumFromThenTo :: FixedBitset i -&gt; FixedBitset i -&gt; FixedBitset i -&gt; [FixedBitset i]
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Enum</span></span></span></span></span></span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680382519"><span id="local-6989586621680382523"><span id="local-6989586621680382527"><span id="local-6989586621680382531"><span id="local-6989586621680382535"><span id="local-6989586621680382539"><span id="local-6989586621680382543"><span class="annot"><span class="annottext">Integer -&gt; FixedBitset i
+FixedBitset i -&gt; FixedBitset i
+FixedBitset i -&gt; FixedBitset i -&gt; FixedBitset i
+(FixedBitset i -&gt; FixedBitset i -&gt; FixedBitset i)
+-&gt; (FixedBitset i -&gt; FixedBitset i -&gt; FixedBitset i)
+-&gt; (FixedBitset i -&gt; FixedBitset i -&gt; FixedBitset i)
+-&gt; (FixedBitset i -&gt; FixedBitset i)
+-&gt; (FixedBitset i -&gt; FixedBitset i)
+-&gt; (FixedBitset i -&gt; FixedBitset i)
+-&gt; (Integer -&gt; FixedBitset i)
+-&gt; Num (FixedBitset i)
+forall a.
+(a -&gt; a -&gt; a)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; (a -&gt; a)
+-&gt; (a -&gt; a)
+-&gt; (a -&gt; a)
+-&gt; (Integer -&gt; a)
+-&gt; Num a
+forall k (i :: k). Integer -&gt; FixedBitset i
+forall k (i :: k). FixedBitset i -&gt; FixedBitset i
+forall k (i :: k). FixedBitset i -&gt; FixedBitset i -&gt; FixedBitset i
+$c+ :: forall k (i :: k). FixedBitset i -&gt; FixedBitset i -&gt; FixedBitset i
++ :: FixedBitset i -&gt; FixedBitset i -&gt; FixedBitset i
+$c- :: forall k (i :: k). FixedBitset i -&gt; FixedBitset i -&gt; FixedBitset i
+- :: FixedBitset i -&gt; FixedBitset i -&gt; FixedBitset i
+$c* :: forall k (i :: k). FixedBitset i -&gt; FixedBitset i -&gt; FixedBitset i
+* :: FixedBitset i -&gt; FixedBitset i -&gt; FixedBitset i
+$cnegate :: forall k (i :: k). FixedBitset i -&gt; FixedBitset i
+negate :: FixedBitset i -&gt; FixedBitset i
+$cabs :: forall k (i :: k). FixedBitset i -&gt; FixedBitset i
+abs :: FixedBitset i -&gt; FixedBitset i
+$csignum :: forall k (i :: k). FixedBitset i -&gt; FixedBitset i
+signum :: FixedBitset i -&gt; FixedBitset i
+$cfromInteger :: forall k (i :: k). Integer -&gt; FixedBitset i
+fromInteger :: Integer -&gt; FixedBitset i
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Num</span></span></span></span></span></span></span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680382552"><span class="annot"><span class="annottext">Num (FixedBitset i)
+Ord (FixedBitset i)
+(Num (FixedBitset i), Ord (FixedBitset i)) =&gt;
+(FixedBitset i -&gt; Rational) -&gt; Real (FixedBitset i)
+FixedBitset i -&gt; Rational
+forall a. (Num a, Ord a) =&gt; (a -&gt; Rational) -&gt; Real a
+forall k (i :: k). Num (FixedBitset i)
+forall k (i :: k). Ord (FixedBitset i)
+forall k (i :: k). FixedBitset i -&gt; Rational
+$ctoRational :: forall k (i :: k). FixedBitset i -&gt; Rational
+toRational :: FixedBitset i -&gt; Rational
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var">Real</span></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680382559"><span id="local-6989586621680382563"><span id="local-6989586621680382567"><span id="local-6989586621680382571"><span id="local-6989586621680382575"><span id="local-6989586621680382579"><span id="local-6989586621680382583"><span id="local-6989586621680382587"><span id="local-6989586621680382591"><span id="local-6989586621680382595"><span id="local-6989586621680382599"><span id="local-6989586621680382603"><span id="local-6989586621680382607"><span id="local-6989586621680382611"><span id="local-6989586621680382615"><span id="local-6989586621680382619"><span id="local-6989586621680382623"><span id="local-6989586621680382627"><span id="local-6989586621680382631"><span id="local-6989586621680382635"><span id="local-6989586621680382639"><span id="local-6989586621680382643"><span class="annot"><span class="annottext">Eq (FixedBitset i)
+FixedBitset i
+Eq (FixedBitset i) =&gt;
+(FixedBitset i -&gt; FixedBitset i -&gt; FixedBitset i)
+-&gt; (FixedBitset i -&gt; FixedBitset i -&gt; FixedBitset i)
+-&gt; (FixedBitset i -&gt; FixedBitset i -&gt; FixedBitset i)
+-&gt; (FixedBitset i -&gt; FixedBitset i)
+-&gt; (FixedBitset i -&gt; Int -&gt; FixedBitset i)
+-&gt; (FixedBitset i -&gt; Int -&gt; FixedBitset i)
+-&gt; FixedBitset i
+-&gt; (Int -&gt; FixedBitset i)
+-&gt; (FixedBitset i -&gt; Int -&gt; FixedBitset i)
+-&gt; (FixedBitset i -&gt; Int -&gt; FixedBitset i)
+-&gt; (FixedBitset i -&gt; Int -&gt; FixedBitset i)
+-&gt; (FixedBitset i -&gt; Int -&gt; Bool)
+-&gt; (FixedBitset i -&gt; Maybe Int)
+-&gt; (FixedBitset i -&gt; Int)
+-&gt; (FixedBitset i -&gt; Bool)
+-&gt; (FixedBitset i -&gt; Int -&gt; FixedBitset i)
+-&gt; (FixedBitset i -&gt; Int -&gt; FixedBitset i)
+-&gt; (FixedBitset i -&gt; Int -&gt; FixedBitset i)
+-&gt; (FixedBitset i -&gt; Int -&gt; FixedBitset i)
+-&gt; (FixedBitset i -&gt; Int -&gt; FixedBitset i)
+-&gt; (FixedBitset i -&gt; Int -&gt; FixedBitset i)
+-&gt; (FixedBitset i -&gt; Int)
+-&gt; Bits (FixedBitset i)
+Int -&gt; FixedBitset i
+FixedBitset i -&gt; Bool
+FixedBitset i -&gt; Int
+FixedBitset i -&gt; Maybe Int
+FixedBitset i -&gt; FixedBitset i
+FixedBitset i -&gt; Int -&gt; Bool
+FixedBitset i -&gt; Int -&gt; FixedBitset i
+FixedBitset i -&gt; FixedBitset i -&gt; FixedBitset i
+forall a.
+Eq a =&gt;
+(a -&gt; a -&gt; a)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; (a -&gt; a -&gt; a)
+-&gt; (a -&gt; a)
+-&gt; (a -&gt; Int -&gt; a)
+-&gt; (a -&gt; Int -&gt; a)
+-&gt; a
+-&gt; (Int -&gt; a)
+-&gt; (a -&gt; Int -&gt; a)
+-&gt; (a -&gt; Int -&gt; a)
+-&gt; (a -&gt; Int -&gt; a)
+-&gt; (a -&gt; Int -&gt; Bool)
+-&gt; (a -&gt; Maybe Int)
+-&gt; (a -&gt; Int)
+-&gt; (a -&gt; Bool)
+-&gt; (a -&gt; Int -&gt; a)
+-&gt; (a -&gt; Int -&gt; a)
+-&gt; (a -&gt; Int -&gt; a)
+-&gt; (a -&gt; Int -&gt; a)
+-&gt; (a -&gt; Int -&gt; a)
+-&gt; (a -&gt; Int -&gt; a)
+-&gt; (a -&gt; Int)
+-&gt; Bits a
+forall k (i :: k). Eq (FixedBitset i)
+forall k (i :: k). FixedBitset i
+forall k (i :: k). Int -&gt; FixedBitset i
+forall k (i :: k). FixedBitset i -&gt; Bool
+forall k (i :: k). FixedBitset i -&gt; Int
+forall k (i :: k). FixedBitset i -&gt; Maybe Int
+forall k (i :: k). FixedBitset i -&gt; FixedBitset i
+forall k (i :: k). FixedBitset i -&gt; Int -&gt; Bool
+forall k (i :: k). FixedBitset i -&gt; Int -&gt; FixedBitset i
+forall k (i :: k). FixedBitset i -&gt; FixedBitset i -&gt; FixedBitset i
+$c.&amp;. :: forall k (i :: k). FixedBitset i -&gt; FixedBitset i -&gt; FixedBitset i
+.&amp;. :: FixedBitset i -&gt; FixedBitset i -&gt; FixedBitset i
+$c.|. :: forall k (i :: k). FixedBitset i -&gt; FixedBitset i -&gt; FixedBitset i
+.|. :: FixedBitset i -&gt; FixedBitset i -&gt; FixedBitset i
+$cxor :: forall k (i :: k). FixedBitset i -&gt; FixedBitset i -&gt; FixedBitset i
+xor :: FixedBitset i -&gt; FixedBitset i -&gt; FixedBitset i
+$ccomplement :: forall k (i :: k). FixedBitset i -&gt; FixedBitset i
+complement :: FixedBitset i -&gt; FixedBitset i
+$cshift :: forall k (i :: k). FixedBitset i -&gt; Int -&gt; FixedBitset i
+shift :: FixedBitset i -&gt; Int -&gt; FixedBitset i
+$crotate :: forall k (i :: k). FixedBitset i -&gt; Int -&gt; FixedBitset i
+rotate :: FixedBitset i -&gt; Int -&gt; FixedBitset i
+$czeroBits :: forall k (i :: k). FixedBitset i
+zeroBits :: FixedBitset i
+$cbit :: forall k (i :: k). Int -&gt; FixedBitset i
+bit :: Int -&gt; FixedBitset i
+$csetBit :: forall k (i :: k). FixedBitset i -&gt; Int -&gt; FixedBitset i
+setBit :: FixedBitset i -&gt; Int -&gt; FixedBitset i
+$cclearBit :: forall k (i :: k). FixedBitset i -&gt; Int -&gt; FixedBitset i
+clearBit :: FixedBitset i -&gt; Int -&gt; FixedBitset i
+$ccomplementBit :: forall k (i :: k). FixedBitset i -&gt; Int -&gt; FixedBitset i
+complementBit :: FixedBitset i -&gt; Int -&gt; FixedBitset i
+$ctestBit :: forall k (i :: k). FixedBitset i -&gt; Int -&gt; Bool
+testBit :: FixedBitset i -&gt; Int -&gt; Bool
+$cbitSizeMaybe :: forall k (i :: k). FixedBitset i -&gt; Maybe Int
+bitSizeMaybe :: FixedBitset i -&gt; Maybe Int
+$cbitSize :: forall k (i :: k). FixedBitset i -&gt; Int
+bitSize :: FixedBitset i -&gt; Int
+$cisSigned :: forall k (i :: k). FixedBitset i -&gt; Bool
+isSigned :: FixedBitset i -&gt; Bool
+$cshiftL :: forall k (i :: k). FixedBitset i -&gt; Int -&gt; FixedBitset i
+shiftL :: FixedBitset i -&gt; Int -&gt; FixedBitset i
+$cunsafeShiftL :: forall k (i :: k). FixedBitset i -&gt; Int -&gt; FixedBitset i
+unsafeShiftL :: FixedBitset i -&gt; Int -&gt; FixedBitset i
+$cshiftR :: forall k (i :: k). FixedBitset i -&gt; Int -&gt; FixedBitset i
+shiftR :: FixedBitset i -&gt; Int -&gt; FixedBitset i
+$cunsafeShiftR :: forall k (i :: k). FixedBitset i -&gt; Int -&gt; FixedBitset i
+unsafeShiftR :: FixedBitset i -&gt; Int -&gt; FixedBitset i
+$crotateL :: forall k (i :: k). FixedBitset i -&gt; Int -&gt; FixedBitset i
+rotateL :: FixedBitset i -&gt; Int -&gt; FixedBitset i
+$crotateR :: forall k (i :: k). FixedBitset i -&gt; Int -&gt; FixedBitset i
+rotateR :: FixedBitset i -&gt; Int -&gt; FixedBitset i
+$cpopCount :: forall k (i :: k). FixedBitset i -&gt; Int
+popCount :: FixedBitset i -&gt; Int
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Bits</span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-183"></span><span>
+</span><span id="line-184"></span><span class="hs-comment">-- if too few bytes, pad with zeroes; if too many, truncate</span><span>
+</span><span id="line-185"></span><span class="annot"><a href="M.Pack.Internal.Bit.html#trim"><span class="hs-identifier hs-type">trim</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Int</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">VU.Vector</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Int8</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">VU.Vector</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Int8</span></span><span>
+</span><span id="line-186"></span><span id="trim"><span class="annot"><span class="annottext">trim :: Int -&gt; Vector Int8 -&gt; Vector Int8
+</span><a href="M.Pack.Internal.Bit.html#trim"><span class="hs-identifier hs-var hs-var">trim</span></a></span></span><span> </span><span id="local-6989586621680382648"><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621680382648"><span class="hs-identifier hs-var">n</span></a></span></span><span> </span><span id="local-6989586621680382649"><span class="annot"><span class="annottext">Vector Int8
+</span><a href="#local-6989586621680382649"><span class="hs-identifier hs-var">v</span></a></span></span><span>
+</span><span id="line-187"></span><span>  </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="annottext">Vector Int8 -&gt; Int
+forall a. Unbox a =&gt; Vector a -&gt; Int
+</span><span class="hs-identifier hs-var">VU.length</span></span><span> </span><span class="annot"><span class="annottext">Vector Int8
+</span><a href="#local-6989586621680382649"><span class="hs-identifier hs-var">v</span></a></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Bool
+forall a. Ord a =&gt; a -&gt; a -&gt; Bool
+</span><span class="hs-operator hs-var">&lt;</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621680382648"><span class="hs-identifier hs-var">n</span></a></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Vector Int8
+</span><a href="#local-6989586621680382649"><span class="hs-identifier hs-var">v</span></a></span><span> </span><span class="annot"><span class="annottext">Vector Int8 -&gt; Vector Int8 -&gt; Vector Int8
+forall a. Semigroup a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">&lt;&gt;</span></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int8 -&gt; Vector Int8
+forall a. Unbox a =&gt; Int -&gt; a -&gt; Vector a
+</span><span class="hs-identifier hs-var">VU.replicate</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621680382648"><span class="hs-identifier hs-var">n</span></a></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Int
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-glyph hs-var">-</span></span><span> </span><span class="annot"><span class="annottext">Vector Int8 -&gt; Int
+forall a. Unbox a =&gt; Vector a -&gt; Int
+</span><span class="hs-identifier hs-var">VU.length</span></span><span> </span><span class="annot"><span class="annottext">Vector Int8
+</span><a href="#local-6989586621680382649"><span class="hs-identifier hs-var">v</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Int8
+</span><span class="hs-number">0</span></span><span>
+</span><span id="line-188"></span><span>  </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="annottext">Bool
+</span><span class="hs-identifier hs-var">otherwise</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int -&gt; Vector Int8 -&gt; Vector Int8
+forall a. Unbox a =&gt; Int -&gt; Vector a -&gt; Vector a
+</span><span class="hs-identifier hs-var">VU.take</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621680382648"><span class="hs-identifier hs-var">n</span></a></span><span> </span><span class="annot"><span class="annottext">Vector Int8
+</span><a href="#local-6989586621680382649"><span class="hs-identifier hs-var">v</span></a></span><span>
+</span><span id="line-189"></span><span>
+</span><span id="line-190"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621680381455"><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">KnownNat</span></span><span> </span><span class="annot"><a href="#local-6989586621680381455"><span class="hs-identifier hs-type">i</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#Pack"><span class="hs-identifier hs-type">Pack</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="M.Pack.Internal.Bit.html#FixedBitset"><span class="hs-identifier hs-type">FixedBitset</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680381455"><span class="hs-identifier hs-type">i</span></a></span><span class="hs-special">)</span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-191"></span><span>  </span><span id="local-6989586621680382667"><span class="annot"><span class="annottext">pack :: FixedBitset i -&gt; Builder
+</span><a href="M.Pack.Internal.Types.html#pack"><span class="hs-identifier hs-var hs-var hs-var">pack</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-192"></span><span>    </span><span class="annot"><span class="annottext">Vector Int8 -&gt; Builder
+forall a. Pack a =&gt; a -&gt; Builder
+</span><a href="M.Pack.Internal.Types.html#pack"><span class="hs-identifier hs-var">pack</span></a></span><span>
+</span><span id="line-193"></span><span>      </span><span class="annot"><span class="annottext">(Vector Int8 -&gt; Builder)
+-&gt; (FixedBitset i -&gt; Vector Int8) -&gt; FixedBitset i -&gt; Builder
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Vector Int8 -&gt; Vector Int8
+</span><a href="M.Pack.Internal.Bit.html#trim"><span class="hs-identifier hs-var">trim</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Integer -&gt; Int
+forall a b. (Integral a, Num b) =&gt; a -&gt; b
+</span><span class="hs-identifier hs-var">fromIntegral</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Proxy i -&gt; Integer
+forall (n :: Nat) (proxy :: Nat -&gt; *).
+KnownNat n =&gt;
+proxy n -&gt; Integer
+</span><span class="hs-identifier hs-var">natVal</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">forall (t :: Nat). Proxy t
+forall {k} (t :: k). Proxy t
+</span><span class="hs-identifier hs-var">Proxy</span></span><span> </span><span class="hs-glyph">@</span><span class="annot"><a href="#local-6989586621680381455"><span class="hs-identifier hs-type">i</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Integer -&gt; Integer -&gt; Integer
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">+</span></span><span> </span><span class="annot"><span class="annottext">Integer
+</span><span class="hs-number">7</span></span><span> </span><span class="annot"><span class="annottext">Integer -&gt; Integer -&gt; Integer
+forall a. Integral a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">`div`</span></span><span> </span><span class="annot"><span class="annottext">Integer
+</span><span class="hs-number">8</span></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Int
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">+</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">1</span></span><span class="hs-special">)</span><span>
+</span><span id="line-194"></span><span>      </span><span class="annot"><span class="annottext">(Vector Int8 -&gt; Vector Int8)
+-&gt; (FixedBitset i -&gt; Vector Int8) -&gt; FixedBitset i -&gt; Vector Int8
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">Bitset -&gt; Vector Int8
+</span><a href="M.Pack.Internal.Bit.html#bitsettovui8"><span class="hs-identifier hs-var">bitsettovui8</span></a></span><span>
+</span><span id="line-195"></span><span>      </span><span class="annot"><span class="annottext">(Bitset -&gt; Vector Int8)
+-&gt; (FixedBitset i -&gt; Bitset) -&gt; FixedBitset i -&gt; Vector Int8
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">Integer -&gt; Bitset
+</span><a href="M.Pack.Internal.Bit.html#Bitset"><span class="hs-identifier hs-var">Bitset</span></a></span><span>
+</span><span id="line-196"></span><span>      </span><span class="annot"><span class="annottext">(Integer -&gt; Bitset)
+-&gt; (FixedBitset i -&gt; Integer) -&gt; FixedBitset i -&gt; Bitset
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">FixedBitset i -&gt; Integer
+forall {k} (i :: k). FixedBitset i -&gt; Integer
+</span><a href="M.Pack.Internal.Bit.html#getfixedbitset"><span class="hs-identifier hs-var">getfixedbitset</span></a></span><span>
+</span><span id="line-197"></span><span>  </span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#pack"><span class="hs-pragma hs-type">pack</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-198"></span><span>
+</span><span id="line-199"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621680381462"><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">KnownNat</span></span><span> </span><span class="annot"><a href="#local-6989586621680381462"><span class="hs-identifier hs-type">i</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#Unpack"><span class="hs-identifier hs-type">Unpack</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="M.Pack.Internal.Bit.html#FixedBitset"><span class="hs-identifier hs-type">FixedBitset</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680381462"><span class="hs-identifier hs-type">i</span></a></span><span class="hs-special">)</span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-200"></span><span>  </span><span id="local-6989586621680382685"><span class="annot"><span class="annottext">unpack :: forall (st :: ZeroBitType) r. Parser st r (FixedBitset i)
+</span><a href="M.Pack.Internal.Types.html#unpack"><span class="hs-identifier hs-var hs-var hs-var">unpack</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-201"></span><span>    </span><span class="annot"><span class="annottext">Integer -&gt; FixedBitset i
+forall k (i :: k). Integer -&gt; FixedBitset i
+</span><a href="M.Pack.Internal.Bit.html#FixedBitset"><span class="hs-identifier hs-var">FixedBitset</span></a></span><span>
+</span><span id="line-202"></span><span>      </span><span class="annot"><span class="annottext">(Integer -&gt; FixedBitset i)
+-&gt; (Vector Int8 -&gt; Integer) -&gt; Vector Int8 -&gt; FixedBitset i
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">Bitset -&gt; Integer
+</span><a href="M.Pack.Internal.Bit.html#getbitset"><span class="hs-identifier hs-var">getbitset</span></a></span><span>
+</span><span id="line-203"></span><span>      </span><span class="annot"><span class="annottext">(Bitset -&gt; Integer)
+-&gt; (Vector Int8 -&gt; Bitset) -&gt; Vector Int8 -&gt; Integer
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">Vector Int8 -&gt; Bitset
+</span><a href="M.Pack.Internal.Bit.html#bitsetfromvui8"><span class="hs-identifier hs-var">bitsetfromvui8</span></a></span><span>
+</span><span id="line-204"></span><span>      </span><span class="annot"><span class="annottext">(Vector Int8 -&gt; Bitset)
+-&gt; (Vector Int8 -&gt; Vector Int8) -&gt; Vector Int8 -&gt; Bitset
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Vector Int8 -&gt; Vector Int8
+</span><a href="M.Pack.Internal.Bit.html#trim"><span class="hs-identifier hs-var">trim</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Integer -&gt; Int
+forall a b. (Integral a, Num b) =&gt; a -&gt; b
+</span><span class="hs-identifier hs-var">fromIntegral</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Proxy i -&gt; Integer
+forall (n :: Nat) (proxy :: Nat -&gt; *).
+KnownNat n =&gt;
+proxy n -&gt; Integer
+</span><span class="hs-identifier hs-var">natVal</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">forall (t :: Nat). Proxy t
+forall {k} (t :: k). Proxy t
+</span><span class="hs-identifier hs-var">Proxy</span></span><span> </span><span class="hs-glyph">@</span><span class="annot"><a href="#local-6989586621680381462"><span class="hs-identifier hs-type">i</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Integer -&gt; Integer -&gt; Integer
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">+</span></span><span> </span><span class="annot"><span class="annottext">Integer
+</span><span class="hs-number">7</span></span><span> </span><span class="annot"><span class="annottext">Integer -&gt; Integer -&gt; Integer
+forall a. Integral a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">`div`</span></span><span> </span><span class="annot"><span class="annottext">Integer
+</span><span class="hs-number">8</span></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Int
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">+</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">1</span></span><span class="hs-special">)</span><span>
+</span><span id="line-205"></span><span>      </span><span class="annot"><span class="annottext">(Vector Int8 -&gt; FixedBitset i)
+-&gt; ParserT st r ParseError (Vector Int8)
+-&gt; ParserT st r ParseError (FixedBitset i)
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-operator hs-var">&lt;$&gt;</span></span><span> </span><span class="annot"><span class="annottext">ParserT st r ParseError (Vector Int8)
+forall (st :: ZeroBitType) r. Parser st r (Vector Int8)
+forall a (st :: ZeroBitType) r. Unpack a =&gt; Parser st r a
+</span><a href="M.Pack.Internal.Types.html#unpack"><span class="hs-identifier hs-var">unpack</span></a></span><span>
+</span><span id="line-206"></span><span>  </span><span class="hs-pragma">{-# INLINE</span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#unpack"><span class="hs-pragma hs-type">unpack</span></a></span><span> </span><span class="hs-pragma">#-}</span><span>
+</span><span id="line-207"></span></pre></body></html>

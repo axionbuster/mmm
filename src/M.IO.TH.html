@@ -1,0 +1,991 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span class="hs-comment">-- |</span><span>
+</span><span id="line-2"></span><span class="hs-comment">-- Module: M.IO.TH</span><span>
+</span><span id="line-3"></span><span class="hs-comment">-- Description: Template Haskell generators for packet parsing states</span><span>
+</span><span id="line-4"></span><span class="hs-comment">-- Copyright: (c) axionbuster, 2025</span><span>
+</span><span id="line-5"></span><span class="hs-comment">-- License: BSD-3-Clause</span><span>
+</span><span id="line-6"></span><span class="hs-comment">--</span><span>
+</span><span id="line-7"></span><span class="hs-comment">-- This module provides Template Haskell functionality to generate parser states</span><span>
+</span><span id="line-8"></span><span class="hs-comment">-- for client-server packet handling. It uses a simple grammar to define packet</span><span>
+</span><span id="line-9"></span><span class="hs-comment">-- mappings and their associated codes.</span><span>
+</span><span id="line-10"></span><span class="hs-comment">--</span><span>
+</span><span id="line-11"></span><span class="hs-comment">-- == Usage</span><span>
+</span><span id="line-12"></span><span class="hs-comment">--</span><span>
+</span><span id="line-13"></span><span class="hs-comment">-- Define parser states using the 'states' quasi-quoter:</span><span>
+</span><span id="line-14"></span><span class="hs-comment">--</span><span>
+</span><span id="line-15"></span><span class="hs-comment">-- @</span><span>
+</span><span id="line-16"></span><span class="hs-comment">-- -- creates mystatepair :: 'ParserStates'</span><span>
+</span><span id="line-17"></span><span class="hs-comment">-- [states|</span><span>
+</span><span id="line-18"></span><span class="hs-comment">--   mystatepair</span><span>
+</span><span id="line-19"></span><span class="hs-comment">--   Login:1f:2f     -- Login packet: recv=0x1f, send=0x2f</span><span>
+</span><span id="line-20"></span><span class="hs-comment">--   Handshake::3f   -- Handshake packet: send=0x3f only</span><span>
+</span><span id="line-21"></span><span class="hs-comment">--   |]</span><span>
+</span><span id="line-22"></span><span class="hs-comment">-- @</span><span>
+</span><span id="line-23"></span><span class="hs-comment">--</span><span>
+</span><span id="line-24"></span><span class="hs-comment">-- See: 'ParserStates', 'forserver', and 'forclient'.</span><span>
+</span><span id="line-25"></span><span class="hs-comment">--</span><span>
+</span><span id="line-26"></span><span class="hs-comment">-- == Note</span><span>
+</span><span id="line-27"></span><span class="hs-comment">--</span><span>
+</span><span id="line-28"></span><span class="hs-comment">-- All numerals are hexadecimal.</span><span>
+</span><span id="line-29"></span><span class="hs-keyword">module</span><span> </span><span class="annot"><a href="M.IO.TH.html"><span class="hs-identifier">M.IO.TH</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="M.IO.TH.html#ParserStates"><span class="hs-identifier">ParserStates</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">..</span><span class="hs-special">)</span><span class="hs-special">,</span><span> </span><span class="annot"><a href="M.IO.TH.html#states"><span class="hs-identifier">states</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-30"></span><span>
+</span><span id="line-31"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Control.Applicative.Combinators</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">manyTill</span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier">skipManyTill</span></span><span class="hs-special">)</span><span>
+</span><span id="line-32"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Control.Monad</span></span><span>
+</span><span id="line-33"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Control.Monad.Fix</span></span><span>
+</span><span id="line-34"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Char</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">isLetter</span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier">ord</span></span><span class="hs-special">)</span><span>
+</span><span id="line-35"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Function</span></span><span>
+</span><span id="line-36"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Functor</span></span><span>
+</span><span id="line-37"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.HashMap.Strict</span></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">H</span></span><span>
+</span><span id="line-38"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.IntMap.Strict</span></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">I</span></span><span>
+</span><span id="line-39"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Proxy</span></span><span>
+</span><span id="line-40"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Text</span></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">T</span></span><span>
+</span><span id="line-41"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Text.Encoding</span></span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">TE</span></span><span>
+</span><span id="line-42"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Typeable</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">typeRep</span></span><span class="hs-special">)</span><span>
+</span><span id="line-43"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Word</span></span><span>
+</span><span id="line-44"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">FlatParse.Stateful</span></span><span> </span><span class="hs-keyword">hiding</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">Parser</span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier">Result</span></span><span class="hs-special">)</span><span>
+</span><span id="line-45"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Language.Haskell.TH</span></span><span> </span><span class="hs-keyword">hiding</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">Code</span></span><span class="hs-special">)</span><span>
+</span><span id="line-46"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Language.Haskell.TH.Quote</span></span><span>
+</span><span id="line-47"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="M.IO.Internal.Datagram.html"><span class="hs-identifier">M.IO.Internal.Datagram</span></a></span><span>
+</span><span id="line-48"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="M.IO.Internal.EffectTypes.html"><span class="hs-identifier">M.IO.Internal.EffectTypes</span></a></span><span>
+</span><span id="line-49"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="M.Pack.html"><span class="hs-identifier">M.Pack</span></a></span><span>
+</span><span id="line-50"></span><span>
+</span><span id="line-51"></span><span class="hs-comment">-- | A quasi-quoter for generating parser states.</span><span>
+</span><span id="line-52"></span><span class="hs-comment">-- Parses the input grammar and generates appropriate ParserState pairs.</span><span>
+</span><span id="line-53"></span><span class="annot"><a href="M.IO.TH.html#states"><span class="hs-identifier hs-type">states</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">QuasiQuoter</span></span><span>
+</span><span id="line-54"></span><span id="states"><span class="annot"><span class="annottext">states :: QuasiQuoter
+</span><a href="M.IO.TH.html#states"><span class="hs-identifier hs-var hs-var">states</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-55"></span><span>  </span><span class="annot"><span class="hs-identifier hs-type">QuasiQuoter</span></span><span>
+</span><span id="line-56"></span><span>    </span><span class="hs-special">{</span><span> </span><span class="annot"><span class="annottext">quoteDec :: [Char] -&gt; Q [Dec]
+</span><span class="hs-identifier hs-var">quoteDec</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-glyph">\</span><span class="hs-special">(</span><span class="annot"><span class="annottext">(forall (st :: ZeroBitType). Parser st () (Name, [S]))
+-&gt; ByteString -&gt; Result (Name, [S])
+forall a.
+(forall (st :: ZeroBitType). Parser st () a)
+-&gt; ByteString -&gt; Result a
+</span><a href="M.Pack.Internal.Types.html#parsepure0"><span class="hs-identifier hs-var">parsepure0</span></a></span><span> </span><span class="annot"><span class="annottext">Parser st () (Name, [S])
+forall (st :: ZeroBitType). Parser st () (Name, [S])
+forall (st :: ZeroBitType) r. Parser st r (Name, [S])
+</span><a href="M.IO.TH.html#doc"><span class="hs-identifier hs-var">doc</span></a></span><span> </span><span class="annot"><span class="annottext">(ByteString -&gt; Result (Name, [S]))
+-&gt; ([Char] -&gt; ByteString) -&gt; [Char] -&gt; Result (Name, [S])
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">Text -&gt; ByteString
+</span><span class="hs-identifier hs-var">TE.encodeUtf8</span></span><span> </span><span class="annot"><span class="annottext">(Text -&gt; ByteString) -&gt; ([Char] -&gt; Text) -&gt; [Char] -&gt; ByteString
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">[Char] -&gt; Text
+</span><span class="hs-identifier hs-var">T.pack</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span id="local-6989586621680387556"><span class="annot"><span class="annottext">Result (Name, [S])
+</span><a href="#local-6989586621680387556"><span class="hs-identifier hs-var">pr</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-57"></span><span>        </span><span class="hs-keyword">case</span><span> </span><span class="annot"><span class="annottext">Result (Name, [S])
+</span><a href="#local-6989586621680387556"><span class="hs-identifier hs-var">pr</span></a></span><span> </span><span class="hs-keyword">of</span><span>
+</span><span id="line-58"></span><span>          </span><span class="annot"><span class="hs-identifier hs-type">OK</span></span><span> </span><span class="hs-special">(</span><span id="local-6989586621680387558"><span class="annot"><span class="annottext">Name
+</span><a href="#local-6989586621680387558"><span class="hs-identifier hs-var">n</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680387559"><span class="annot"><span class="annottext">[S]
+</span><a href="#local-6989586621680387559"><span class="hs-identifier hs-var">m</span></a></span></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-identifier">_</span></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><span class="hs-identifier">_</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-59"></span><span>            </span><span class="hs-keyword">let</span><span> </span><span id="local-6989586621680387573"><span class="annot"><span class="annottext">two :: m (Item b) -&gt; m (Item b) -&gt; m b
+</span><a href="#local-6989586621680387573"><span class="hs-identifier hs-var hs-var hs-var">two</span></a></span></span><span> </span><span id="local-6989586621680387574"><span class="annot"><span class="annottext">m (Item b)
+</span><a href="#local-6989586621680387574"><span class="hs-identifier hs-var">a</span></a></span></span><span> </span><span id="local-6989586621680387575"><span class="annot"><span class="annottext">m (Item b)
+</span><a href="#local-6989586621680387575"><span class="hs-identifier hs-var">b</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span> </span><span id="local-6989586621680387576"><span class="annot"><a href="#local-6989586621680387576"><span class="hs-identifier hs-var">p</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">m (Item b)
+</span><a href="#local-6989586621680387574"><span class="hs-identifier hs-var">a</span></a></span><span class="hs-special">;</span><span> </span><span id="local-6989586621680387577"><span class="annot"><a href="#local-6989586621680387577"><span class="hs-identifier hs-var">q</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><a href="#local-6989586621680387575"><span class="hs-identifier hs-type">b</span></a></span><span class="hs-special">;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">pure</span></span><span> </span><span class="hs-special">[</span><span class="annot"><span class="hs-identifier">p</span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier">q</span></span><span class="hs-special">]</span><span>
+</span><span id="line-60"></span><span>            </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">pure</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span id="local-6989586621680387578"><span class="annot"><a href="#local-6989586621680387578"><span class="hs-identifier hs-var">t</span></a></span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier hs-type">pure</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span id="local-6989586621680387579"><span class="annot"><a href="#local-6989586621680387579"><span class="hs-identifier hs-var">b</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">[S] -&gt; Q (Type, Exp)
+</span><a href="M.IO.TH.html#thparserstates"><span class="hs-identifier hs-var">thparserstates</span></a></span><span> </span><span class="annot"><span class="annottext">[S]
+</span><a href="#local-6989586621680387559"><span class="hs-identifier hs-var">m</span></a></span><span>
+</span><span id="line-61"></span><span>            </span><span class="annot"><a href="#local-6989586621680387573"><span class="hs-identifier hs-type">two</span></a></span><span>
+</span><span id="line-62"></span><span>              </span><span class="hs-keyword">do</span><span> </span><span class="annot"><span class="hs-identifier hs-type">sigD</span></span><span> </span><span class="annot"><a href="#local-6989586621680387558"><span class="hs-identifier hs-type">n</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680387578"><span class="hs-identifier hs-type">t</span></a></span><span>
+</span><span id="line-63"></span><span>              </span><span class="hs-keyword">do</span><span> </span><span class="annot"><span class="hs-identifier hs-type">valD</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">varP</span></span><span> </span><span class="annot"><a href="#local-6989586621680387558"><span class="hs-identifier hs-type">n</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">normalB</span></span><span> </span><span class="annot"><a href="#local-6989586621680387579"><span class="hs-identifier hs-type">b</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-special">[</span><span class="hs-special">]</span><span>
+</span><span id="line-64"></span><span>          </span><span class="annot"><span class="hs-identifier hs-type">Err</span></span><span> </span><span id="local-6989586621680387582"><span class="annot"><span class="annottext">ParseError
+</span><a href="#local-6989586621680387582"><span class="hs-identifier hs-var">e</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">[Char] -&gt; Q [Dec]
+forall a. HasCallStack =&gt; [Char] -&gt; a
+</span><span class="hs-identifier hs-var">error</span></span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-65"></span><span>            </span><span class="annot"><span class="annottext">[Char]
+</span><span class="hs-string">&quot;states quasiquoter: unexpected error: &quot;</span></span><span> </span><span class="annot"><span class="annottext">[Char] -&gt; [Char] -&gt; [Char]
+forall a. [a] -&gt; [a] -&gt; [a]
+</span><span class="hs-operator hs-var">++</span></span><span> </span><span class="annot"><span class="annottext">ParseError -&gt; [Char]
+</span><a href="M.Pack.Internal.Types.html#showparseerror"><span class="hs-identifier hs-var">showparseerror</span></a></span><span> </span><span class="annot"><span class="annottext">ParseError
+</span><a href="#local-6989586621680387582"><span class="hs-identifier hs-var">e</span></a></span><span>
+</span><span id="line-66"></span><span>          </span><span class="annot"><span class="annottext">Result (Name, [S])
+</span><span class="hs-identifier hs-var">Fail</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">[Char] -&gt; Q [Dec]
+forall a. HasCallStack =&gt; [Char] -&gt; a
+</span><span class="hs-identifier hs-var">error</span></span><span> </span><span class="annot"><span class="annottext">[Char]
+</span><span class="hs-string">&quot;states quasiquoter: unexpected error (no message)&quot;</span></span><span class="hs-special">,</span><span>
+</span><span id="line-67"></span><span>      </span><span class="annot"><span class="annottext">quoteExp :: [Char] -&gt; Q Exp
+</span><span class="hs-identifier hs-var">quoteExp</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">[Char] -&gt; [Char] -&gt; Q Exp
+forall a. HasCallStack =&gt; [Char] -&gt; a
+</span><span class="hs-identifier hs-var">error</span></span><span> </span><span class="annot"><span class="annottext">[Char]
+</span><span class="hs-string">&quot;states quasiquoter cannot be used in an expression&quot;</span></span><span class="hs-special">,</span><span>
+</span><span id="line-68"></span><span>      </span><span class="annot"><span class="annottext">quotePat :: [Char] -&gt; Q Pat
+</span><span class="hs-identifier hs-var">quotePat</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">[Char] -&gt; [Char] -&gt; Q Pat
+forall a. HasCallStack =&gt; [Char] -&gt; a
+</span><span class="hs-identifier hs-var">error</span></span><span> </span><span class="annot"><span class="annottext">[Char]
+</span><span class="hs-string">&quot;states quasiquoter cannot be used in a pattern&quot;</span></span><span class="hs-special">,</span><span>
+</span><span id="line-69"></span><span>      </span><span class="annot"><span class="annottext">quoteType :: [Char] -&gt; Q Type
+</span><span class="hs-identifier hs-var">quoteType</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">[Char] -&gt; [Char] -&gt; Q Type
+forall a. HasCallStack =&gt; [Char] -&gt; a
+</span><span class="hs-identifier hs-var">error</span></span><span> </span><span class="annot"><span class="annottext">[Char]
+</span><span class="hs-string">&quot;states quasiquoter cannot be used in a type&quot;</span></span><span>
+</span><span id="line-70"></span><span>    </span><span class="hs-special">}</span><span>
+</span><span id="line-71"></span><span>
+</span><span id="line-72"></span><span class="hs-comment">-- | Represents a pair of parser states - one for server-side parsing and one for client-side.</span><span>
+</span><span id="line-73"></span><span class="hs-comment">-- The states contain mappings between packet types, codes and identifiers.</span><span>
+</span><span id="line-74"></span><span class="hs-keyword">data</span><span> </span><span id="ParserStates"><span class="annot"><a href="M.IO.TH.html#ParserStates"><span class="hs-identifier hs-var">ParserStates</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="ParserStates"><span class="annot"><a href="M.IO.TH.html#ParserStates"><span class="hs-identifier hs-var">ParserStates</span></a></span></span><span>
+</span><span id="line-75"></span><span>  </span><span class="hs-special">{</span><span> </span><span id="forserver"><span class="annot"><span class="annottext">ParserStates -&gt; ParserState
+</span><a href="M.IO.TH.html#forserver"><span class="hs-identifier hs-var hs-var">forserver</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="M.IO.Internal.EffectTypes.html#ParserState"><span class="hs-identifier hs-type">ParserState</span></a></span><span class="hs-special">,</span><span>
+</span><span id="line-76"></span><span>    </span><span id="forclient"><span class="annot"><span class="annottext">ParserStates -&gt; ParserState
+</span><a href="M.IO.TH.html#forclient"><span class="hs-identifier hs-var hs-var">forclient</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="M.IO.Internal.EffectTypes.html#ParserState"><span class="hs-identifier hs-type">ParserState</span></a></span><span>
+</span><span id="line-77"></span><span>  </span><span class="hs-special">}</span><span>
+</span><span id="line-78"></span><span>
+</span><span id="line-79"></span><span class="hs-comment">-- | Internal representation of a single packet definition line from the grammar.</span><span>
+</span><span id="line-80"></span><span class="hs-comment">-- Contains the packet name and optional receive/send codes.</span><span>
+</span><span id="line-81"></span><span class="hs-keyword">data</span><span> </span><span id="S"><span class="annot"><a href="M.IO.TH.html#S"><span class="hs-identifier hs-var">S</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="S"><span class="annot"><a href="M.IO.TH.html#S"><span class="hs-identifier hs-var">S</span></a></span></span><span>
+</span><span id="line-82"></span><span>  </span><span class="hs-special">{</span><span> </span><span id="sna"><span class="annot"><span class="annottext">S -&gt; [Char]
+</span><a href="M.IO.TH.html#sna"><span class="hs-identifier hs-var hs-var">sna</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">String</span></span><span class="hs-special">,</span><span> </span><span class="hs-comment">-- packet name</span><span>
+</span><span id="line-83"></span><span>    </span><span id="recv"><span class="annot"><span class="annottext">S -&gt; Maybe Int
+</span><a href="M.IO.TH.html#recv"><span class="hs-identifier hs-var hs-var">recv</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Maybe</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Int</span></span><span class="hs-special">,</span><span> </span><span class="hs-comment">-- receive code (client in/server out)</span><span>
+</span><span id="line-84"></span><span>    </span><span id="send"><span class="annot"><span class="annottext">S -&gt; Maybe Int
+</span><a href="M.IO.TH.html#send"><span class="hs-identifier hs-var hs-var">send</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Maybe</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Int</span></span><span> </span><span class="hs-comment">-- send code (client out/server in)</span><span>
+</span><span id="line-85"></span><span>  </span><span class="hs-special">}</span><span>
+</span><span id="line-86"></span><span>
+</span><span id="line-87"></span><span class="annot"><span class="hs-comment">-- | Helper for integer conversion</span></span><span>
+</span><span id="line-88"></span><span id="local-6989586621680387223"><span id="local-6989586621680387224"><span class="annot"><a href="M.IO.TH.html#fi"><span class="hs-identifier hs-type">fi</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">Integral</span></span><span> </span><span class="annot"><a href="#local-6989586621680387223"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Num</span></span><span> </span><span class="annot"><a href="#local-6989586621680387224"><span class="hs-identifier hs-type">b</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=&gt;</span><span> </span><span class="annot"><a href="#local-6989586621680387223"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621680387224"><span class="hs-identifier hs-type">b</span></a></span></span></span><span>
+</span><span id="line-89"></span><span id="fi"><span class="annot"><span class="annottext">fi :: forall a b. (Integral a, Num b) =&gt; a -&gt; b
+</span><a href="M.IO.TH.html#fi"><span class="hs-identifier hs-var hs-var">fi</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">a -&gt; b
+forall a b. (Integral a, Num b) =&gt; a -&gt; b
+</span><span class="hs-identifier hs-var">fromIntegral</span></span><span>
+</span><span id="line-90"></span><span>
+</span><span id="line-91"></span><span class="annot"><span class="hs-comment">-- | Lookup with runtime error on missing key</span></span><span>
+</span><span id="line-92"></span><span id="local-6989586621680387227"><span class="annot"><a href="M.IO.TH.html#forceindex"><span class="hs-identifier hs-type">forceindex</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">I.IntMap</span></span><span> </span><span class="annot"><a href="#local-6989586621680387227"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Int</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621680387227"><span class="hs-identifier hs-type">a</span></a></span></span><span>
+</span><span id="line-93"></span><span id="forceindex"><span class="annot"><span class="annottext">forceindex :: forall a. IntMap a -&gt; Int -&gt; a
+</span><a href="M.IO.TH.html#forceindex"><span class="hs-identifier hs-var hs-var">forceindex</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">IntMap a -&gt; Int -&gt; a
+forall a. IntMap a -&gt; Int -&gt; a
+</span><span class="hs-operator hs-var">(I.!)</span></span><span>
+</span><span id="line-94"></span><span>
+</span><span id="line-95"></span><span class="annot"><span class="hs-comment">-- | List concatenation helper</span></span><span>
+</span><span id="line-96"></span><span id="local-6989586621680387597"><span class="annot"><a href="M.IO.TH.html#concat2"><span class="hs-identifier hs-type">concat2</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">[</span><span class="annot"><a href="#local-6989586621680387597"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">]</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">[</span><span class="annot"><a href="#local-6989586621680387597"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">]</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">[</span><span class="annot"><a href="#local-6989586621680387597"><span class="hs-identifier hs-type">a</span></a></span><span class="hs-special">]</span></span><span>
+</span><span id="line-97"></span><span id="concat2"><span class="annot"><span class="annottext">concat2 :: forall a. [a] -&gt; [a] -&gt; [a]
+</span><a href="M.IO.TH.html#concat2"><span class="hs-identifier hs-var hs-var">concat2</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">[a] -&gt; [a] -&gt; [a]
+forall a. [a] -&gt; [a] -&gt; [a]
+</span><span class="hs-operator hs-var">(++)</span></span><span>
+</span><span id="line-98"></span><span>
+</span><span id="line-99"></span><span id="local-6989586621680387231"><span class="annot"><a href="M.IO.TH.html#okorerror"><span class="hs-identifier hs-type">okorerror</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#Result"><span class="hs-identifier hs-type">Result</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680387231"><span class="hs-identifier hs-type">a</span></a></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621680387231"><span class="hs-identifier hs-type">a</span></a></span></span><span>
+</span><span id="line-100"></span><span id="okorerror"><span class="annot"><span class="annottext">okorerror :: forall a. Result a -&gt; a
+</span><a href="M.IO.TH.html#okorerror"><span class="hs-identifier hs-var hs-var">okorerror</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-glyph">\</span><span class="hs-glyph">case</span><span>
+</span><span id="line-101"></span><span>  </span><span class="annot"><span class="hs-identifier hs-type">OK</span></span><span> </span><span id="local-6989586621680387605"><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621680387605"><span class="hs-identifier hs-var">a</span></a></span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-identifier">_</span></span><span> </span><span class="annot"><span class="annottext">ByteString
+</span><span class="hs-identifier">_</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621680387605"><span class="hs-identifier hs-var">a</span></a></span><span>
+</span><span id="line-102"></span><span>  </span><span class="annot"><span class="annottext">Result a
+</span><span class="hs-identifier hs-var">Fail</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">[Char] -&gt; a
+forall a. HasCallStack =&gt; [Char] -&gt; a
+</span><span class="hs-identifier hs-var">error</span></span><span> </span><span class="annot"><span class="annottext">[Char]
+</span><span class="hs-string">&quot;&lt;code generated by IO.TH&gt;: unexpected uninformative failure&quot;</span></span><span>
+</span><span id="line-103"></span><span>  </span><span class="annot"><span class="hs-identifier hs-type">Err</span></span><span> </span><span id="local-6989586621680387606"><span class="annot"><span class="annottext">ParseError
+</span><a href="#local-6989586621680387606"><span class="hs-identifier hs-var">e</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">[Char] -&gt; a
+forall a. HasCallStack =&gt; [Char] -&gt; a
+</span><span class="hs-identifier hs-var">error</span></span><span> </span><span class="annot"><span class="annottext">([Char] -&gt; a) -&gt; [Char] -&gt; a
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">[Char]
+</span><span class="hs-string">&quot;&lt;code generated by IO.TH&gt;: error: &quot;</span></span><span> </span><span class="annot"><span class="annottext">[Char] -&gt; [Char] -&gt; [Char]
+forall a. [a] -&gt; [a] -&gt; [a]
+</span><span class="hs-operator hs-var">++</span></span><span> </span><span class="annot"><span class="annottext">ParseError -&gt; [Char]
+</span><a href="M.Pack.Internal.Types.html#showparseerror"><span class="hs-identifier hs-var">showparseerror</span></a></span><span> </span><span class="annot"><span class="annottext">ParseError
+</span><a href="#local-6989586621680387606"><span class="hs-identifier hs-var">e</span></a></span><span>
+</span><span id="line-104"></span><span>
+</span><span id="line-105"></span><span class="hs-comment">-- | Generate Template Haskell type signature and expression for a ParserStates pair.</span><span>
+</span><span id="line-106"></span><span class="hs-comment">-- Takes a list of packet definitions and produces corresponding parser states.</span><span>
+</span><span id="line-107"></span><span class="annot"><a href="M.IO.TH.html#thparserstates"><span class="hs-identifier hs-type">thparserstates</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">[</span><span class="annot"><a href="M.IO.TH.html#S"><span class="hs-identifier hs-type">S</span></a></span><span class="hs-special">]</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Q</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">Type</span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Exp</span></span><span class="hs-special">)</span><span>
+</span><span id="line-108"></span><span id="thparserstates"><span class="annot"><span class="annottext">thparserstates :: [S] -&gt; Q (Type, Exp)
+</span><a href="M.IO.TH.html#thparserstates"><span class="hs-identifier hs-var hs-var">thparserstates</span></a></span></span><span> </span><span id="local-6989586621680387607"><span class="annot"><span class="annottext">[S]
+</span><a href="#local-6989586621680387607"><span class="hs-identifier hs-var">rows</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-109"></span><span>  </span><span class="hs-keyword">let</span><span> </span><span id="local-6989586621680387608"><span class="annot"><span class="annottext">genparse :: (S -&gt; Maybe Int) -&gt; Q Exp
+</span><a href="#local-6989586621680387608"><span class="hs-identifier hs-var hs-var hs-var">genparse</span></a></span></span><span> </span><span id="local-6989586621680387609"><span class="annot"><span class="annottext">S -&gt; Maybe Int
+</span><a href="#local-6989586621680387609"><span class="hs-identifier hs-var">l</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-110"></span><span>        </span><span class="hs-keyword">let</span><span> </span><span id="local-6989586621680387610"><span class="annot"><span class="annottext">f :: S -&gt; [(Q Type, Q Exp)] -&gt; [(Q Type, Q Exp)]
+</span><a href="#local-6989586621680387610"><span class="hs-identifier hs-var hs-var">f</span></a></span></span><span> </span><span id="local-6989586621680387611"><span class="annot"><span class="annottext">S
+</span><a href="#local-6989586621680387611"><span class="hs-identifier hs-var">s</span></a></span></span><span> </span><span id="local-6989586621680387612"><span class="annot"><span class="annottext">[(Q Type, Q Exp)]
+</span><a href="#local-6989586621680387612"><span class="hs-identifier hs-var">a</span></a></span></span><span>
+</span><span id="line-111"></span><span>              </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Just</span></span><span> </span><span id="local-6989586621680387613"><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621680387613"><span class="hs-identifier hs-var">i</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">S -&gt; Maybe Int
+</span><a href="#local-6989586621680387609"><span class="hs-identifier hs-var">l</span></a></span><span> </span><span class="annot"><span class="annottext">S
+</span><a href="#local-6989586621680387611"><span class="hs-identifier hs-var">s</span></a></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-112"></span><span>                  </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Name -&gt; Q Type
+forall (m :: * -&gt; *). Quote m =&gt; Name -&gt; m Type
+</span><span class="hs-identifier hs-var">conT</span></span><span> </span><span class="annot"><span class="annottext">(Name -&gt; Q Type) -&gt; Name -&gt; Q Type
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">[Char] -&gt; Name
+</span><span class="hs-identifier hs-var">mkName</span></span><span> </span><span class="annot"><span class="annottext">([Char] -&gt; Name) -&gt; [Char] -&gt; Name
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">S -&gt; [Char]
+</span><a href="M.IO.TH.html#sna"><span class="hs-identifier hs-var">sna</span></a></span><span> </span><span class="annot"><span class="annottext">S
+</span><a href="#local-6989586621680387611"><span class="hs-identifier hs-var">s</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Lit -&gt; Q Exp
+forall (m :: * -&gt; *). Quote m =&gt; Lit -&gt; m Exp
+</span><span class="hs-identifier hs-var">litE</span></span><span> </span><span class="annot"><span class="annottext">(Lit -&gt; Q Exp) -&gt; (Int -&gt; Lit) -&gt; Int -&gt; Q Exp
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">Integer -&gt; Lit
+</span><span class="hs-identifier hs-var">IntegerL</span></span><span> </span><span class="annot"><span class="annottext">(Integer -&gt; Lit) -&gt; (Int -&gt; Integer) -&gt; Int -&gt; Lit
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Integer
+forall a b. (Integral a, Num b) =&gt; a -&gt; b
+</span><a href="M.IO.TH.html#fi"><span class="hs-identifier hs-var">fi</span></a></span><span> </span><span class="annot"><span class="annottext">(Int -&gt; Q Exp) -&gt; Int -&gt; Q Exp
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621680387613"><span class="hs-identifier hs-var">i</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">(Q Type, Q Exp) -&gt; [(Q Type, Q Exp)] -&gt; [(Q Type, Q Exp)]
+forall a. a -&gt; [a] -&gt; [a]
+</span><span class="hs-glyph hs-var">:</span></span><span> </span><span class="annot"><span class="annottext">[(Q Type, Q Exp)]
+</span><a href="#local-6989586621680387612"><span class="hs-identifier hs-var">a</span></a></span><span>
+</span><span id="line-113"></span><span>              </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="annottext">Bool
+</span><span class="hs-identifier hs-var">otherwise</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">[(Q Type, Q Exp)]
+</span><a href="#local-6989586621680387612"><span class="hs-identifier hs-var">a</span></a></span><span>
+</span><span id="line-114"></span><span>            </span><span id="local-6989586621680387615"><span class="annot"><span class="annottext">pairs :: [(Q Type, Q Exp)]
+</span><a href="#local-6989586621680387615"><span class="hs-identifier hs-var hs-var">pairs</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(S -&gt; [(Q Type, Q Exp)] -&gt; [(Q Type, Q Exp)])
+-&gt; [(Q Type, Q Exp)] -&gt; [S] -&gt; [(Q Type, Q Exp)]
+forall a b. (a -&gt; b -&gt; b) -&gt; b -&gt; [a] -&gt; b
+forall (t :: * -&gt; *) a b.
+Foldable t =&gt;
+(a -&gt; b -&gt; b) -&gt; b -&gt; t a -&gt; b
+</span><span class="hs-identifier hs-var">foldr</span></span><span> </span><span class="annot"><span class="annottext">S -&gt; [(Q Type, Q Exp)] -&gt; [(Q Type, Q Exp)]
+</span><a href="#local-6989586621680387610"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="hs-special">[</span><span class="hs-special">]</span><span> </span><span class="annot"><span class="annottext">[S]
+</span><a href="#local-6989586621680387607"><span class="hs-identifier hs-var">rows</span></a></span><span>
+</span><span id="line-115"></span><span>         </span><span class="hs-keyword">in</span><span> </span><span class="annot"><span class="annottext">Q Exp -&gt; Q Exp -&gt; Q Exp
+forall (m :: * -&gt; *). Quote m =&gt; m Exp -&gt; m Exp -&gt; m Exp
+</span><span class="hs-identifier hs-var">appE</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Name -&gt; Q Exp
+forall (m :: * -&gt; *). Quote m =&gt; Name -&gt; m Exp
+</span><span class="hs-identifier hs-var">varE</span></span><span> </span><span class="hs-special">'</span><span class="hs-identifier">I.fromList</span><span class="hs-special">)</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-116"></span><span>              </span><span class="annot"><span class="annottext">[Q Exp] -&gt; Q Exp
+forall (m :: * -&gt; *). Quote m =&gt; [m Exp] -&gt; m Exp
+</span><span class="hs-identifier hs-var">listE</span></span><span> </span><span class="annot"><span class="annottext">([Q Exp] -&gt; Q Exp) -&gt; [Q Exp] -&gt; Q Exp
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">(((Q Type, Q Exp) -&gt; Q Exp) -&gt; [(Q Type, Q Exp)] -&gt; [Q Exp])
+-&gt; [(Q Type, Q Exp)] -&gt; ((Q Type, Q Exp) -&gt; Q Exp) -&gt; [Q Exp]
+forall a b c. (a -&gt; b -&gt; c) -&gt; b -&gt; a -&gt; c
+</span><span class="hs-identifier hs-var">flip</span></span><span> </span><span class="annot"><span class="annottext">((Q Type, Q Exp) -&gt; Q Exp) -&gt; [(Q Type, Q Exp)] -&gt; [Q Exp]
+forall a b. (a -&gt; b) -&gt; [a] -&gt; [b]
+</span><span class="hs-identifier hs-var">map</span></span><span> </span><span class="annot"><span class="annottext">[(Q Type, Q Exp)]
+</span><a href="#local-6989586621680387615"><span class="hs-identifier hs-var">pairs</span></a></span><span> </span><span class="hs-glyph">\</span><span class="hs-special">(</span><span id="local-6989586621680387618"><span class="annot"><span class="annottext">Q Type
+</span><a href="#local-6989586621680387618"><span class="hs-identifier hs-var">ty</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680387619"><span class="annot"><span class="annottext">Q Exp
+</span><a href="#local-6989586621680387619"><span class="hs-identifier hs-var">co</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-117"></span><span>                </span><span class="annot"><span class="annottext">[Q Exp] -&gt; Q Exp
+forall (m :: * -&gt; *). Quote m =&gt; [m Exp] -&gt; m Exp
+</span><span class="hs-identifier hs-var">tupE</span></span><span> </span><span class="hs-special">[</span><span class="annot"><span class="annottext">Q Exp
+Item [Q Exp]
+</span><a href="#local-6989586621680387619"><span class="hs-identifier hs-var">co</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Q Exp -&gt; Q Type -&gt; Q Exp
+forall (m :: * -&gt; *). Quote m =&gt; m Exp -&gt; m Type -&gt; m Exp
+</span><span class="hs-identifier hs-var">appTypeE</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Name -&gt; Q Exp
+forall (m :: * -&gt; *). Quote m =&gt; Name -&gt; m Exp
+</span><span class="hs-identifier hs-var">varE</span></span><span> </span><span class="hs-special">'</span><span class="hs-identifier">unpacksome</span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Q Type
+</span><a href="#local-6989586621680387618"><span class="hs-identifier hs-var">ty</span></a></span><span class="hs-special">]</span><span>
+</span><span id="line-118"></span><span>      </span><span id="local-6989586621680387621"><span class="annot"><span class="annottext">gencode :: (S -&gt; Maybe Int) -&gt; (S -&gt; Maybe Int) -&gt; Q Exp
+</span><a href="#local-6989586621680387621"><span class="hs-identifier hs-var hs-var hs-var">gencode</span></a></span></span><span> </span><span id="local-6989586621680387622"><span class="annot"><span class="annottext">S -&gt; Maybe Int
+</span><a href="#local-6989586621680387622"><span class="hs-identifier hs-var">li</span></a></span></span><span> </span><span id="local-6989586621680387623"><span class="annot"><span class="annottext">S -&gt; Maybe Int
+</span><a href="#local-6989586621680387623"><span class="hs-identifier hs-var">lo</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-119"></span><span>        </span><span class="hs-keyword">let</span><span> </span><span id="local-6989586621680387663"><span class="annot"><span class="annottext">f :: (S -&gt; Maybe a) -&gt; S -&gt; [(m Exp, m Exp)] -&gt; [(m Exp, m Exp)]
+</span><a href="#local-6989586621680387663"><span class="hs-identifier hs-var hs-var">f</span></a></span></span><span> </span><span id="local-6989586621680387664"><span class="annot"><span class="annottext">S -&gt; Maybe a
+</span><a href="#local-6989586621680387664"><span class="hs-identifier hs-var">l</span></a></span></span><span> </span><span id="local-6989586621680387665"><span class="annot"><span class="annottext">S
+</span><a href="#local-6989586621680387665"><span class="hs-identifier hs-var">s</span></a></span></span><span> </span><span id="local-6989586621680387666"><span class="annot"><span class="annottext">[(m Exp, m Exp)]
+</span><a href="#local-6989586621680387666"><span class="hs-identifier hs-var">a</span></a></span></span><span>
+</span><span id="line-120"></span><span>              </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Just</span></span><span> </span><span id="local-6989586621680387667"><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621680387667"><span class="hs-identifier hs-var">i</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">S -&gt; Maybe a
+</span><a href="#local-6989586621680387664"><span class="hs-identifier hs-var">l</span></a></span><span> </span><span class="annot"><span class="annottext">S
+</span><a href="#local-6989586621680387665"><span class="hs-identifier hs-var">s</span></a></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-121"></span><span>                  </span><span class="hs-keyword">let</span><span> </span><span id="local-6989586621680387668"><span class="annot"><span class="annottext">t :: Name
+</span><a href="#local-6989586621680387668"><span class="hs-identifier hs-var hs-var">t</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">[Char] -&gt; Name
+</span><span class="hs-identifier hs-var">mkName</span></span><span> </span><span class="annot"><span class="annottext">([Char] -&gt; Name) -&gt; [Char] -&gt; Name
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">S -&gt; [Char]
+</span><a href="M.IO.TH.html#sna"><span class="hs-identifier hs-var">sna</span></a></span><span> </span><span class="annot"><span class="annottext">S
+</span><a href="#local-6989586621680387665"><span class="hs-identifier hs-var">s</span></a></span><span>
+</span><span id="line-122"></span><span>                   </span><span class="hs-keyword">in</span><span> </span><span class="hs-special">(</span><span> </span><span class="annot"><span class="annottext">m Exp -&gt; m Exp -&gt; m Exp
+forall (m :: * -&gt; *). Quote m =&gt; m Exp -&gt; m Exp -&gt; m Exp
+</span><span class="hs-identifier hs-var">appE</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Name -&gt; m Exp
+forall (m :: * -&gt; *). Quote m =&gt; Name -&gt; m Exp
+</span><span class="hs-identifier hs-var">varE</span></span><span> </span><span class="hs-special">'</span><span class="hs-identifier">typeRep</span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">m Exp -&gt; m Type -&gt; m Exp
+forall (m :: * -&gt; *). Quote m =&gt; m Exp -&gt; m Type -&gt; m Exp
+</span><span class="hs-identifier hs-var">appTypeE</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Name -&gt; m Exp
+forall (m :: * -&gt; *). Quote m =&gt; Name -&gt; m Exp
+</span><span class="hs-identifier hs-var">conE</span></span><span> </span><span class="hs-special">'</span><span class="hs-identifier">Proxy</span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Name -&gt; m Type
+forall (m :: * -&gt; *). Quote m =&gt; Name -&gt; m Type
+</span><span class="hs-identifier hs-var">conT</span></span><span> </span><span class="annot"><span class="annottext">Name
+</span><a href="#local-6989586621680387668"><span class="hs-identifier hs-var">t</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span class="hs-special">,</span><span>
+</span><span id="line-123"></span><span>                        </span><span class="annot"><span class="annottext">Lit -&gt; m Exp
+forall (m :: * -&gt; *). Quote m =&gt; Lit -&gt; m Exp
+</span><span class="hs-identifier hs-var">litE</span></span><span> </span><span class="annot"><span class="annottext">(Lit -&gt; m Exp) -&gt; (a -&gt; Lit) -&gt; a -&gt; m Exp
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">Integer -&gt; Lit
+</span><span class="hs-identifier hs-var">IntegerL</span></span><span> </span><span class="annot"><span class="annottext">(Integer -&gt; Lit) -&gt; (a -&gt; Integer) -&gt; a -&gt; Lit
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">a -&gt; Integer
+forall a b. (Integral a, Num b) =&gt; a -&gt; b
+</span><a href="M.IO.TH.html#fi"><span class="hs-identifier hs-var">fi</span></a></span><span> </span><span class="annot"><span class="annottext">(a -&gt; m Exp) -&gt; a -&gt; m Exp
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621680387667"><span class="hs-identifier hs-var">i</span></a></span><span>
+</span><span id="line-124"></span><span>                      </span><span class="hs-special">)</span><span>
+</span><span id="line-125"></span><span>                        </span><span class="annot"><span class="annottext">(m Exp, m Exp) -&gt; [(m Exp, m Exp)] -&gt; [(m Exp, m Exp)]
+forall a. a -&gt; [a] -&gt; [a]
+</span><span class="hs-glyph hs-var">:</span></span><span> </span><span class="annot"><span class="annottext">[(m Exp, m Exp)]
+</span><a href="#local-6989586621680387666"><span class="hs-identifier hs-var">a</span></a></span><span>
+</span><span id="line-126"></span><span>              </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="annottext">Bool
+</span><span class="hs-identifier hs-var">otherwise</span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">[(m Exp, m Exp)]
+</span><a href="#local-6989586621680387666"><span class="hs-identifier hs-var">a</span></a></span><span>
+</span><span id="line-127"></span><span>            </span><span id="local-6989586621680387669"><span class="annot"><span class="annottext">inbound :: [(Q Exp, Q Exp)]
+</span><a href="#local-6989586621680387669"><span class="hs-identifier hs-var hs-var">inbound</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(S -&gt; [(Q Exp, Q Exp)] -&gt; [(Q Exp, Q Exp)])
+-&gt; [(Q Exp, Q Exp)] -&gt; [S] -&gt; [(Q Exp, Q Exp)]
+forall a b. (a -&gt; b -&gt; b) -&gt; b -&gt; [a] -&gt; b
+forall (t :: * -&gt; *) a b.
+Foldable t =&gt;
+(a -&gt; b -&gt; b) -&gt; b -&gt; t a -&gt; b
+</span><span class="hs-identifier hs-var">foldr</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">(S -&gt; Maybe Int) -&gt; S -&gt; [(Q Exp, Q Exp)] -&gt; [(Q Exp, Q Exp)]
+forall {m :: * -&gt; *} {m :: * -&gt; *} {a}.
+(Quote m, Quote m, Integral a) =&gt;
+(S -&gt; Maybe a) -&gt; S -&gt; [(m Exp, m Exp)] -&gt; [(m Exp, m Exp)]
+</span><a href="#local-6989586621680387663"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="annot"><span class="annottext">S -&gt; Maybe Int
+</span><a href="#local-6989586621680387622"><span class="hs-identifier hs-var">li</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-special">[</span><span class="hs-special">]</span><span> </span><span class="annot"><span class="annottext">[S]
+</span><a href="#local-6989586621680387607"><span class="hs-identifier hs-var">rows</span></a></span><span>
+</span><span id="line-128"></span><span>            </span><span id="local-6989586621680387670"><span class="annot"><span class="annottext">outbound :: [(Q Exp, Q Exp)]
+</span><a href="#local-6989586621680387670"><span class="hs-identifier hs-var hs-var">outbound</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(S -&gt; [(Q Exp, Q Exp)] -&gt; [(Q Exp, Q Exp)])
+-&gt; [(Q Exp, Q Exp)] -&gt; [S] -&gt; [(Q Exp, Q Exp)]
+forall a b. (a -&gt; b -&gt; b) -&gt; b -&gt; [a] -&gt; b
+forall (t :: * -&gt; *) a b.
+Foldable t =&gt;
+(a -&gt; b -&gt; b) -&gt; b -&gt; t a -&gt; b
+</span><span class="hs-identifier hs-var">foldr</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">(S -&gt; Maybe Int) -&gt; S -&gt; [(Q Exp, Q Exp)] -&gt; [(Q Exp, Q Exp)]
+forall {m :: * -&gt; *} {m :: * -&gt; *} {a}.
+(Quote m, Quote m, Integral a) =&gt;
+(S -&gt; Maybe a) -&gt; S -&gt; [(m Exp, m Exp)] -&gt; [(m Exp, m Exp)]
+</span><a href="#local-6989586621680387663"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="annot"><span class="annottext">S -&gt; Maybe Int
+</span><a href="#local-6989586621680387623"><span class="hs-identifier hs-var">lo</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-special">[</span><span class="hs-special">]</span><span> </span><span class="annot"><span class="annottext">[S]
+</span><a href="#local-6989586621680387607"><span class="hs-identifier hs-var">rows</span></a></span><span>
+</span><span id="line-129"></span><span>            </span><span id="local-6989586621680387686"><span class="annot"><span class="annottext">u :: [(m Exp, m Exp)] -&gt; Name -&gt; m Exp
+</span><a href="#local-6989586621680387686"><span class="hs-identifier hs-var hs-var">u</span></a></span></span><span> </span><span id="local-6989586621680387687"><span class="annot"><span class="annottext">[(m Exp, m Exp)]
+</span><a href="#local-6989586621680387687"><span class="hs-identifier hs-var">l</span></a></span></span><span> </span><span id="local-6989586621680387688"><span class="annot"><span class="annottext">Name
+</span><a href="#local-6989586621680387688"><span class="hs-identifier hs-var">i</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">[m Exp] -&gt; m Exp
+forall (m :: * -&gt; *). Quote m =&gt; [m Exp] -&gt; m Exp
+</span><span class="hs-identifier hs-var">listE</span></span><span> </span><span class="annot"><span class="annottext">([m Exp] -&gt; m Exp) -&gt; [m Exp] -&gt; m Exp
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">(((m Exp, m Exp) -&gt; m Exp) -&gt; [(m Exp, m Exp)] -&gt; [m Exp])
+-&gt; [(m Exp, m Exp)] -&gt; ((m Exp, m Exp) -&gt; m Exp) -&gt; [m Exp]
+forall a b c. (a -&gt; b -&gt; c) -&gt; b -&gt; a -&gt; c
+</span><span class="hs-identifier hs-var">flip</span></span><span> </span><span class="annot"><span class="annottext">((m Exp, m Exp) -&gt; m Exp) -&gt; [(m Exp, m Exp)] -&gt; [m Exp]
+forall a b. (a -&gt; b) -&gt; [a] -&gt; [b]
+</span><span class="hs-identifier hs-var">map</span></span><span> </span><span class="annot"><span class="annottext">[(m Exp, m Exp)]
+</span><a href="#local-6989586621680387687"><span class="hs-identifier hs-var">l</span></a></span><span> </span><span class="hs-glyph">\</span><span class="hs-special">(</span><span id="local-6989586621680387689"><span class="annot"><span class="annottext">m Exp
+</span><a href="#local-6989586621680387689"><span class="hs-identifier hs-var">tr</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680387690"><span class="annot"><span class="annottext">m Exp
+</span><a href="#local-6989586621680387690"><span class="hs-identifier hs-var">co</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-130"></span><span>              </span><span class="annot"><span class="annottext">[m Exp] -&gt; m Exp
+forall (m :: * -&gt; *). Quote m =&gt; [m Exp] -&gt; m Exp
+</span><span class="hs-identifier hs-var">tupE</span></span><span>
+</span><span id="line-131"></span><span>                </span><span class="hs-special">[</span><span> </span><span class="annot"><span class="annottext">[m Exp] -&gt; m Exp
+forall (m :: * -&gt; *). Quote m =&gt; [m Exp] -&gt; m Exp
+</span><span class="hs-identifier hs-var">tupE</span></span><span> </span><span class="hs-special">[</span><span class="annot"><span class="annottext">Name -&gt; m Exp
+forall (m :: * -&gt; *). Quote m =&gt; Name -&gt; m Exp
+</span><span class="hs-identifier hs-var">conE</span></span><span> </span><span class="annot"><span class="annottext">Name
+</span><a href="#local-6989586621680387688"><span class="hs-identifier hs-var">i</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">m Exp
+Item [m Exp]
+</span><a href="#local-6989586621680387689"><span class="hs-identifier hs-var">tr</span></a></span><span class="hs-special">]</span><span class="hs-special">,</span><span>
+</span><span id="line-132"></span><span>                  </span><span class="annot"><span class="annottext">m Exp -&gt; m Type -&gt; m Exp
+forall (m :: * -&gt; *). Quote m =&gt; m Exp -&gt; m Type -&gt; m Exp
+</span><span class="hs-identifier hs-var">sigE</span></span><span> </span><span class="annot"><span class="annottext">m Exp
+</span><a href="#local-6989586621680387690"><span class="hs-identifier hs-var">co</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Name -&gt; m Type
+forall (m :: * -&gt; *). Quote m =&gt; Name -&gt; m Type
+</span><span class="hs-identifier hs-var">conT</span></span><span> </span><span class="hs-special">''</span><span class="hs-identifier">Word8</span><span class="hs-special">)</span><span>
+</span><span id="line-133"></span><span>                </span><span class="hs-special">]</span><span>
+</span><span id="line-134"></span><span>         </span><span class="hs-keyword">in</span><span> </span><span class="annot"><span class="annottext">Q Exp -&gt; Q Exp -&gt; Q Exp
+forall (m :: * -&gt; *). Quote m =&gt; m Exp -&gt; m Exp -&gt; m Exp
+</span><span class="hs-identifier hs-var">appE</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Name -&gt; Q Exp
+forall (m :: * -&gt; *). Quote m =&gt; Name -&gt; m Exp
+</span><span class="hs-identifier hs-var">varE</span></span><span> </span><span class="hs-special">'</span><span class="hs-identifier">H.fromList</span><span class="hs-special">)</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-135"></span><span>              </span><span class="annot"><span class="annottext">Q Exp -&gt; Q Exp -&gt; Q Exp
+forall (m :: * -&gt; *). Quote m =&gt; m Exp -&gt; m Exp -&gt; m Exp
+</span><span class="hs-identifier hs-var">appE</span></span><span>
+</span><span id="line-136"></span><span>                </span><span class="hs-special">(</span><span> </span><span class="annot"><span class="annottext">Q Exp -&gt; Q Exp -&gt; Q Exp
+forall (m :: * -&gt; *). Quote m =&gt; m Exp -&gt; m Exp -&gt; m Exp
+</span><span class="hs-identifier hs-var">appE</span></span><span>
+</span><span id="line-137"></span><span>                    </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Name -&gt; Q Exp
+forall (m :: * -&gt; *). Quote m =&gt; Name -&gt; m Exp
+</span><span class="hs-identifier hs-var">varE</span></span><span> </span><span class="hs-special">'</span><span class="hs-identifier">concat2</span><span class="hs-special">)</span><span>
+</span><span id="line-138"></span><span>                    </span><span class="hs-special">(</span><span class="annot"><span class="annottext">[(Q Exp, Q Exp)] -&gt; Name -&gt; Q Exp
+forall {m :: * -&gt; *}. Quote m =&gt; [(m Exp, m Exp)] -&gt; Name -&gt; m Exp
+</span><a href="#local-6989586621680387686"><span class="hs-identifier hs-var">u</span></a></span><span> </span><span class="annot"><span class="annottext">[(Q Exp, Q Exp)]
+</span><a href="#local-6989586621680387669"><span class="hs-identifier hs-var">inbound</span></a></span><span> </span><span class="hs-special">'</span><span class="hs-identifier">Inbound</span><span class="hs-special">)</span><span>
+</span><span id="line-139"></span><span>                </span><span class="hs-special">)</span><span>
+</span><span id="line-140"></span><span>                </span><span class="hs-special">(</span><span class="annot"><span class="annottext">[(Q Exp, Q Exp)] -&gt; Name -&gt; Q Exp
+forall {m :: * -&gt; *}. Quote m =&gt; [(m Exp, m Exp)] -&gt; Name -&gt; m Exp
+</span><a href="#local-6989586621680387686"><span class="hs-identifier hs-var">u</span></a></span><span> </span><span class="annot"><span class="annottext">[(Q Exp, Q Exp)]
+</span><a href="#local-6989586621680387670"><span class="hs-identifier hs-var">outbound</span></a></span><span> </span><span class="hs-special">'</span><span class="hs-identifier">Outbound</span><span class="hs-special">)</span><span>
+</span><span id="line-141"></span><span>      </span><span class="hs-comment">-- Server uses send for inbound, recv for outbound</span><span>
+</span><span id="line-142"></span><span>      </span><span id="local-6989586621680387691"><span class="annot"><span class="annottext">gensparse :: Q Exp
+</span><a href="#local-6989586621680387691"><span class="hs-identifier hs-var hs-var hs-var">gensparse</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(S -&gt; Maybe Int) -&gt; Q Exp
+</span><a href="#local-6989586621680387608"><span class="hs-identifier hs-var">genparse</span></a></span><span> </span><span class="annot"><span class="annottext">S -&gt; Maybe Int
+</span><a href="M.IO.TH.html#send"><span class="hs-identifier hs-var">send</span></a></span><span>
+</span><span id="line-143"></span><span>      </span><span id="local-6989586621680387692"><span class="annot"><span class="annottext">genscode :: Q Exp
+</span><a href="#local-6989586621680387692"><span class="hs-identifier hs-var hs-var hs-var">genscode</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(S -&gt; Maybe Int) -&gt; (S -&gt; Maybe Int) -&gt; Q Exp
+</span><a href="#local-6989586621680387621"><span class="hs-identifier hs-var">gencode</span></a></span><span> </span><span class="annot"><span class="annottext">S -&gt; Maybe Int
+</span><a href="M.IO.TH.html#send"><span class="hs-identifier hs-var">send</span></a></span><span> </span><span class="annot"><span class="annottext">S -&gt; Maybe Int
+</span><a href="M.IO.TH.html#recv"><span class="hs-identifier hs-var">recv</span></a></span><span>
+</span><span id="line-144"></span><span>      </span><span class="hs-comment">-- Client uses recv for inbound, send for outbound</span><span>
+</span><span id="line-145"></span><span>      </span><span id="local-6989586621680387693"><span class="annot"><span class="annottext">gencparse :: Q Exp
+</span><a href="#local-6989586621680387693"><span class="hs-identifier hs-var hs-var hs-var">gencparse</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(S -&gt; Maybe Int) -&gt; Q Exp
+</span><a href="#local-6989586621680387608"><span class="hs-identifier hs-var">genparse</span></a></span><span> </span><span class="annot"><span class="annottext">S -&gt; Maybe Int
+</span><a href="M.IO.TH.html#recv"><span class="hs-identifier hs-var">recv</span></a></span><span>
+</span><span id="line-146"></span><span>      </span><span id="local-6989586621680387694"><span class="annot"><span class="annottext">genccode :: Q Exp
+</span><a href="#local-6989586621680387694"><span class="hs-identifier hs-var hs-var hs-var">genccode</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(S -&gt; Maybe Int) -&gt; (S -&gt; Maybe Int) -&gt; Q Exp
+</span><a href="#local-6989586621680387621"><span class="hs-identifier hs-var">gencode</span></a></span><span> </span><span class="annot"><span class="annottext">S -&gt; Maybe Int
+</span><a href="M.IO.TH.html#recv"><span class="hs-identifier hs-var">recv</span></a></span><span> </span><span class="annot"><span class="annottext">S -&gt; Maybe Int
+</span><a href="M.IO.TH.html#send"><span class="hs-identifier hs-var">send</span></a></span><span>
+</span><span id="line-147"></span><span>  </span><span id="local-6989586621680387695"><span class="annot"><a href="#local-6989586621680387695"><span class="hs-identifier hs-var">argname</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">[Char] -&gt; Q Name
+forall (m :: * -&gt; *). Quote m =&gt; [Char] -&gt; m Name
+</span><span class="hs-identifier hs-var">newName</span></span><span> </span><span class="annot"><span class="annottext">[Char]
+</span><span class="hs-string">&quot;argname&quot;</span></span><span> </span><span class="hs-comment">-- some temporary binder</span><span>
+</span><span id="line-148"></span><span>  </span><span id="local-6989586621680387696"><span class="annot"><a href="#local-6989586621680387696"><span class="hs-identifier hs-var">u</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="hs-identifier hs-type">newName</span></span><span> </span><span class="annot"><span class="hs-string">&quot;u&quot;</span></span><span> </span><span class="hs-comment">-- uninterpreted (essentially code * rest of packet)</span><span>
+</span><span id="line-149"></span><span>  </span><span id="local-6989586621680387697"><span class="annot"><a href="#local-6989586621680387697"><span class="hs-identifier hs-var">a</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="hs-identifier hs-type">newName</span></span><span> </span><span class="annot"><span class="hs-string">&quot;a&quot;</span></span><span> </span><span class="hs-comment">-- the parsing list</span><span>
+</span><span id="line-150"></span><span>  </span><span id="local-6989586621680387698"><span class="annot"><a href="#local-6989586621680387698"><span class="hs-identifier hs-var">b</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="hs-identifier hs-type">newName</span></span><span> </span><span class="annot"><span class="hs-string">&quot;b&quot;</span></span><span> </span><span class="hs-comment">-- the direction * type -&gt; code list</span><span>
+</span><span id="line-151"></span><span>  </span><span id="local-6989586621680387699"><span class="annot"><a href="#local-6989586621680387699"><span class="hs-identifier hs-var">d</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="hs-identifier hs-type">newName</span></span><span> </span><span class="annot"><span class="hs-string">&quot;d&quot;</span></span><span> </span><span class="hs-comment">-- direction</span><span>
+</span><span id="line-152"></span><span>  </span><span id="local-6989586621680387700"><span class="annot"><a href="#local-6989586621680387700"><span class="hs-identifier hs-var">y</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="hs-identifier hs-type">newName</span></span><span> </span><span class="annot"><span class="hs-string">&quot;y&quot;</span></span><span> </span><span class="hs-comment">-- type</span><span>
+</span><span id="line-153"></span><span>  </span><span class="hs-keyword">let</span><span> </span><span id="local-6989586621680387701"><span class="annot"><a href="#local-6989586621680387701"><span class="hs-identifier hs-var hs-var">half</span></a></span></span><span> </span><span id="local-6989586621680387702"><span class="annot"><span class="annottext">Q Exp
+</span><a href="#local-6989586621680387702"><span class="hs-identifier hs-var">g0</span></a></span></span><span> </span><span id="local-6989586621680387703"><span class="annot"><span class="annottext">Q Exp
+</span><a href="#local-6989586621680387703"><span class="hs-identifier hs-var">g1</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-154"></span><span>        </span><span class="annot"><span class="annottext">[Q Dec] -&gt; Q Exp -&gt; Q Exp
+forall (m :: * -&gt; *). Quote m =&gt; [m Dec] -&gt; m Exp -&gt; m Exp
+</span><span class="hs-identifier hs-var">letE</span></span><span> </span><span class="hs-special">[</span><span class="annot"><span class="annottext">Q Pat -&gt; Q Body -&gt; [Q Dec] -&gt; Q Dec
+forall (m :: * -&gt; *).
+Quote m =&gt;
+m Pat -&gt; m Body -&gt; [m Dec] -&gt; m Dec
+</span><span class="hs-identifier hs-var">valD</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Name -&gt; Q Pat
+forall (m :: * -&gt; *). Quote m =&gt; Name -&gt; m Pat
+</span><span class="hs-identifier hs-var">varP</span></span><span> </span><span class="annot"><span class="annottext">Name
+</span><a href="#local-6989586621680387697"><span class="hs-identifier hs-var">a</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Q Exp -&gt; Q Body
+forall (m :: * -&gt; *). Quote m =&gt; m Exp -&gt; m Body
+</span><span class="hs-identifier hs-var">normalB</span></span><span> </span><span class="annot"><span class="annottext">Q Exp
+</span><a href="#local-6989586621680387702"><span class="hs-identifier hs-var">g0</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-special">[</span><span class="hs-special">]</span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Q Pat -&gt; Q Body -&gt; [Q Dec] -&gt; Q Dec
+forall (m :: * -&gt; *).
+Quote m =&gt;
+m Pat -&gt; m Body -&gt; [m Dec] -&gt; m Dec
+</span><span class="hs-identifier hs-var">valD</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Name -&gt; Q Pat
+forall (m :: * -&gt; *). Quote m =&gt; Name -&gt; m Pat
+</span><span class="hs-identifier hs-var">varP</span></span><span> </span><span class="annot"><span class="annottext">Name
+</span><a href="#local-6989586621680387698"><span class="hs-identifier hs-var">b</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Q Exp -&gt; Q Body
+forall (m :: * -&gt; *). Quote m =&gt; m Exp -&gt; m Body
+</span><span class="hs-identifier hs-var">normalB</span></span><span> </span><span class="annot"><span class="annottext">Q Exp
+</span><a href="#local-6989586621680387703"><span class="hs-identifier hs-var">g1</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-special">[</span><span class="hs-special">]</span><span class="hs-special">]</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-155"></span><span>          </span><span class="annot"><span class="annottext">Q Exp -&gt; Q Exp -&gt; Q Exp
+forall (m :: * -&gt; *). Quote m =&gt; m Exp -&gt; m Exp -&gt; m Exp
+</span><span class="hs-identifier hs-var">appE</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Name -&gt; Q Exp
+forall (m :: * -&gt; *). Quote m =&gt; Name -&gt; m Exp
+</span><span class="hs-identifier hs-var">conE</span></span><span> </span><span class="hs-special">'</span><span class="hs-identifier">ParserState</span><span class="hs-special">)</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-156"></span><span>            </span><span class="annot"><span class="annottext">Q Pat -&gt; Q Exp -&gt; Q Exp
+forall (m :: * -&gt; *). Quote m =&gt; m Pat -&gt; m Exp -&gt; m Exp
+</span><span class="hs-identifier hs-var">lam1E</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Name -&gt; Q Pat
+forall (m :: * -&gt; *). Quote m =&gt; Name -&gt; m Pat
+</span><span class="hs-identifier hs-var">varP</span></span><span> </span><span class="annot"><span class="annottext">Name
+</span><a href="#local-6989586621680387695"><span class="hs-identifier hs-var">argname</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-157"></span><span>              </span><span class="annot"><span class="annottext">Q Exp -&gt; [Q Match] -&gt; Q Exp
+forall (m :: * -&gt; *). Quote m =&gt; m Exp -&gt; [m Match] -&gt; m Exp
+</span><span class="hs-identifier hs-var">caseE</span></span><span>
+</span><span id="line-158"></span><span>                </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Name -&gt; Q Exp
+forall (m :: * -&gt; *). Quote m =&gt; Name -&gt; m Exp
+</span><span class="hs-identifier hs-var">varE</span></span><span> </span><span class="annot"><span class="annottext">Name
+</span><a href="#local-6989586621680387695"><span class="hs-identifier hs-var">argname</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-159"></span><span>                </span><span class="hs-special">[</span><span> </span><span class="annot"><span class="annottext">Q Pat -&gt; Q Body -&gt; [Q Dec] -&gt; Q Match
+forall (m :: * -&gt; *).
+Quote m =&gt;
+m Pat -&gt; m Body -&gt; [m Dec] -&gt; m Match
+</span><span class="hs-identifier hs-var">match</span></span><span>
+</span><span id="line-160"></span><span>                    </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Name -&gt; [Q Pat] -&gt; Q Pat
+forall (m :: * -&gt; *). Quote m =&gt; Name -&gt; [m Pat] -&gt; m Pat
+</span><span class="hs-identifier hs-var">conP</span></span><span> </span><span class="hs-special">'</span><span class="hs-identifier">Parse</span><span> </span><span class="hs-special">[</span><span class="annot"><span class="annottext">Name -&gt; Q Pat
+forall (m :: * -&gt; *). Quote m =&gt; Name -&gt; m Pat
+</span><span class="hs-identifier hs-var">varP</span></span><span> </span><span class="annot"><span class="annottext">Name
+</span><a href="#local-6989586621680387696"><span class="hs-identifier hs-var">u</span></a></span><span class="hs-special">]</span><span class="hs-special">)</span><span>
+</span><span id="line-161"></span><span>                    </span><span class="hs-special">(</span><span> </span><span class="annot"><span class="annottext">Q Exp -&gt; Q Body
+forall (m :: * -&gt; *). Quote m =&gt; m Exp -&gt; m Body
+</span><span class="hs-identifier hs-var">normalB</span></span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-162"></span><span>                        </span><span class="annot"><span class="annottext">Q Exp -&gt; Q Exp -&gt; Q Exp
+forall (m :: * -&gt; *). Quote m =&gt; m Exp -&gt; m Exp -&gt; m Exp
+</span><span class="hs-identifier hs-var">appE</span></span><span>
+</span><span id="line-163"></span><span>                          </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Name -&gt; Q Exp
+forall (m :: * -&gt; *). Quote m =&gt; Name -&gt; m Exp
+</span><span class="hs-identifier hs-var">varE</span></span><span> </span><span class="hs-special">'</span><span class="hs-identifier">okorerror</span><span class="hs-special">)</span><span>
+</span><span id="line-164"></span><span>                          </span><span class="hs-special">(</span><span> </span><span class="annot"><span class="annottext">Q Exp -&gt; Q Exp -&gt; Q Exp
+forall (m :: * -&gt; *). Quote m =&gt; m Exp -&gt; m Exp -&gt; m Exp
+</span><span class="hs-identifier hs-var">appE</span></span><span>
+</span><span id="line-165"></span><span>                              </span><span class="hs-special">(</span><span> </span><span class="annot"><span class="annottext">Q Exp -&gt; Q Exp -&gt; Q Exp
+forall (m :: * -&gt; *). Quote m =&gt; m Exp -&gt; m Exp -&gt; m Exp
+</span><span class="hs-identifier hs-var">appE</span></span><span>
+</span><span id="line-166"></span><span>                                  </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Name -&gt; Q Exp
+forall (m :: * -&gt; *). Quote m =&gt; Name -&gt; m Exp
+</span><span class="hs-identifier hs-var">varE</span></span><span> </span><span class="hs-special">'</span><span class="hs-identifier">parsepure0</span><span class="hs-special">)</span><span>
+</span><span id="line-167"></span><span>                                  </span><span class="hs-special">(</span><span> </span><span class="annot"><span class="annottext">Q Exp -&gt; Q Exp -&gt; Q Exp
+forall (m :: * -&gt; *). Quote m =&gt; m Exp -&gt; m Exp -&gt; m Exp
+</span><span class="hs-identifier hs-var">appE</span></span><span>
+</span><span id="line-168"></span><span>                                      </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Q Exp -&gt; Q Exp -&gt; Q Exp
+forall (m :: * -&gt; *). Quote m =&gt; m Exp -&gt; m Exp -&gt; m Exp
+</span><span class="hs-identifier hs-var">appE</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Name -&gt; Q Exp
+forall (m :: * -&gt; *). Quote m =&gt; Name -&gt; m Exp
+</span><span class="hs-identifier hs-var">varE</span></span><span> </span><span class="hs-special">'</span><span class="hs-identifier">forceindex</span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Name -&gt; Q Exp
+forall (m :: * -&gt; *). Quote m =&gt; Name -&gt; m Exp
+</span><span class="hs-identifier hs-var">varE</span></span><span> </span><span class="annot"><span class="annottext">Name
+</span><a href="#local-6989586621680387697"><span class="hs-identifier hs-var">a</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-169"></span><span>                                      </span><span class="hs-special">(</span><span> </span><span class="annot"><span class="annottext">Q Exp -&gt; Q Exp -&gt; Q Exp
+forall (m :: * -&gt; *). Quote m =&gt; m Exp -&gt; m Exp -&gt; m Exp
+</span><span class="hs-identifier hs-var">appE</span></span><span>
+</span><span id="line-170"></span><span>                                          </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Name -&gt; Q Exp
+forall (m :: * -&gt; *). Quote m =&gt; Name -&gt; m Exp
+</span><span class="hs-identifier hs-var">varE</span></span><span> </span><span class="hs-special">'</span><span class="hs-identifier">fi</span><span class="hs-special">)</span><span>
+</span><span id="line-171"></span><span>                                          </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Q Exp -&gt; Q Exp -&gt; Q Exp
+forall (m :: * -&gt; *). Quote m =&gt; m Exp -&gt; m Exp -&gt; m Exp
+</span><span class="hs-identifier hs-var">appE</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Name -&gt; Q Exp
+forall (m :: * -&gt; *). Quote m =&gt; Name -&gt; m Exp
+</span><span class="hs-identifier hs-var">varE</span></span><span> </span><span class="hs-special">'</span><span class="hs-identifier">pkcode</span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Name -&gt; Q Exp
+forall (m :: * -&gt; *). Quote m =&gt; Name -&gt; m Exp
+</span><span class="hs-identifier hs-var">varE</span></span><span> </span><span class="annot"><span class="annottext">Name
+</span><a href="#local-6989586621680387696"><span class="hs-identifier hs-var">u</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-172"></span><span>                                      </span><span class="hs-special">)</span><span>
+</span><span id="line-173"></span><span>                                  </span><span class="hs-special">)</span><span>
+</span><span id="line-174"></span><span>                              </span><span class="hs-special">)</span><span>
+</span><span id="line-175"></span><span>                              </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Q Exp -&gt; Q Exp -&gt; Q Exp
+forall (m :: * -&gt; *). Quote m =&gt; m Exp -&gt; m Exp -&gt; m Exp
+</span><span class="hs-identifier hs-var">appE</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Name -&gt; Q Exp
+forall (m :: * -&gt; *). Quote m =&gt; Name -&gt; m Exp
+</span><span class="hs-identifier hs-var">varE</span></span><span> </span><span class="hs-special">'</span><span class="hs-identifier">pkdata</span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Name -&gt; Q Exp
+forall (m :: * -&gt; *). Quote m =&gt; Name -&gt; m Exp
+</span><span class="hs-identifier hs-var">varE</span></span><span> </span><span class="annot"><span class="annottext">Name
+</span><a href="#local-6989586621680387696"><span class="hs-identifier hs-var">u</span></a></span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-176"></span><span>                          </span><span class="hs-special">)</span><span>
+</span><span id="line-177"></span><span>                    </span><span class="hs-special">)</span><span>
+</span><span id="line-178"></span><span>                    </span><span class="hs-special">[</span><span class="hs-special">]</span><span class="hs-special">,</span><span>
+</span><span id="line-179"></span><span>                  </span><span class="annot"><span class="annottext">Q Pat -&gt; Q Body -&gt; [Q Dec] -&gt; Q Match
+forall (m :: * -&gt; *).
+Quote m =&gt;
+m Pat -&gt; m Body -&gt; [m Dec] -&gt; m Match
+</span><span class="hs-identifier hs-var">match</span></span><span>
+</span><span id="line-180"></span><span>                    </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Name -&gt; [Q Pat] -&gt; Q Pat
+forall (m :: * -&gt; *). Quote m =&gt; Name -&gt; [m Pat] -&gt; m Pat
+</span><span class="hs-identifier hs-var">conP</span></span><span> </span><span class="hs-special">'</span><span class="hs-identifier">Code</span><span> </span><span class="hs-special">[</span><span class="annot"><span class="annottext">Name -&gt; Q Pat
+forall (m :: * -&gt; *). Quote m =&gt; Name -&gt; m Pat
+</span><span class="hs-identifier hs-var">varP</span></span><span> </span><span class="annot"><span class="annottext">Name
+</span><a href="#local-6989586621680387699"><span class="hs-identifier hs-var">d</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Name -&gt; Q Pat
+forall (m :: * -&gt; *). Quote m =&gt; Name -&gt; m Pat
+</span><span class="hs-identifier hs-var">varP</span></span><span> </span><span class="annot"><span class="annottext">Name
+</span><a href="#local-6989586621680387700"><span class="hs-identifier hs-var">y</span></a></span><span class="hs-special">]</span><span class="hs-special">)</span><span>
+</span><span id="line-181"></span><span>                    </span><span class="hs-special">(</span><span> </span><span class="annot"><span class="annottext">Q Exp -&gt; Q Body
+forall (m :: * -&gt; *). Quote m =&gt; m Exp -&gt; m Body
+</span><span class="hs-identifier hs-var">normalB</span></span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-182"></span><span>                        </span><span class="annot"><span class="annottext">Q Exp -&gt; Q Exp -&gt; Q Exp
+forall (m :: * -&gt; *). Quote m =&gt; m Exp -&gt; m Exp -&gt; m Exp
+</span><span class="hs-identifier hs-var">appE</span></span><span>
+</span><span id="line-183"></span><span>                          </span><span class="hs-special">(</span><span> </span><span class="annot"><span class="annottext">Q Exp -&gt; Q Exp -&gt; Q Exp
+forall (m :: * -&gt; *). Quote m =&gt; m Exp -&gt; m Exp -&gt; m Exp
+</span><span class="hs-identifier hs-var">appE</span></span><span>
+</span><span id="line-184"></span><span>                              </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Name -&gt; Q Exp
+forall (m :: * -&gt; *). Quote m =&gt; Name -&gt; m Exp
+</span><span class="hs-identifier hs-var">varE</span></span><span> </span><span class="hs-special">'</span><span class="hs-identifier">H.lookup</span><span class="hs-special">)</span><span>
+</span><span id="line-185"></span><span>                              </span><span class="hs-special">(</span><span class="annot"><span class="annottext">[Q Exp] -&gt; Q Exp
+forall (m :: * -&gt; *). Quote m =&gt; [m Exp] -&gt; m Exp
+</span><span class="hs-identifier hs-var">tupE</span></span><span> </span><span class="hs-special">[</span><span class="annot"><span class="annottext">Name -&gt; Q Exp
+forall (m :: * -&gt; *). Quote m =&gt; Name -&gt; m Exp
+</span><span class="hs-identifier hs-var">varE</span></span><span> </span><span class="annot"><span class="annottext">Name
+</span><a href="#local-6989586621680387699"><span class="hs-identifier hs-var">d</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Name -&gt; Q Exp
+forall (m :: * -&gt; *). Quote m =&gt; Name -&gt; m Exp
+</span><span class="hs-identifier hs-var">varE</span></span><span> </span><span class="annot"><span class="annottext">Name
+</span><a href="#local-6989586621680387700"><span class="hs-identifier hs-var">y</span></a></span><span class="hs-special">]</span><span class="hs-special">)</span><span>
+</span><span id="line-186"></span><span>                          </span><span class="hs-special">)</span><span>
+</span><span id="line-187"></span><span>                          </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Name -&gt; Q Exp
+forall (m :: * -&gt; *). Quote m =&gt; Name -&gt; m Exp
+</span><span class="hs-identifier hs-var">varE</span></span><span> </span><span class="annot"><span class="annottext">Name
+</span><a href="#local-6989586621680387698"><span class="hs-identifier hs-var">b</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-188"></span><span>                    </span><span class="hs-special">)</span><span>
+</span><span id="line-189"></span><span>                    </span><span class="hs-special">[</span><span class="hs-special">]</span><span>
+</span><span id="line-190"></span><span>                </span><span class="hs-special">]</span><span>
+</span><span id="line-191"></span><span>      </span><span id="local-6989586621680387711"><span class="annot"><a href="#local-6989586621680387711"><span class="hs-identifier hs-var hs-var">sig</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Name -&gt; Q Type
+forall (m :: * -&gt; *). Quote m =&gt; Name -&gt; m Type
+</span><span class="hs-identifier hs-var">conT</span></span><span> </span><span class="hs-special">''</span><span class="hs-identifier">ParserStates</span><span>
+</span><span id="line-192"></span><span>  </span><span id="local-6989586621680387712"><span class="annot"><a href="#local-6989586621680387712"><span class="hs-identifier hs-var">s1</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><a href="#local-6989586621680387711"><span class="hs-identifier hs-type">sig</span></a></span><span>
+</span><span id="line-193"></span><span>  </span><span id="local-6989586621680387713"><span class="annot"><a href="#local-6989586621680387713"><span class="hs-identifier hs-var">s2</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span>
+</span><span id="line-194"></span><span>    </span><span class="annot"><span class="hs-identifier hs-type">appE</span></span><span>
+</span><span id="line-195"></span><span>      </span><span class="hs-special">(</span><span> </span><span class="annot"><span class="hs-identifier hs-type">appE</span></span><span>
+</span><span id="line-196"></span><span>          </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">conE</span></span><span> </span><span class="hs-special">'</span><span class="hs-identifier">ParserStates</span><span class="hs-special">)</span><span>
+</span><span id="line-197"></span><span>          </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621680387701"><span class="hs-identifier hs-type">half</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680387691"><span class="hs-identifier hs-type">gensparse</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680387692"><span class="hs-identifier hs-type">genscode</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-198"></span><span>      </span><span class="hs-special">)</span><span>
+</span><span id="line-199"></span><span>      </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621680387701"><span class="hs-identifier hs-type">half</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680387693"><span class="hs-identifier hs-type">gencparse</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680387694"><span class="hs-identifier hs-type">genccode</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-200"></span><span>  </span><span class="annot"><span class="hs-identifier hs-type">pure</span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621680387712"><span class="hs-identifier hs-type">s1</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="#local-6989586621680387713"><span class="hs-identifier hs-type">s2</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-201"></span><span>
+</span><span id="line-202"></span><span class="annot"><span class="hs-comment">-- | Parse a single colon character</span></span><span>
+</span><span id="line-203"></span><span id="local-6989586621680387265"><span id="local-6989586621680387266"><span class="annot"><a href="M.IO.TH.html#colon"><span class="hs-identifier hs-type">colon</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#Parser"><span class="hs-identifier hs-type">Parser</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680387265"><span class="hs-identifier hs-type">st</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680387266"><span class="hs-identifier hs-type">r</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span></span></span><span>
+</span><span id="line-204"></span><span id="colon"><span class="annot"><span class="annottext">colon :: forall (st :: ZeroBitType) r. Parser st r ()
+</span><a href="M.IO.TH.html#colon"><span class="hs-identifier hs-var hs-var">colon</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(Char -&gt; Bool) -&gt; ParserT st r ParseError ()
+forall (st :: ZeroBitType) r e. (Char -&gt; Bool) -&gt; ParserT st r e ()
+</span><span class="hs-identifier hs-var">skipSatisfyAscii</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Char -&gt; Char -&gt; Bool
+forall a. Eq a =&gt; a -&gt; a -&gt; Bool
+</span><span class="hs-operator hs-var">==</span></span><span> </span><span class="annot"><span class="annottext">Char
+</span><span class="hs-char">':'</span></span><span class="hs-special">)</span><span>
+</span><span id="line-205"></span><span>
+</span><span id="line-206"></span><span class="annot"><span class="hs-comment">-- | Parse a colon with error reporting</span></span><span>
+</span><span id="line-207"></span><span id="local-6989586621680387718"><span id="local-6989586621680387719"><span class="annot"><a href="M.IO.TH.html#colon%27"><span class="hs-identifier hs-type">colon'</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#Parser"><span class="hs-identifier hs-type">Parser</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680387718"><span class="hs-identifier hs-type">st</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680387719"><span class="hs-identifier hs-type">r</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span></span></span><span>
+</span><span id="line-208"></span><span id="colon%27"><span class="annot"><span class="annottext">colon' :: forall (st :: ZeroBitType) r. Parser st r ()
+</span><a href="M.IO.TH.html#colon%27"><span class="hs-identifier hs-var hs-var">colon'</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">ParserT st r ParseError ()
+-&gt; ParseError -&gt; ParserT st r ParseError ()
+forall (st :: ZeroBitType) r e a.
+ParserT st r e a -&gt; e -&gt; ParserT st r e a
+</span><span class="hs-identifier hs-var">cut</span></span><span> </span><span class="annot"><span class="annottext">ParserT st r ParseError ()
+forall (st :: ZeroBitType) r. Parser st r ()
+</span><a href="M.IO.TH.html#colon"><span class="hs-identifier hs-var">colon</span></a></span><span> </span><span class="annot"><span class="annottext">ParseError
+</span><span class="hs-string">&quot;expected colon (:)&quot;</span></span><span>
+</span><span id="line-209"></span><span>
+</span><span id="line-210"></span><span class="hs-comment">-- | Parse a hexadecimal number into an Int</span><span>
+</span><span id="line-211"></span><span class="hs-comment">-- Supports both uppercase and lowercase hex digits</span><span>
+</span><span id="line-212"></span><span id="local-6989586621680387280"><span id="local-6989586621680387281"><span class="annot"><a href="M.IO.TH.html#hexnumber"><span class="hs-identifier hs-type">hexnumber</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#Parser"><span class="hs-identifier hs-type">Parser</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680387280"><span class="hs-identifier hs-type">st</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680387281"><span class="hs-identifier hs-type">r</span></a></span><span> </span><span class="annot"><span class="hs-identifier hs-type">Int</span></span></span></span><span>
+</span><span id="line-213"></span><span id="hexnumber"><span class="annot"><span class="annottext">hexnumber :: forall (st :: ZeroBitType) r. Parser st r Int
+</span><a href="M.IO.TH.html#hexnumber"><span class="hs-identifier hs-var hs-var">hexnumber</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-214"></span><span>  </span><span class="hs-special">(</span><span id="local-6989586621680387738"><span class="annot"><a href="#local-6989586621680387738"><span class="hs-identifier hs-var">p</span></a></span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621680387739"><span class="annot"><a href="#local-6989586621680387739"><span class="hs-identifier hs-var">n</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">(Int -&gt; (Int, Int) -&gt; (Int, Int))
+-&gt; ParserT st r ParseError Int
+-&gt; ParserT st r ParseError (Int, Int)
+-&gt; ParserT st r ParseError (Int, Int)
+forall a b (st :: ZeroBitType) r e.
+(a -&gt; b -&gt; b)
+-&gt; ParserT st r e a -&gt; ParserT st r e b -&gt; ParserT st r e b
+</span><span class="hs-identifier hs-var">chainr</span></span><span> </span><span class="annot"><span class="annottext">Int -&gt; (Int, Int) -&gt; (Int, Int)
+forall {b}. Num b =&gt; b -&gt; (b, b) -&gt; (b, b)
+</span><a href="#local-6989586621680387741"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="annot"><span class="annottext">ParserT st r ParseError Int
+forall {st :: ZeroBitType} {r} {e}. ParserT st r e Int
+</span><a href="#local-6989586621680387742"><span class="hs-identifier hs-var">digit</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">(Int, Int) -&gt; ParserT st r ParseError (Int, Int)
+forall a. a -&gt; ParserT st r ParseError a
+forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><span class="hs-identifier hs-var">pure</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">1</span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">0</span></span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-215"></span><span>  </span><span class="annot"><span class="hs-identifier hs-type">guard</span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621680387738"><span class="hs-identifier hs-type">p</span></a></span><span> </span><span class="annot"><span class="hs-operator hs-type">/=</span></span><span> </span><span class="annot"><span class="hs-number">1</span></span><span class="hs-special">)</span><span>
+</span><span id="line-216"></span><span>  </span><span class="annot"><span class="hs-identifier hs-type">pure</span></span><span> </span><span class="annot"><a href="#local-6989586621680387739"><span class="hs-identifier hs-type">n</span></a></span><span>
+</span><span id="line-217"></span><span>  </span><span class="hs-keyword">where</span><span>
+</span><span id="line-218"></span><span>    </span><span id="local-6989586621680387741"><span class="annot"><span class="annottext">f :: b -&gt; (b, b) -&gt; (b, b)
+</span><a href="#local-6989586621680387741"><span class="hs-identifier hs-var hs-var">f</span></a></span></span><span> </span><span id="local-6989586621680387749"><span class="annot"><span class="annottext">b
+</span><a href="#local-6989586621680387749"><span class="hs-identifier hs-var">n</span></a></span></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">!</span><span id="local-6989586621680387750"><span class="annot"><span class="annottext">b
+</span><a href="#local-6989586621680387750"><span class="hs-identifier hs-var">place</span></a></span></span><span class="hs-special">,</span><span> </span><span class="hs-glyph">!</span><span id="local-6989586621680387751"><span class="annot"><span class="annottext">b
+</span><a href="#local-6989586621680387751"><span class="hs-identifier hs-var">a</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">b
+</span><a href="#local-6989586621680387750"><span class="hs-identifier hs-var">place</span></a></span><span> </span><span class="annot"><span class="annottext">b -&gt; b -&gt; b
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">*</span></span><span> </span><span class="annot"><span class="annottext">b
+</span><span class="hs-number">16</span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">b
+</span><a href="#local-6989586621680387751"><span class="hs-identifier hs-var">a</span></a></span><span> </span><span class="annot"><span class="annottext">b -&gt; b -&gt; b
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">+</span></span><span> </span><span class="annot"><span class="annottext">b
+</span><a href="#local-6989586621680387750"><span class="hs-identifier hs-var">place</span></a></span><span> </span><span class="annot"><span class="annottext">b -&gt; b -&gt; b
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">*</span></span><span> </span><span class="annot"><span class="annottext">b
+</span><a href="#local-6989586621680387749"><span class="hs-identifier hs-var">n</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-219"></span><span>    </span><span id="local-6989586621680387742"><span class="annot"><span class="annottext">digit :: ParserT st r e Int
+</span><a href="#local-6989586621680387742"><span class="hs-identifier hs-var hs-var">digit</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-220"></span><span>      </span><span class="annot"><span class="annottext">(Char -&gt; Bool) -&gt; ParserT st r e Char
+forall (st :: ZeroBitType) r e.
+(Char -&gt; Bool) -&gt; ParserT st r e Char
+</span><span class="hs-identifier hs-var">satisfyAscii</span></span><span> </span><span class="annot"><span class="annottext">Char -&gt; Bool
+</span><a href="#local-6989586621680387769"><span class="hs-identifier hs-var">d</span></a></span><span> </span><span class="annot"><span class="annottext">ParserT st r e Char -&gt; (Char -&gt; Int) -&gt; ParserT st r e Int
+forall (f :: * -&gt; *) a b. Functor f =&gt; f a -&gt; (a -&gt; b) -&gt; f b
+</span><span class="hs-operator hs-var">&lt;&amp;&gt;</span></span><span> </span><span class="hs-glyph">\</span><span class="hs-glyph">case</span><span>
+</span><span id="line-221"></span><span>        </span><span id="local-6989586621680387771"><span class="annot"><span class="annottext">Char
+</span><a href="#local-6989586621680387771"><span class="hs-identifier hs-var">c</span></a></span></span><span> </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="annottext">Char
+</span><span class="hs-char">'0'</span></span><span> </span><span class="annot"><span class="annottext">Char -&gt; Char -&gt; Bool
+forall a. Ord a =&gt; a -&gt; a -&gt; Bool
+</span><span class="hs-operator hs-var">&lt;=</span></span><span> </span><span class="annot"><span class="annottext">Char
+</span><a href="#local-6989586621680387771"><span class="hs-identifier hs-var">c</span></a></span><span> </span><span class="annot"><span class="annottext">Bool -&gt; Bool -&gt; Bool
+</span><span class="hs-operator hs-var">&amp;&amp;</span></span><span> </span><span class="annot"><span class="annottext">Char
+</span><a href="#local-6989586621680387771"><span class="hs-identifier hs-var">c</span></a></span><span> </span><span class="annot"><span class="annottext">Char -&gt; Char -&gt; Bool
+forall a. Ord a =&gt; a -&gt; a -&gt; Bool
+</span><span class="hs-operator hs-var">&lt;=</span></span><span> </span><span class="annot"><span class="annottext">Char
+</span><span class="hs-char">'9'</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Char -&gt; Int
+</span><span class="hs-identifier hs-var">ord</span></span><span> </span><span class="annot"><span class="annottext">Char
+</span><a href="#local-6989586621680387771"><span class="hs-identifier hs-var">c</span></a></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Int
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-glyph hs-var">-</span></span><span> </span><span class="annot"><span class="annottext">Char -&gt; Int
+</span><span class="hs-identifier hs-var">ord</span></span><span> </span><span class="annot"><span class="annottext">Char
+</span><span class="hs-char">'0'</span></span><span>
+</span><span id="line-222"></span><span>        </span><span id="local-6989586621680387774"><span class="annot"><span class="annottext">Char
+</span><a href="#local-6989586621680387774"><span class="hs-identifier hs-var">c</span></a></span></span><span> </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="annottext">Char
+</span><span class="hs-char">'A'</span></span><span> </span><span class="annot"><span class="annottext">Char -&gt; Char -&gt; Bool
+forall a. Ord a =&gt; a -&gt; a -&gt; Bool
+</span><span class="hs-operator hs-var">&lt;=</span></span><span> </span><span class="annot"><span class="annottext">Char
+</span><a href="#local-6989586621680387774"><span class="hs-identifier hs-var">c</span></a></span><span> </span><span class="annot"><span class="annottext">Bool -&gt; Bool -&gt; Bool
+</span><span class="hs-operator hs-var">&amp;&amp;</span></span><span> </span><span class="annot"><span class="annottext">Char
+</span><a href="#local-6989586621680387774"><span class="hs-identifier hs-var">c</span></a></span><span> </span><span class="annot"><span class="annottext">Char -&gt; Char -&gt; Bool
+forall a. Ord a =&gt; a -&gt; a -&gt; Bool
+</span><span class="hs-operator hs-var">&lt;=</span></span><span> </span><span class="annot"><span class="annottext">Char
+</span><span class="hs-char">'F'</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Char -&gt; Int
+</span><span class="hs-identifier hs-var">ord</span></span><span> </span><span class="annot"><span class="annottext">Char
+</span><a href="#local-6989586621680387774"><span class="hs-identifier hs-var">c</span></a></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Int
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-glyph hs-var">-</span></span><span> </span><span class="annot"><span class="annottext">Char -&gt; Int
+</span><span class="hs-identifier hs-var">ord</span></span><span> </span><span class="annot"><span class="annottext">Char
+</span><span class="hs-char">'A'</span></span><span>
+</span><span id="line-223"></span><span>        </span><span id="local-6989586621680387775"><span class="annot"><span class="annottext">Char
+</span><a href="#local-6989586621680387775"><span class="hs-identifier hs-var">c</span></a></span></span><span> </span><span class="hs-glyph">|</span><span> </span><span class="annot"><span class="annottext">Char
+</span><span class="hs-char">'a'</span></span><span> </span><span class="annot"><span class="annottext">Char -&gt; Char -&gt; Bool
+forall a. Ord a =&gt; a -&gt; a -&gt; Bool
+</span><span class="hs-operator hs-var">&lt;=</span></span><span> </span><span class="annot"><span class="annottext">Char
+</span><a href="#local-6989586621680387775"><span class="hs-identifier hs-var">c</span></a></span><span> </span><span class="annot"><span class="annottext">Bool -&gt; Bool -&gt; Bool
+</span><span class="hs-operator hs-var">&amp;&amp;</span></span><span> </span><span class="annot"><span class="annottext">Char
+</span><a href="#local-6989586621680387775"><span class="hs-identifier hs-var">c</span></a></span><span> </span><span class="annot"><span class="annottext">Char -&gt; Char -&gt; Bool
+forall a. Ord a =&gt; a -&gt; a -&gt; Bool
+</span><span class="hs-operator hs-var">&lt;=</span></span><span> </span><span class="annot"><span class="annottext">Char
+</span><span class="hs-char">'f'</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Char -&gt; Int
+</span><span class="hs-identifier hs-var">ord</span></span><span> </span><span class="annot"><span class="annottext">Char
+</span><a href="#local-6989586621680387775"><span class="hs-identifier hs-var">c</span></a></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Int
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-glyph hs-var">-</span></span><span> </span><span class="annot"><span class="annottext">Char -&gt; Int
+</span><span class="hs-identifier hs-var">ord</span></span><span> </span><span class="annot"><span class="annottext">Char
+</span><span class="hs-char">'a'</span></span><span>
+</span><span id="line-224"></span><span>        </span><span class="annot"><span class="annottext">Char
+</span><span class="hs-identifier">_</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">[Char] -&gt; Int
+forall a. HasCallStack =&gt; [Char] -&gt; a
+</span><span class="hs-identifier hs-var">error</span></span><span> </span><span class="annot"><span class="annottext">[Char]
+</span><span class="hs-string">&quot;hexnumber/digit: impossible&quot;</span></span><span>
+</span><span id="line-225"></span><span>    </span><span id="local-6989586621680387769"><span class="annot"><span class="annottext">d :: Char -&gt; Bool
+</span><a href="#local-6989586621680387769"><span class="hs-identifier hs-var hs-var">d</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(Bool -&gt; Bool -&gt; Bool)
+-&gt; (Char -&gt; Bool) -&gt; (Char -&gt; Bool) -&gt; Char -&gt; Bool
+forall a b c.
+(a -&gt; b -&gt; c) -&gt; (Char -&gt; a) -&gt; (Char -&gt; b) -&gt; Char -&gt; c
+forall (f :: * -&gt; *) a b c.
+Applicative f =&gt;
+(a -&gt; b -&gt; c) -&gt; f a -&gt; f b -&gt; f c
+</span><span class="hs-identifier hs-var">liftA2</span></span><span> </span><span class="annot"><span class="annottext">Bool -&gt; Bool -&gt; Bool
+</span><span class="hs-operator hs-var">(||)</span></span><span> </span><span class="annot"><span class="annottext">Char -&gt; Bool
+</span><span class="hs-identifier hs-var">isDigit</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">(Char -&gt; [Char] -&gt; Bool) -&gt; [Char] -&gt; Char -&gt; Bool
+forall a b c. (a -&gt; b -&gt; c) -&gt; b -&gt; a -&gt; c
+</span><span class="hs-identifier hs-var">flip</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">forall (t :: * -&gt; *) a. (Foldable t, Eq a) =&gt; a -&gt; t a -&gt; Bool
+</span><span class="hs-identifier hs-var">elem</span></span><span> </span><span class="hs-glyph">@</span><span class="hs-special">[</span><span class="hs-special">]</span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">[Char]
+</span><span class="hs-string">&quot;ABCDEFabcdef&quot;</span></span><span class="hs-special">)</span><span>
+</span><span id="line-226"></span><span>
+</span><span id="line-227"></span><span class="hs-comment">-- | Parse a valid identifier</span><span>
+</span><span id="line-228"></span><span class="hs-comment">-- First char must be letter, underscore or quote</span><span>
+</span><span id="line-229"></span><span class="hs-comment">-- Later chars can also include dots and digits</span><span>
+</span><span id="line-230"></span><span id="local-6989586621680387319"><span id="local-6989586621680387320"><span class="annot"><a href="M.IO.TH.html#ident"><span class="hs-identifier hs-type">ident</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#Parser"><span class="hs-identifier hs-type">Parser</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680387319"><span class="hs-identifier hs-type">st</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680387320"><span class="hs-identifier hs-type">r</span></a></span><span> </span><span class="annot"><span class="hs-identifier hs-type">String</span></span></span></span><span>
+</span><span id="line-231"></span><span id="ident"><span class="annot"><span class="annottext">ident :: forall (st :: ZeroBitType) r. Parser st r [Char]
+</span><a href="M.IO.TH.html#ident"><span class="hs-identifier hs-var hs-var">ident</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-232"></span><span>  </span><span class="annot"><span class="annottext">(Char -&gt; [Char] -&gt; [Char])
+-&gt; ParserT st r ParseError Char
+-&gt; ParserT st r ParseError [Char]
+-&gt; ParserT st r ParseError [Char]
+forall a b c.
+(a -&gt; b -&gt; c)
+-&gt; ParserT st r ParseError a
+-&gt; ParserT st r ParseError b
+-&gt; ParserT st r ParseError c
+forall (f :: * -&gt; *) a b c.
+Applicative f =&gt;
+(a -&gt; b -&gt; c) -&gt; f a -&gt; f b -&gt; f c
+</span><span class="hs-identifier hs-var">liftA2</span></span><span>
+</span><span id="line-233"></span><span>    </span><span class="hs-special">(</span><span class="hs-glyph">:</span><span class="hs-special">)</span><span>
+</span><span id="line-234"></span><span>    </span><span class="hs-keyword">do</span><span> </span><span class="annot"><span class="annottext">(Char -&gt; Bool) -&gt; ParserT st r ParseError Char
+forall (st :: ZeroBitType) r e.
+(Char -&gt; Bool) -&gt; ParserT st r e Char
+</span><span class="hs-identifier hs-var">satisfyAscii</span></span><span> </span><span class="annot"><span class="annottext">Char -&gt; Bool
+</span><a href="#local-6989586621680387789"><span class="hs-identifier hs-var">firstchar</span></a></span><span>
+</span><span id="line-235"></span><span>    </span><span class="hs-keyword">do</span><span> </span><span class="annot"><span class="annottext">ParserT st r ParseError Char -&gt; ParserT st r ParseError [Char]
+forall a. ParserT st r ParseError a -&gt; ParserT st r ParseError [a]
+forall (f :: * -&gt; *) a. Alternative f =&gt; f a -&gt; f [a]
+</span><span class="hs-identifier hs-var">many</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">(Char -&gt; Bool) -&gt; ParserT st r ParseError Char
+forall (st :: ZeroBitType) r e.
+(Char -&gt; Bool) -&gt; ParserT st r e Char
+</span><span class="hs-identifier hs-var">satisfyAscii</span></span><span> </span><span class="annot"><span class="annottext">Char -&gt; Bool
+</span><a href="#local-6989586621680387791"><span class="hs-identifier hs-var">laterchar</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-236"></span><span>  </span><span class="hs-keyword">where</span><span>
+</span><span id="line-237"></span><span>    </span><span id="local-6989586621680387794"><span class="annot"><span class="annottext">liftany :: [b -&gt; Bool] -&gt; b -&gt; Bool
+</span><a href="#local-6989586621680387794"><span class="hs-identifier hs-var hs-var">liftany</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">forall (t :: * -&gt; *) a b.
+Foldable t =&gt;
+(a -&gt; b -&gt; b) -&gt; b -&gt; t a -&gt; b
+</span><span class="hs-identifier hs-var">foldr</span></span><span> </span><span class="hs-glyph">@</span><span class="hs-special">[</span><span class="hs-special">]</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">(Bool -&gt; Bool -&gt; Bool) -&gt; (b -&gt; Bool) -&gt; (b -&gt; Bool) -&gt; b -&gt; Bool
+forall a b c. (a -&gt; b -&gt; c) -&gt; (b -&gt; a) -&gt; (b -&gt; b) -&gt; b -&gt; c
+forall (f :: * -&gt; *) a b c.
+Applicative f =&gt;
+(a -&gt; b -&gt; c) -&gt; f a -&gt; f b -&gt; f c
+</span><span class="hs-identifier hs-var">liftA2</span></span><span> </span><span class="annot"><span class="annottext">Bool -&gt; Bool -&gt; Bool
+</span><span class="hs-operator hs-var">(||)</span></span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Bool -&gt; b -&gt; Bool
+forall a b. a -&gt; b -&gt; a
+</span><span class="hs-identifier hs-var">const</span></span><span> </span><span class="annot"><span class="annottext">Bool
+</span><span class="hs-identifier hs-var">False</span></span><span class="hs-special">)</span><span>
+</span><span id="line-238"></span><span>    </span><span id="local-6989586621680387789"><span class="annot"><span class="annottext">firstchar :: Char -&gt; Bool
+</span><a href="#local-6989586621680387789"><span class="hs-identifier hs-var hs-var">firstchar</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">[Char -&gt; Bool] -&gt; Char -&gt; Bool
+forall {b}. [b -&gt; Bool] -&gt; b -&gt; Bool
+</span><a href="#local-6989586621680387794"><span class="hs-identifier hs-var">liftany</span></a></span><span> </span><span class="hs-special">[</span><span class="hs-special">(</span><span class="annot"><span class="annottext">Char -&gt; Char -&gt; Bool
+forall a. Eq a =&gt; a -&gt; a -&gt; Bool
+</span><span class="hs-operator hs-var">==</span></span><span> </span><span class="annot"><span class="annottext">Char
+</span><span class="hs-char">'\''</span></span><span class="hs-special">)</span><span class="hs-special">,</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Char -&gt; Char -&gt; Bool
+forall a. Eq a =&gt; a -&gt; a -&gt; Bool
+</span><span class="hs-operator hs-var">==</span></span><span> </span><span class="annot"><span class="annottext">Char
+</span><span class="hs-char">'_'</span></span><span class="hs-special">)</span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Item [Char -&gt; Bool]
+Char -&gt; Bool
+</span><span class="hs-identifier hs-var">isLetter</span></span><span class="hs-special">]</span><span>
+</span><span id="line-239"></span><span>    </span><span id="local-6989586621680387791"><span class="annot"><span class="annottext">laterchar :: Char -&gt; Bool
+</span><a href="#local-6989586621680387791"><span class="hs-identifier hs-var hs-var">laterchar</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">[Char -&gt; Bool] -&gt; Char -&gt; Bool
+forall {b}. [b -&gt; Bool] -&gt; b -&gt; Bool
+</span><a href="#local-6989586621680387794"><span class="hs-identifier hs-var">liftany</span></a></span><span> </span><span class="hs-special">[</span><span class="hs-special">(</span><span class="annot"><span class="annottext">Char -&gt; Char -&gt; Bool
+forall a. Eq a =&gt; a -&gt; a -&gt; Bool
+</span><span class="hs-operator hs-var">==</span></span><span> </span><span class="annot"><span class="annottext">Char
+</span><span class="hs-char">'.'</span></span><span class="hs-special">)</span><span class="hs-special">,</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Char -&gt; Char -&gt; Bool
+forall a. Eq a =&gt; a -&gt; a -&gt; Bool
+</span><span class="hs-operator hs-var">==</span></span><span> </span><span class="annot"><span class="annottext">Char
+</span><span class="hs-char">'_'</span></span><span class="hs-special">)</span><span class="hs-special">,</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Char -&gt; Char -&gt; Bool
+forall a. Eq a =&gt; a -&gt; a -&gt; Bool
+</span><span class="hs-operator hs-var">==</span></span><span> </span><span class="annot"><span class="annottext">Char
+</span><span class="hs-char">'\''</span></span><span class="hs-special">)</span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Item [Char -&gt; Bool]
+Char -&gt; Bool
+</span><span class="hs-identifier hs-var">isDigit</span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Item [Char -&gt; Bool]
+Char -&gt; Bool
+</span><span class="hs-identifier hs-var">isLetter</span></span><span class="hs-special">]</span><span>
+</span><span id="line-240"></span><span>
+</span><span id="line-241"></span><span class="annot"><span class="hs-comment">-- | Parse an identifier with error reporting</span></span><span>
+</span><span id="line-242"></span><span id="local-6989586621680387803"><span id="local-6989586621680387804"><span class="annot"><a href="M.IO.TH.html#ident%27"><span class="hs-identifier hs-type">ident'</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#Parser"><span class="hs-identifier hs-type">Parser</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680387803"><span class="hs-identifier hs-type">st</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680387804"><span class="hs-identifier hs-type">r</span></a></span><span> </span><span class="annot"><span class="hs-identifier hs-type">String</span></span></span></span><span>
+</span><span id="line-243"></span><span id="ident%27"><span class="annot"><span class="annottext">ident' :: forall (st :: ZeroBitType) r. Parser st r [Char]
+</span><a href="M.IO.TH.html#ident%27"><span class="hs-identifier hs-var hs-var">ident'</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">ParserT st r ParseError [Char]
+-&gt; ParseError -&gt; ParserT st r ParseError [Char]
+forall (st :: ZeroBitType) r e a.
+ParserT st r e a -&gt; e -&gt; ParserT st r e a
+</span><span class="hs-identifier hs-var">cut</span></span><span> </span><span class="annot"><span class="annottext">ParserT st r ParseError [Char]
+forall (st :: ZeroBitType) r. Parser st r [Char]
+</span><a href="M.IO.TH.html#ident"><span class="hs-identifier hs-var">ident</span></a></span><span> </span><span class="annot"><span class="annottext">ParseError
+</span><span class="hs-string">&quot;expected an identifier&quot;</span></span><span>
+</span><span id="line-244"></span><span>
+</span><span id="line-245"></span><span class="annot"><span class="hs-comment">-- | Skip a line comment starting with --</span></span><span>
+</span><span id="line-246"></span><span id="local-6989586621680387807"><span id="local-6989586621680387808"><span class="annot"><a href="M.IO.TH.html#linecomment"><span class="hs-identifier hs-type">linecomment</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#Parser"><span class="hs-identifier hs-type">Parser</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680387807"><span class="hs-identifier hs-type">st</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680387808"><span class="hs-identifier hs-type">r</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span></span></span><span>
+</span><span id="line-247"></span><span id="linecomment"><span class="annot"><span class="annottext">linecomment :: forall (st :: ZeroBitType) r. Parser st r ()
+</span><a href="M.IO.TH.html#linecomment"><span class="hs-identifier hs-var hs-var">linecomment</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-248"></span><span>  </span><span class="annot"><span class="annottext">ParserT st r ParseError Word8
+-&gt; (Word8 -&gt; ParserT st r ParseError ())
+-&gt; ParserT st r ParseError ()
+-&gt; ParserT st r ParseError ()
+forall (st :: ZeroBitType) r e a ret.
+ParserT st r e a
+-&gt; (a -&gt; ParserT st r e ret)
+-&gt; ParserT st r e ret
+-&gt; ParserT st r e ret
+</span><span class="hs-identifier hs-var">withOption</span></span><span>
+</span><span id="line-249"></span><span>    </span><span class="annot"><span class="annottext">ParserT st r ParseError Word8
+forall (st :: ZeroBitType) r e. ParserT st r e Word8
+</span><span class="hs-identifier hs-var">anyWord8</span></span><span>
+</span><span id="line-250"></span><span>    </span><span class="hs-special">(</span><span class="hs-glyph">\</span><span class="hs-glyph">case</span><span> </span><span class="annot"><span class="annottext">Word8
+</span><span class="hs-number">10</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">ParserT st r ParseError ()
+forall (st :: ZeroBitType) r. Parser st r ()
+</span><a href="M.IO.TH.html#ws"><span class="hs-identifier hs-var">ws</span></a></span><span class="hs-special">;</span><span> </span><span class="annot"><span class="annottext">Word8
+</span><span class="hs-identifier">_</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">ParserT st r ParseError ()
+forall (st :: ZeroBitType) r. Parser st r ()
+</span><a href="M.IO.TH.html#linecomment"><span class="hs-identifier hs-var">linecomment</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-251"></span><span>    </span><span class="hs-special">(</span><span class="annot"><span class="annottext">() -&gt; ParserT st r ParseError ()
+forall a. a -&gt; ParserT st r ParseError a
+forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><span class="hs-identifier hs-var">pure</span></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-252"></span><span>
+</span><span id="line-253"></span><span class="hs-comment">-- | Skip a multi-line comment between {- and -}</span><span>
+</span><span id="line-254"></span><span class="hs-comment">-- Handles nested comments correctly</span><span>
+</span><span id="line-255"></span><span id="local-6989586621680387818"><span id="local-6989586621680387819"><span class="annot"><a href="M.IO.TH.html#multilinecomment"><span class="hs-identifier hs-type">multilinecomment</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#Parser"><span class="hs-identifier hs-type">Parser</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680387818"><span class="hs-identifier hs-type">st</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680387819"><span class="hs-identifier hs-type">r</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span></span></span><span>
+</span><span id="line-256"></span><span id="multilinecomment"><span class="annot"><span class="annottext">multilinecomment :: forall (st :: ZeroBitType) r. Parser st r ()
+</span><a href="M.IO.TH.html#multilinecomment"><span class="hs-identifier hs-var hs-var">multilinecomment</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-257"></span><span>  </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">1</span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Int</span></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Int -&gt; (Int -&gt; Parser st r ()) -&gt; Parser st r ()
+forall a b. a -&gt; (a -&gt; b) -&gt; b
+</span><span class="hs-operator hs-var">&amp;</span></span><span> </span><span class="annot"><span class="annottext">((Int -&gt; Parser st r ()) -&gt; Int -&gt; Parser st r ())
+-&gt; Int -&gt; Parser st r ()
+forall a. (a -&gt; a) -&gt; a
+</span><span class="hs-identifier hs-var">fix</span></span><span> </span><span class="hs-glyph">\</span><span id="local-6989586621680387840"><span class="annot"><span class="annottext">Int -&gt; Parser st r ()
+</span><a href="#local-6989586621680387840"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-glyph">\</span><span class="hs-glyph">case</span><span>
+</span><span id="line-258"></span><span>    </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">0</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="annottext">Parser st r ()
+forall (st :: ZeroBitType) r. Parser st r ()
+</span><a href="M.IO.TH.html#ws"><span class="hs-identifier hs-var">ws</span></a></span><span>
+</span><span id="line-259"></span><span>    </span><span id="local-6989586621680387841"><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621680387841"><span class="hs-identifier hs-var">n</span></a></span></span><span> </span><span class="hs-glyph">-&gt;</span><span>
+</span><span id="line-260"></span><span>      </span><span class="hs-special">$</span><span id="local-6989586621680387842"><span id="local-6989586621680387843"><span id="local-6989586621680387844"><span class="hs-special">(</span><span> </span><span class="annot"><span class="hs-identifier hs-type">switch</span></span><span>
+</span><span id="line-261"></span><span>           </span><span class="hs-special">[|</span><span>
+</span><span id="line-262"></span><span>             </span><span class="hs-keyword">case</span><span> </span><span class="annot"><span class="hs-identifier">_</span></span><span> </span><span class="hs-keyword">of</span><span>
+</span><span id="line-263"></span><span>               </span><span class="annot"><span class="hs-string">&quot;-}&quot;</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621680387840"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621680387841"><span class="hs-identifier hs-type">n</span></a></span><span> </span><span class="annot"><span class="hs-glyph hs-type">-</span></span><span> </span><span class="annot"><span class="hs-number">1</span></span><span class="hs-special">)</span><span>
+</span><span id="line-264"></span><span>               </span><span class="annot"><span class="hs-string">&quot;{-&quot;</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="#local-6989586621680387840"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621680387841"><span class="hs-identifier hs-type">n</span></a></span><span> </span><span class="annot"><span class="hs-operator hs-type">+</span></span><span> </span><span class="annot"><span class="hs-number">1</span></span><span class="hs-special">)</span><span>
+</span><span id="line-265"></span><span>               </span><span class="annot"><span class="hs-identifier">_</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">branch</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">anyWord8</span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621680387840"><span class="hs-identifier hs-type">f</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680387841"><span class="hs-identifier hs-type">n</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">pure</span></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-266"></span><span>             </span><span class="hs-special">|]</span><span>
+</span><span id="line-267"></span><span>       </span><span class="hs-special">)</span></span></span></span><span>
+</span><span id="line-268"></span><span>
+</span><span id="line-269"></span><span class="annot"><span class="hs-comment">-- | Skip whitespace and comments</span></span><span>
+</span><span id="line-270"></span><span id="local-6989586621680387852"><span id="local-6989586621680387853"><span class="annot"><a href="M.IO.TH.html#ws"><span class="hs-identifier hs-type">ws</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#Parser"><span class="hs-identifier hs-type">Parser</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680387852"><span class="hs-identifier hs-type">st</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680387853"><span class="hs-identifier hs-type">r</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span></span></span><span>
+</span><span id="line-271"></span><span id="ws"><span class="annot"><span class="annottext">ws :: forall (st :: ZeroBitType) r. Parser st r ()
+</span><a href="M.IO.TH.html#ws"><span class="hs-identifier hs-var hs-var">ws</span></a></span></span><span> </span><span class="hs-glyph">=</span><span>
+</span><span id="line-272"></span><span>  </span><span class="hs-special">$</span><span id="local-6989586621680387874"><span id="local-6989586621680387875"><span id="local-6989586621680387876"><span id="local-6989586621680387877"><span id="local-6989586621680387878"><span id="local-6989586621680387879"><span id="local-6989586621680387880"><span class="hs-special">(</span><span> </span><span class="annot"><span class="hs-identifier hs-type">switch</span></span><span>
+</span><span id="line-273"></span><span>       </span><span class="hs-special">[|</span><span>
+</span><span id="line-274"></span><span>         </span><span class="hs-keyword">case</span><span> </span><span class="annot"><span class="hs-identifier">_</span></span><span> </span><span class="hs-keyword">of</span><span>
+</span><span id="line-275"></span><span>           </span><span class="annot"><span class="hs-string">&quot; &quot;</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="M.IO.TH.html#ws"><span class="hs-identifier hs-type">ws</span></a></span><span>
+</span><span id="line-276"></span><span>           </span><span class="annot"><span class="hs-string">&quot;\n&quot;</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="M.IO.TH.html#ws"><span class="hs-identifier hs-type">ws</span></a></span><span>
+</span><span id="line-277"></span><span>           </span><span class="annot"><span class="hs-string">&quot;\t&quot;</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="M.IO.TH.html#ws"><span class="hs-identifier hs-type">ws</span></a></span><span>
+</span><span id="line-278"></span><span>           </span><span class="annot"><span class="hs-string">&quot;\r&quot;</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="M.IO.TH.html#ws"><span class="hs-identifier hs-type">ws</span></a></span><span>
+</span><span id="line-279"></span><span>           </span><span class="annot"><span class="hs-string">&quot;--&quot;</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="M.IO.TH.html#linecomment"><span class="hs-identifier hs-type">linecomment</span></a></span><span>
+</span><span id="line-280"></span><span>           </span><span class="annot"><span class="hs-string">&quot;{-&quot;</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="M.IO.TH.html#multilinecomment"><span class="hs-identifier hs-type">multilinecomment</span></a></span><span>
+</span><span id="line-281"></span><span>           </span><span class="annot"><span class="hs-identifier">_</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">pure</span></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span><span>
+</span><span id="line-282"></span><span>         </span><span class="hs-special">|]</span><span>
+</span><span id="line-283"></span><span>   </span><span class="hs-special">)</span></span></span></span></span></span></span></span><span>
+</span><span id="line-284"></span><span>
+</span><span id="line-285"></span><span class="annot"><span class="hs-comment">-- | Skip to end of current line</span></span><span>
+</span><span id="line-286"></span><span id="local-6989586621680387884"><span id="local-6989586621680387885"><span class="annot"><a href="M.IO.TH.html#skipline"><span class="hs-identifier hs-type">skipline</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#Parser"><span class="hs-identifier hs-type">Parser</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680387884"><span class="hs-identifier hs-type">st</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680387885"><span class="hs-identifier hs-type">r</span></a></span><span> </span><span class="hs-special">(</span><span class="hs-special">)</span></span></span><span>
+</span><span id="line-287"></span><span id="skipline"><span class="annot"><span class="annottext">skipline :: forall (st :: ZeroBitType) r. Parser st r ()
+</span><a href="M.IO.TH.html#skipline"><span class="hs-identifier hs-var hs-var">skipline</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">ParserT st r ParseError Word8
+-&gt; ParserT st r ParseError () -&gt; ParserT st r ParseError ()
+forall (m :: * -&gt; *) a end. Alternative m =&gt; m a -&gt; m end -&gt; m end
+</span><span class="hs-identifier hs-var">skipManyTill</span></span><span> </span><span class="annot"><span class="annottext">ParserT st r ParseError Word8
+forall (st :: ZeroBitType) r e. ParserT st r e Word8
+</span><span class="hs-identifier hs-var">anyWord8</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">ParserT st r ParseError ()
+forall (st :: ZeroBitType) r e. ParserT st r e ()
+</span><span class="hs-identifier hs-var">eof</span></span><span> </span><span class="annot"><span class="annottext">ParserT st r ParseError ()
+-&gt; ParserT st r ParseError () -&gt; ParserT st r ParseError ()
+forall (st :: ZeroBitType) r e a.
+ParserT st r e a -&gt; ParserT st r e a -&gt; ParserT st r e a
+</span><span class="hs-operator hs-var">&lt;|&gt;</span></span><span> </span><span class="annot"><span class="annottext">(Char -&gt; Bool) -&gt; ParserT st r ParseError ()
+forall (st :: ZeroBitType) r e. (Char -&gt; Bool) -&gt; ParserT st r e ()
+</span><span class="hs-identifier hs-var">skipSatisfyAscii</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Char -&gt; Char -&gt; Bool
+forall a. Eq a =&gt; a -&gt; a -&gt; Bool
+</span><span class="hs-operator hs-var">==</span></span><span> </span><span class="annot"><span class="annottext">Char
+</span><span class="hs-char">'\n'</span></span><span class="hs-special">)</span><span class="hs-special">)</span><span>
+</span><span id="line-288"></span><span>
+</span><span id="line-289"></span><span class="hs-comment">-- | Parse a single packet definition line</span><span>
+</span><span id="line-290"></span><span class="hs-comment">-- Format: &lt;name&gt;:&lt;recv code&gt;:&lt;send code&gt;</span><span>
+</span><span id="line-291"></span><span id="local-6989586621680387385"><span id="local-6989586621680387386"><span class="annot"><a href="M.IO.TH.html#line"><span class="hs-identifier hs-type">line</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#Parser"><span class="hs-identifier hs-type">Parser</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680387385"><span class="hs-identifier hs-type">st</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680387386"><span class="hs-identifier hs-type">r</span></a></span><span> </span><span class="annot"><a href="M.IO.TH.html#S"><span class="hs-identifier hs-type">S</span></a></span></span></span><span>
+</span><span id="line-292"></span><span id="line"><span class="annot"><span class="annottext">line :: forall (st :: ZeroBitType) r. Parser st r S
+</span><a href="M.IO.TH.html#line"><span class="hs-identifier hs-var hs-var">line</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-293"></span><span>  </span><span id="local-6989586621680387902"><span class="annot"><a href="#local-6989586621680387902"><span class="hs-identifier hs-var">sna</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">Parser st r ()
+forall (st :: ZeroBitType) r. Parser st r ()
+</span><a href="M.IO.TH.html#ws"><span class="hs-identifier hs-var">ws</span></a></span><span> </span><span class="annot"><span class="annottext">Parser st r ()
+-&gt; ParserT st r ParseError [Char] -&gt; ParserT st r ParseError [Char]
+forall a b.
+ParserT st r ParseError a
+-&gt; ParserT st r ParseError b -&gt; ParserT st r ParseError b
+forall (f :: * -&gt; *) a b. Applicative f =&gt; f a -&gt; f b -&gt; f b
+</span><span class="hs-operator hs-var">*&gt;</span></span><span> </span><span class="annot"><span class="annottext">ParserT st r ParseError [Char]
+forall (st :: ZeroBitType) r. Parser st r [Char]
+</span><a href="M.IO.TH.html#ident%27"><span class="hs-identifier hs-var">ident'</span></a></span><span> </span><span class="annot"><span class="annottext">ParserT st r ParseError [Char]
+-&gt; Parser st r () -&gt; ParserT st r ParseError [Char]
+forall a b.
+ParserT st r ParseError a
+-&gt; ParserT st r ParseError b -&gt; ParserT st r ParseError a
+forall (f :: * -&gt; *) a b. Applicative f =&gt; f a -&gt; f b -&gt; f a
+</span><span class="hs-operator hs-var">&lt;*</span></span><span> </span><span class="annot"><span class="annottext">Parser st r ()
+forall (st :: ZeroBitType) r. Parser st r ()
+</span><a href="M.IO.TH.html#colon%27"><span class="hs-identifier hs-var">colon'</span></a></span><span>
+</span><span id="line-294"></span><span>  </span><span id="local-6989586621680387904"><span class="annot"><a href="#local-6989586621680387904"><span class="hs-identifier hs-var">recv</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><a href="M.IO.TH.html#ws"><span class="hs-identifier hs-type">ws</span></a></span><span> </span><span class="annot"><span class="hs-operator hs-type">*&gt;</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">optional</span></span><span> </span><span class="annot"><a href="M.IO.TH.html#hexnumber"><span class="hs-identifier hs-type">hexnumber</span></a></span><span> </span><span class="annot"><span class="hs-operator hs-type">&lt;*</span></span><span> </span><span class="annot"><a href="M.IO.TH.html#colon%27"><span class="hs-identifier hs-type">colon'</span></a></span><span>
+</span><span id="line-295"></span><span>  </span><span id="local-6989586621680387906"><span class="annot"><a href="#local-6989586621680387906"><span class="hs-identifier hs-var">send</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><a href="M.IO.TH.html#ws"><span class="hs-identifier hs-type">ws</span></a></span><span> </span><span class="annot"><span class="hs-operator hs-type">*&gt;</span></span><span> </span><span class="annot"><span class="hs-identifier hs-type">optional</span></span><span> </span><span class="annot"><a href="M.IO.TH.html#hexnumber"><span class="hs-identifier hs-type">hexnumber</span></a></span><span> </span><span class="annot"><span class="hs-operator hs-type">&lt;*</span></span><span> </span><span class="annot"><a href="M.IO.TH.html#skipline"><span class="hs-identifier hs-type">skipline</span></a></span><span>
+</span><span id="line-296"></span><span>  </span><span class="annot"><span class="hs-identifier hs-type">pure</span></span><span> </span><span class="annot"><a href="M.IO.TH.html#S"><span class="hs-identifier hs-type">S</span></a></span><span> </span><span class="hs-special">{</span><span class="annot"><a href="M.IO.TH.html#sna"><span class="hs-glyph hs-var hs-var hs-var hs-type hs-type hs-type">..</span></a></span><span class="hs-special">}</span><span>
+</span><span id="line-297"></span><span>
+</span><span id="line-298"></span><span class="hs-comment">-- | Parse the complete grammar document</span><span>
+</span><span id="line-299"></span><span class="hs-comment">-- First line contains state name</span><span>
+</span><span id="line-300"></span><span class="hs-comment">-- Remaining lines contain packet definitions</span><span>
+</span><span id="line-301"></span><span id="local-6989586621680387198"><span id="local-6989586621680387199"><span class="annot"><a href="M.IO.TH.html#doc"><span class="hs-identifier hs-type">doc</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="M.Pack.Internal.Types.html#Parser"><span class="hs-identifier hs-type">Parser</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680387198"><span class="hs-identifier hs-type">st</span></a></span><span> </span><span class="annot"><a href="#local-6989586621680387199"><span class="hs-identifier hs-type">r</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">Name</span></span><span class="hs-special">,</span><span> </span><span class="hs-special">[</span><span class="annot"><a href="M.IO.TH.html#S"><span class="hs-identifier hs-type">S</span></a></span><span class="hs-special">]</span><span class="hs-special">)</span></span></span><span>
+</span><span id="line-302"></span><span id="doc"><span class="annot"><span class="annottext">doc :: forall (st :: ZeroBitType) r. Parser st r (Name, [S])
+</span><a href="M.IO.TH.html#doc"><span class="hs-identifier hs-var hs-var">doc</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-303"></span><span>  </span><span class="hs-comment">-- name of the pair</span><span>
+</span><span id="line-304"></span><span>  </span><span id="local-6989586621680387914"><span class="annot"><a href="#local-6989586621680387914"><span class="hs-identifier hs-var">n</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">[Char] -&gt; Name
+</span><span class="hs-identifier hs-var">mkName</span></span><span> </span><span class="annot"><span class="annottext">([Char] -&gt; Name)
+-&gt; ParserT st r ParseError [Char] -&gt; ParserT st r ParseError Name
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-operator hs-var">&lt;$&gt;</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Parser st r ()
+forall (st :: ZeroBitType) r. Parser st r ()
+</span><a href="M.IO.TH.html#ws"><span class="hs-identifier hs-var">ws</span></a></span><span> </span><span class="annot"><span class="annottext">Parser st r ()
+-&gt; ParserT st r ParseError [Char] -&gt; ParserT st r ParseError [Char]
+forall a b.
+ParserT st r ParseError a
+-&gt; ParserT st r ParseError b -&gt; ParserT st r ParseError b
+forall (f :: * -&gt; *) a b. Applicative f =&gt; f a -&gt; f b -&gt; f b
+</span><span class="hs-operator hs-var">*&gt;</span></span><span> </span><span class="annot"><span class="annottext">ParserT st r ParseError [Char]
+forall (st :: ZeroBitType) r. Parser st r [Char]
+</span><a href="M.IO.TH.html#ident%27"><span class="hs-identifier hs-var">ident'</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-305"></span><span>  </span><span class="hs-comment">-- body</span><span>
+</span><span id="line-306"></span><span>  </span><span id="local-6989586621680387916"><span class="annot"><a href="#local-6989586621680387916"><span class="hs-identifier hs-var">m</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="hs-identifier hs-type">manyTill</span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="M.IO.TH.html#line"><span class="hs-identifier hs-type">line</span></a></span><span> </span><span class="annot"><span class="hs-operator hs-type">&lt;*</span></span><span> </span><span class="annot"><a href="M.IO.TH.html#ws"><span class="hs-identifier hs-type">ws</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="hs-identifier hs-type">eof</span></span><span>
+</span><span id="line-307"></span><span>  </span><span class="annot"><span class="hs-identifier hs-type">pure</span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="#local-6989586621680387914"><span class="hs-identifier hs-type">n</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><a href="#local-6989586621680387916"><span class="hs-identifier hs-type">m</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-308"></span></pre></body></html>

@@ -1,0 +1,33 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span class="hs-pragma">{-# OPTIONS_GHC -Wno-missing-export-lists #-}</span><span>
+</span><span id="line-2"></span><span>
+</span><span id="line-3"></span><span class="hs-comment">-- |</span><span>
+</span><span id="line-4"></span><span class="hs-comment">-- Module: M.V769.H</span><span>
+</span><span id="line-5"></span><span class="hs-comment">-- Description: Protocol handshake packets (AI-generated)</span><span>
+</span><span id="line-6"></span><span class="hs-comment">-- Copyright: (c) axionbuster, 2025</span><span>
+</span><span id="line-7"></span><span class="hs-comment">-- License: BSD-3-Clause</span><span>
+</span><span id="line-8"></span><span class="hs-comment">--</span><span>
+</span><span id="line-9"></span><span class="hs-comment">-- Implements packet structures for the initial handshake phase of protocol</span><span>
+</span><span id="line-10"></span><span class="hs-comment">-- version 769, where clients establish basic connection parameters including</span><span>
+</span><span id="line-11"></span><span class="hs-comment">-- protocol version and intended next state.</span><span>
+</span><span id="line-12"></span><span class="hs-keyword">module</span><span> </span><span class="annot"><a href="M.V769.H.html"><span class="hs-identifier">M.V769.H</span></a></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-13"></span><span>
+</span><span id="line-14"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Control.DeepSeq</span></span><span>
+</span><span id="line-15"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Data</span></span><span>
+</span><span id="line-16"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Int</span></span><span>
+</span><span id="line-17"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Text</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">Text</span></span><span class="hs-special">)</span><span>
+</span><span id="line-18"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><span class="hs-identifier">Data.Word</span></span><span>
+</span><span id="line-19"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="M.LEB.html"><span class="hs-identifier">M.LEB</span></a></span><span>
+</span><span id="line-20"></span><span class="hs-keyword">import</span><span> </span><span class="annot"><a href="M.PkMacro.html"><span class="hs-identifier">M.PkMacro</span></a></span><span>
+</span><span id="line-21"></span><span>
+</span><span id="line-22"></span><span class="hs-identifier">setdefaultderives</span><span>
+</span><span id="line-23"></span><span class="hs-identifier">addproperderives</span><span> </span><span class="hs-special">[</span><span class="hs-special">''</span><span class="hs-identifier">NFData</span><span class="hs-special">,</span><span> </span><span class="hs-special">''</span><span class="hs-identifier">Typeable</span><span class="hs-special">,</span><span> </span><span class="hs-special">''</span><span class="hs-identifier">Show</span><span class="hs-special">,</span><span> </span><span class="hs-special">''</span><span class="hs-identifier">Eq</span><span class="hs-special">]</span><span>
+</span><span id="line-24"></span><span>
+</span><span id="line-25"></span><span id="HandshakePacket"><span id="HandshakePacket__"><span id="local-6989586621680395154"><span id="local-6989586621680395156"><span id="local-6989586621680395158"><span id="local-6989586621680395166"><span id="local-6989586621680395173"><span id="local-6989586621680395175"><span id="local-6989586621680395177"><span id="local-6989586621680395185"><span id="local-6989586621680395196"><span id="local-6989586621680395200"><span id="local-6989586621680395203"><span id="local-6989586621680395212"><span id="local-6989586621680395216"><span id="local-6989586621680395227"><span id="HandshakePacket__"><span id="nextstate__"><span id="serverport__"><span id="serveraddress__"><span id="protocolversion__"><span id="HandshakePacket"><span id="nextstate"><span id="serverport"><span id="serveraddress"><span id="protocolversion"></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span></span><span class="">[pkmacro|
+data HandshakePacket {
+  protocolversion :: Int32 via VarInt,
+  serveraddress :: Text,
+  serverport :: Word16,
+  nextstate :: Int32 via VarInt,
+}
+  |]</span><span>
+</span><span id="line-33"></span></pre></body></html>
