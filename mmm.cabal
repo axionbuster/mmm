@@ -31,6 +31,8 @@ library
       M.Chunk.Net
       M.Collision
       M.Collision.Effectful
+      M.Collision.Effectful2
+      M.Collision.Internal.Effects
       M.Collision.Internal.Face
       M.Collision.Internal.March
       M.Collision.Internal.March2

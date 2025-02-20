@@ -1,24 +1,5 @@
--- |
--- Module: M.Collision.Effectful
--- Description: Effectful collision detection and resolution system
--- Copyright: (c) axionbuster, 2025
--- License: BSD-3-Clause
---
--- Provides the core collision detection and resolution system with effects.
--- Handles block-based collision detection, movement resolution, and ground contact states.
---
--- = Parts
---
--- 1. The 'GetBlock' effect
--- 2. The 'Resolve' data type and 'resolve' function (the main part)
--- 3. The 'NewlyTouchingGround' data type and 'updonground' function
---
--- = Usage
---
--- 1. Use 'getblock' to get a block's shape at integer coordinates
--- 2. Use 'resolve' to detect and resolve collision
--- 3. Use 'updonground' to update the on-ground status (from \#2)
-module M.Collision.Effectful
+-- in benchmark
+module M.Collision.Effectful2
   ( GetBlock (..),
     getblock,
     Resolve (..),
